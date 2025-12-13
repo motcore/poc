@@ -1,4 +1,4 @@
-// MASTER Arduino with MCUFRIEND touchscreen
+// CONTROLLER Arduino with MCUFRIEND touchscreen
 // Controls: 1 stepper motor + 4 servos
 
 #include <MCUFRIEND_kbv.h>

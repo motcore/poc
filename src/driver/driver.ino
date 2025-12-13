@@ -1,4 +1,4 @@
-// SLAVE Arduino with stepper motor + 4 servos
+// DRIVER Arduino with stepper motor + 4 servos
 
 #include <AccelStepper.h>
 #include <Servo.h>
