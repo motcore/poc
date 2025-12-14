@@ -34,7 +34,7 @@ MCUFRIEND_kbv tft;
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 // Servo positions
-#define POS_LEFT   65
+#define POS_LEFT   60
 #define POS_FREE   90
 #define POS_RIGHT  115
 
@@ -76,7 +76,7 @@ void loop() {
   pinMode(XM, OUTPUT);
 
   if (p.z > ts.pressureThreshhold) {
-    int x = map(p.x, TS_MINX, TS_MAXX, 0, SCREEN_W);
+    int x = map(p.x, TS_MINX, TS_MAXX, SCREEN_W, 0);
     int y = map(p.y, TS_MINY, TS_MAXY, 0, SCREEN_H);
 
     processTouch(x, y);
@@ -138,7 +138,7 @@ void drawServoRow(int servoNum, int y) {
   tft.setTextColor(WHITE);
   tft.setTextSize(1);
   tft.setCursor(50, y + 13);
-  tft.print("L 65");
+  tft.print("L 60");
 
   // Free button (90)
   tft.fillRect(105, y, BTN_SMALL_W, BTN_H, currentPos == POS_FREE ? ORANGE : CYAN);

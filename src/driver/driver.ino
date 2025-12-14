@@ -4,7 +4,8 @@
 #include <Servo.h>
 
 // Stepper motor setup (28BYJ-48 with ULN2003)
-AccelStepper stepper(AccelStepper::HALF4WIRE, 8, 10, 9, 11);
+// Pins: IN1=4, IN2=5, IN3=6, IN4=7
+AccelStepper stepper(AccelStepper::HALF4WIRE, 4, 6, 5, 7);
 
 // 4 Servo objects
 Servo servo1;
@@ -13,13 +14,13 @@ Servo servo3;
 Servo servo4;
 
 // Servo pins
-#define SERVO1_PIN 3
-#define SERVO2_PIN 5
-#define SERVO3_PIN 6
-#define SERVO4_PIN 7
+#define SERVO1_PIN 8
+#define SERVO2_PIN 9
+#define SERVO3_PIN 10
+#define SERVO4_PIN 11
 
 // Servo positions
-#define POS_LEFT   65
+#define POS_LEFT   60
 #define POS_FREE   90
 #define POS_RIGHT  115
 
@@ -32,7 +33,7 @@ bool stepperRunning = false;
 
 // Timing for smooth servo movement
 unsigned long lastServoUpdate = 0;
-#define SERVO_STEP_DELAY 15  // ms between 1-degree steps
+#define SERVO_STEP_DELAY 5  // ms between 1-degree steps
 
 void setup() {
   Serial.begin(9600);
@@ -57,12 +58,9 @@ void setup() {
 }
 
 void loop() {
-  // Always run stepper (handles acceleration/deceleration)
-  stepper.run();
-
-  // Keep stepper running continuously when active
-  if (stepperRunning && stepper.distanceToGo() == 0) {
-    stepper.move(2048); // Queue another revolution
+  // Run stepper continuously when active
+  if (stepperRunning) {
+    stepper.runSpeed();
   }
 
   // Process serial commands
@@ -80,12 +78,11 @@ void processCommand(char cmd) {
     // Stepper commands
     case 'G': // GO - start stepper
       stepperRunning = true;
-      stepper.move(2048); // Start with one revolution
+      stepper.setSpeed(500); // Set continuous speed
       break;
 
-    case 'S': // STOP - stop stepper with ramp
+    case 'S': // STOP - stop stepper immediately
       stepperRunning = false;
-      stepper.stop(); // Decelerates to 0
       break;
 
     // Servo 1 commands
