@@ -1,0 +1,196 @@
+# Central Motor Mount for 28BYJ-48 Stepper
+# Integrated base design with direct shaft coupling
+
+import FreeCAD as App
+import Part
+import math
+
+# ============ 28BYJ-48 MOTOR DIMENSIONS ============
+MOTOR_BODY_DIA = 28.0        # Motor body diameter
+MOTOR_BODY_HEIGHT = 19.0     # Motor body height
+MOTOR_SHAFT_DIA = 5.0        # Shaft diameter
+MOTOR_SHAFT_LENGTH = 6.0     # Shaft extension from body
+MOTOR_MOUNT_HOLE_DIST = 35.0 # Distance between mounting holes
+MOTOR_MOUNT_HOLE_DIA = 4.0   # Mounting screw hole diameter
+MOTOR_TAB_WIDTH = 7.0        # Width of mounting tabs
+MOTOR_TAB_HEIGHT = 1.0       # Thickness of mounting tabs
+
+# ============ MOUNT DESIGN PARAMETERS ============
+BASE_SIZE = 60.0             # Square base size
+BASE_HEIGHT = 5.0            # Base thickness
+WALL_THICKNESS = 3.0         # Walls around motor
+MOUNT_HEIGHT = 25.0          # Total mount height (base + walls)
+TOLERANCE = 0.3              # Printing tolerance
+
+# ============ VENTILATION PARAMETERS ============
+VENT_SLOT_WIDTH = 3.0        # Width of each vent slot
+VENT_SLOT_HEIGHT = 12.0      # Height of vent slots
+VENT_SLOT_COUNT = 8          # Number of vent slots around perimeter
+VENT_SLOT_Z_OFFSET = 8.0     # Distance from base to bottom of vents
+
+# ============ CREATE DOCUMENT ============
+doc = App.newDocument("MotorMount")
+
+# ============ BASE PLATE ============
+base = Part.makeBox(BASE_SIZE, BASE_SIZE, BASE_HEIGHT)
+# Center the base at origin
+base.translate(App.Vector(-BASE_SIZE/2, -BASE_SIZE/2, 0))
+
+# ============ MOTOR CAVITY ============
+# Main cylindrical cavity for motor body
+motor_cavity_dia = MOTOR_BODY_DIA + TOLERANCE * 2
+motor_cavity = Part.makeCylinder(
+    motor_cavity_dia / 2,
+    MOTOR_BODY_HEIGHT + BASE_HEIGHT,
+    App.Vector(0, 0, 0),
+    App.Vector(0, 0, 1)
+)
+
+# ============ SHAFT HOLE ============
+# Hole through base for shaft to pass through
+shaft_hole_dia = MOTOR_SHAFT_DIA + TOLERANCE * 2 + 2  # Extra clearance
+shaft_hole = Part.makeCylinder(
+    shaft_hole_dia / 2,
+    BASE_HEIGHT + 2,
+    App.Vector(0, 0, -1),
+    App.Vector(0, 0, 1)
+)
+
+# ============ MOUNTING TAB SLOTS ============
+# Slots for the motor's mounting tabs
+tab_slot_length = MOTOR_TAB_WIDTH + TOLERANCE * 2
+tab_slot_width = MOTOR_TAB_HEIGHT + TOLERANCE * 2 + 1
+tab_slot_height = 5.0
+
+# Tab slot 1 (positive X side)
+tab_slot_1 = Part.makeBox(
+    tab_slot_width,
+    tab_slot_length,
+    tab_slot_height
+)
+tab_slot_1.translate(App.Vector(
+    MOTOR_BODY_DIA/2 - 1,
+    -tab_slot_length/2,
+    BASE_HEIGHT + MOTOR_BODY_HEIGHT - tab_slot_height
+))
+
+# Tab slot 2 (negative X side)
+tab_slot_2 = Part.makeBox(
+    tab_slot_width,
+    tab_slot_length,
+    tab_slot_height
+)
+tab_slot_2.translate(App.Vector(
+    -MOTOR_BODY_DIA/2 - tab_slot_width + 1,
+    -tab_slot_length/2,
+    BASE_HEIGHT + MOTOR_BODY_HEIGHT - tab_slot_height
+))
+
+# ============ OUTER WALLS ============
+# Cylindrical wall around motor
+outer_wall_dia = MOTOR_BODY_DIA + WALL_THICKNESS * 2 + TOLERANCE * 2
+outer_wall = Part.makeCylinder(
+    outer_wall_dia / 2,
+    MOUNT_HEIGHT,
+    App.Vector(0, 0, 0),
+    App.Vector(0, 0, 1)
+)
+
+# ============ MOUNTING SCREW HOLES (for motor tabs) ============
+screw_hole_1 = Part.makeCylinder(
+    MOTOR_MOUNT_HOLE_DIA / 2,
+    MOUNT_HEIGHT + 2,
+    App.Vector(MOTOR_MOUNT_HOLE_DIST/2, 0, -1),
+    App.Vector(0, 0, 1)
+)
+
+screw_hole_2 = Part.makeCylinder(
+    MOTOR_MOUNT_HOLE_DIA / 2,
+    MOUNT_HEIGHT + 2,
+    App.Vector(-MOTOR_MOUNT_HOLE_DIST/2, 0, -1),
+    App.Vector(0, 0, 1)
+)
+
+# ============ CORNER MOUNTING HOLES (for base attachment) ============
+corner_hole_dia = 4.0
+corner_offset = BASE_SIZE/2 - 8
+
+corner_holes = []
+for x_sign in [-1, 1]:
+    for y_sign in [-1, 1]:
+        hole = Part.makeCylinder(
+            corner_hole_dia / 2,
+            BASE_HEIGHT + 2,
+            App.Vector(x_sign * corner_offset, y_sign * corner_offset, -1),
+            App.Vector(0, 0, 1)
+        )
+        corner_holes.append(hole)
+
+# ============ VENTILATION SLOTS ============
+# Radial slots around the cylindrical wall for airflow
+vent_slots = []
+wall_radius = outer_wall_dia / 2
+
+for i in range(VENT_SLOT_COUNT):
+    angle = (2 * math.pi * i) / VENT_SLOT_COUNT
+
+    # Create a box for the vent slot
+    vent = Part.makeBox(
+        WALL_THICKNESS + 4,  # Depth (through wall)
+        VENT_SLOT_WIDTH,
+        VENT_SLOT_HEIGHT
+    )
+
+    # Position at wall radius
+    vent.translate(App.Vector(
+        -WALL_THICKNESS/2 - 2,
+        -VENT_SLOT_WIDTH/2,
+        VENT_SLOT_Z_OFFSET
+    ))
+
+    # Move to wall edge
+    vent.translate(App.Vector(wall_radius - 1, 0, 0))
+
+    # Rotate around Z axis
+    vent.rotate(App.Vector(0, 0, 0), App.Vector(0, 0, 1), math.degrees(angle))
+
+    vent_slots.append(vent)
+
+# ============ COMBINE ALL PARTS ============
+# Start with base + outer wall
+mount = base.fuse(outer_wall)
+
+# Subtract motor cavity
+mount = mount.cut(motor_cavity)
+
+# Subtract shaft hole
+mount = mount.cut(shaft_hole)
+
+# Subtract tab slots
+mount = mount.cut(tab_slot_1)
+mount = mount.cut(tab_slot_2)
+
+# Subtract motor mounting screw holes
+mount = mount.cut(screw_hole_1)
+mount = mount.cut(screw_hole_2)
+
+# Subtract corner mounting holes
+for hole in corner_holes:
+    mount = mount.cut(hole)
+
+# Subtract ventilation slots
+for vent in vent_slots:
+    mount = mount.cut(vent)
+
+# ============ DISPLAY RESULT ============
+Part.show(mount, "CentralMotorMount")
+
+# Recompute
+App.ActiveDocument.recompute()
+
+print("Central Motor Mount created!")
+print(f"  Base: {BASE_SIZE}x{BASE_SIZE}x{BASE_HEIGHT}mm")
+print(f"  Total height: {MOUNT_HEIGHT}mm")
+print(f"  Motor cavity: {motor_cavity_dia}mm diameter")
+print(f"  Shaft clearance hole: {shaft_hole_dia}mm diameter")
+print(f"  Ventilation: {VENT_SLOT_COUNT} slots ({VENT_SLOT_WIDTH}x{VENT_SLOT_HEIGHT}mm)")
