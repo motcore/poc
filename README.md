@@ -321,7 +321,7 @@ You are free to share and adapt the documentation, even commercially, as long as
 
 ## 🙏 Acknowledgments
 
-**Original concept and design:** Javier [Tu Apellido] (2025)
+**Original concept and design:** Javier Asensio Montiel (2025)
 
 **Inspired by:**
 - Steve McGeer's work on passive dynamic walking
@@ -392,7 +392,7 @@ If Motcore is useful or interesting to you:
 ---
 
 **Motcore** - Making multi-axis actuation accessible through elegant design  
-© 2025 Javier [Tu Apellido] | Open Source Hardware | CERN-OHL-P-2.0
+© 2025 Javier Asensio Montiel | Open Source Hardware | CERN-OHL-P-2.0
 
 ---
 
