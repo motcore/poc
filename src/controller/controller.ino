@@ -34,9 +34,9 @@ MCUFRIEND_kbv tft;
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 // Servo positions
-#define POS_LEFT   60
+#define POS_LEFT   0
 #define POS_FREE   90
-#define POS_RIGHT  115
+#define POS_RIGHT  180
 
 // UI Layout constants
 #define SCREEN_W 320
@@ -133,24 +133,24 @@ void drawServoRow(int servoNum, int y) {
 
   int currentPos = servoPos[servoNum];
 
-  // Left button (65)
+  // Left button (0)
   tft.fillRect(35, y, BTN_SMALL_W, BTN_H, currentPos == POS_LEFT ? ORANGE : BLUE);
   tft.setTextColor(WHITE);
   tft.setTextSize(1);
-  tft.setCursor(50, y + 13);
-  tft.print("L 60");
+  tft.setCursor(55, y + 13);
+  tft.print("0");
 
   // Free button (90)
   tft.fillRect(105, y, BTN_SMALL_W, BTN_H, currentPos == POS_FREE ? ORANGE : CYAN);
   tft.setTextColor(BLACK);
-  tft.setCursor(117, y + 13);
-  tft.print("F 90");
+  tft.setCursor(122, y + 13);
+  tft.print("90");
 
-  // Right button (115)
+  // Right button (180)
   tft.fillRect(175, y, BTN_SMALL_W + 10, BTN_H, currentPos == POS_RIGHT ? ORANGE : BLUE);
   tft.setTextColor(WHITE);
-  tft.setCursor(185, y + 13);
-  tft.print("R 115");
+  tft.setCursor(192, y + 13);
+  tft.print("180");
 
   // Current position display
   tft.fillRect(255, y, 60, BTN_H, BLACK);

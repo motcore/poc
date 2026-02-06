@@ -20,20 +20,12 @@ Servo servo4;
 #define SERVO4_PIN 11
 
 // Servo positions
-#define POS_LEFT   60
+#define POS_LEFT   0
 #define POS_FREE   90
-#define POS_RIGHT  115
-
-// Target positions for smooth movement
-int targetPos[4] = {POS_FREE, POS_FREE, POS_FREE, POS_FREE};
-int currentPos[4] = {POS_FREE, POS_FREE, POS_FREE, POS_FREE};
+#define POS_RIGHT  180
 
 // Stepper state
 bool stepperRunning = false;
-
-// Timing for smooth servo movement
-unsigned long lastServoUpdate = 0;
-#define SERVO_STEP_DELAY 5  // ms between 1-degree steps
 
 void setup() {
   Serial.begin(9600);
@@ -42,7 +34,7 @@ void setup() {
   stepper.setMaxSpeed(1000);
   stepper.setAcceleration(200);
 
-  // Initialize servos
+  // Attach servos
   servo1.attach(SERVO1_PIN);
   servo2.attach(SERVO2_PIN);
   servo3.attach(SERVO3_PIN);
@@ -54,7 +46,7 @@ void setup() {
   servo3.write(POS_FREE);
   servo4.write(POS_FREE);
 
-  delay(1000); // Give servos time to reach position
+  delay(500);
 }
 
 void loop() {
@@ -68,9 +60,6 @@ void loop() {
     char cmd = Serial.read();
     processCommand(cmd);
   }
-
-  // Smooth servo movement
-  updateServos();
 }
 
 void processCommand(char cmd) {
@@ -78,7 +67,7 @@ void processCommand(char cmd) {
     // Stepper commands
     case 'G': // GO - start stepper
       stepperRunning = true;
-      stepper.setSpeed(500); // Set continuous speed
+      stepper.setSpeed(500);
       break;
 
     case 'S': // STOP - stop stepper immediately
@@ -86,48 +75,23 @@ void processCommand(char cmd) {
       break;
 
     // Servo 1 commands
-    case '1': targetPos[0] = POS_LEFT;  break;
-    case '2': targetPos[0] = POS_FREE;  break;
-    case '3': targetPos[0] = POS_RIGHT; break;
+    case '1': servo1.write(POS_LEFT);  break;
+    case '2': servo1.write(POS_FREE);  break;
+    case '3': servo1.write(POS_RIGHT); break;
 
     // Servo 2 commands
-    case '4': targetPos[1] = POS_LEFT;  break;
-    case '5': targetPos[1] = POS_FREE;  break;
-    case '6': targetPos[1] = POS_RIGHT; break;
+    case '4': servo2.write(POS_LEFT);  break;
+    case '5': servo2.write(POS_FREE);  break;
+    case '6': servo2.write(POS_RIGHT); break;
 
     // Servo 3 commands
-    case '7': targetPos[2] = POS_LEFT;  break;
-    case '8': targetPos[2] = POS_FREE;  break;
-    case '9': targetPos[2] = POS_RIGHT; break;
+    case '7': servo3.write(POS_LEFT);  break;
+    case '8': servo3.write(POS_FREE);  break;
+    case '9': servo3.write(POS_RIGHT); break;
 
     // Servo 4 commands
-    case 'a': targetPos[3] = POS_LEFT;  break;
-    case 'b': targetPos[3] = POS_FREE;  break;
-    case 'c': targetPos[3] = POS_RIGHT; break;
-  }
-}
-
-void updateServos() {
-  // Only update every SERVO_STEP_DELAY ms
-  if (millis() - lastServoUpdate < SERVO_STEP_DELAY) return;
-  lastServoUpdate = millis();
-
-  // Move each servo one step toward target
-  for (int i = 0; i < 4; i++) {
-    if (currentPos[i] != targetPos[i]) {
-      if (currentPos[i] < targetPos[i]) {
-        currentPos[i]++;
-      } else {
-        currentPos[i]--;
-      }
-
-      // Write to appropriate servo
-      switch (i) {
-        case 0: servo1.write(currentPos[0]); break;
-        case 1: servo2.write(currentPos[1]); break;
-        case 2: servo3.write(currentPos[2]); break;
-        case 3: servo4.write(currentPos[3]); break;
-      }
-    }
+    case 'a': servo4.write(POS_LEFT);  break;
+    case 'b': servo4.write(POS_FREE);  break;
+    case 'c': servo4.write(POS_RIGHT); break;
   }
 }
