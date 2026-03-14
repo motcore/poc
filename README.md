@@ -180,8 +180,8 @@ This isn't just about cost - it's about design elegance.
 
 ```bash
 # Clone the repository
-git clone https://github.com/motcore/arduino-cube.git
-cd arduino-cube
+git clone https://github.com/Motcore/poc.git
+cd poc
 
 # Open in PlatformIO
 # OR open software/controller/ and software/driver/ in Arduino IDE
@@ -383,11 +383,11 @@ If Motcore is useful or interesting to you:
 
 ## 📊 Project Stats
 
-![GitHub stars](https://img.shields.io/github/stars/motcore/arduino-cube?style=social)
-![GitHub forks](https://img.shields.io/github/forks/motcore/arduino-cube?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/motcore/arduino-cube?style=social)
-![GitHub issues](https://img.shields.io/github/issues/motcore/arduino-cube)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/motcore/arduino-cube)
+![GitHub stars](https://img.shields.io/github/stars/Motcore/poc?style=social)
+![GitHub forks](https://img.shields.io/github/forks/Motcore/poc?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/Motcore/poc?style=social)
+![GitHub issues](https://img.shields.io/github/issues/Motcore/poc)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/Motcore/poc)
 
 ---
 
