@@ -1,97 +1,80 @@
-// DRIVER Arduino with stepper motor + 4 servos
-
+#include <IRremote.h>
 #include <AccelStepper.h>
 #include <Servo.h>
 
-// Stepper motor setup (28BYJ-48 with ULN2003)
-// Pins: IN1=4, IN2=5, IN3=6, IN4=7
+#define IR_PIN 2
+
 AccelStepper stepper(AccelStepper::HALF4WIRE, 4, 6, 5, 7);
 
-// 4 Servo objects
-Servo servo1;
-Servo servo2;
-Servo servo3;
-Servo servo4;
+Servo servo1, servo2, servo3, servo4;
 
-// Servo pins
 #define SERVO1_PIN 8
 #define SERVO2_PIN 9
 #define SERVO3_PIN 10
 #define SERVO4_PIN 11
 
-// Servo positions
-#define POS_LEFT   0
-#define POS_FREE   90
-#define POS_RIGHT  180
+#define POS_LEFT 0
+#define POS_FREE 90
+#define POS_RIGHT 180
 
-// Stepper state
 bool stepperRunning = false;
 
 void setup() {
   Serial.begin(9600);
+  IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
 
-  // Initialize stepper
   stepper.setMaxSpeed(1000);
   stepper.setAcceleration(200);
 
-  // Attach servos
   servo1.attach(SERVO1_PIN);
   servo2.attach(SERVO2_PIN);
   servo3.attach(SERVO3_PIN);
   servo4.attach(SERVO4_PIN);
 
-  // Set initial positions
   servo1.write(POS_FREE);
   servo2.write(POS_FREE);
   servo3.write(POS_FREE);
   servo4.write(POS_FREE);
 
   delay(500);
+  Serial.println("Motcore listo");
 }
 
 void loop() {
-  // Run stepper continuously when active
   if (stepperRunning) {
     stepper.runSpeed();
   }
 
-  // Process serial commands
-  if (Serial.available() > 0) {
-    char cmd = Serial.read();
-    processCommand(cmd);
+  if (IrReceiver.decode()) {
+    processIR(IrReceiver.decodedIRData.command);
+    IrReceiver.resume();
   }
 }
 
-void processCommand(char cmd) {
+void processIR(uint8_t cmd) {
   switch (cmd) {
-    // Stepper commands
-    case 'G': // GO - start stepper
-      stepperRunning = true;
-      stepper.setSpeed(500);
-      break;
+    // Stepper
+    case 0x1:  stepperRunning = true;  stepper.setSpeed(500); break; // Vol+
+    case 0x2:  stepperRunning = false;                         break; // Func/Stop
 
-    case 'S': // STOP - stop stepper immediately
-      stepperRunning = false;
-      break;
+    // Servo 1
+    case 0x10: servo1.write(POS_LEFT);  break; // 1
+    case 0x11: servo1.write(POS_FREE);  break; // 2
+    case 0x12: servo1.write(POS_RIGHT); break; // 3
 
-    // Servo 1 commands
-    case '1': servo1.write(POS_LEFT);  break;
-    case '2': servo1.write(POS_FREE);  break;
-    case '3': servo1.write(POS_RIGHT); break;
+    // Servo 2
+    case 0x14: servo2.write(POS_LEFT);  break; // 4
+    case 0x15: servo2.write(POS_FREE);  break; // 5
+    case 0x16: servo2.write(POS_RIGHT); break; // 6
 
-    // Servo 2 commands
-    case '4': servo2.write(POS_LEFT);  break;
-    case '5': servo2.write(POS_FREE);  break;
-    case '6': servo2.write(POS_RIGHT); break;
+    // Servo 3
+    case 0x18: servo3.write(POS_LEFT);  break; // 7
+    case 0x19: servo3.write(POS_FREE);  break; // 8
+    case 0x1A: servo3.write(POS_RIGHT); break; // 9
 
-    // Servo 3 commands
-    case '7': servo3.write(POS_LEFT);  break;
-    case '8': servo3.write(POS_FREE);  break;
-    case '9': servo3.write(POS_RIGHT); break;
-
-    // Servo 4 commands
-    case 'a': servo4.write(POS_LEFT);  break;
-    case 'b': servo4.write(POS_FREE);  break;
-    case 'c': servo4.write(POS_RIGHT); break;
+    // Servo 4
+    case 0xA: servo4.write(POS_LEFT);  break; // Arriba
+    case 0x9: servo4.write(POS_FREE);  break; // Vol-
+    case 0x8: servo4.write(POS_RIGHT); break; // Abajo
   }
 }
