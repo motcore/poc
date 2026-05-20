@@ -25,14 +25,13 @@ bearing_id  =   8.0   # mm — 608 bearing inner diameter
 bearing_w   =   7.0   # mm — 608 bearing width
 plate_thick =   8.0   # mm — top/bottom plate thickness
 
-wheel_dia   =  60.0   # mm — friction wheel outer diameter   ← PARAMETRIC
+wheel_dia   =  40.0   # mm — friction wheel outer diameter   ← PARAMETRIC
 wheel_sep   =  30.0   # mm — distance between wheel centers  ← PARAMETRIC
 wheel_thick =  4.0   # mm — friction wheel height
 
 # Rubber ring (arandela de goma) — sits on the inward face of each wheel
 rubber_thick =   2.0  # mm — ring thickness
 rubber_id    =  18.0  # mm — inner diameter (clears hub body)
-rubber_od    =  60.0  # mm — outer diameter (= wheel_dia, covers full face)
 
 # Standard flanged shaft hub (generic AliExpress/Amazon 8mm flanged hub)
 # ← Update these when the physical hub arrives
@@ -55,6 +54,8 @@ tol         =   0.2   # mm — print tolerance (added to holes/seats)
 hs          = cube_size / 2
 z_center    = cube_size / 2
 z_top_plate = cube_size - plate_thick
+
+rubber_od = wheel_dia   # always covers full wheel face
 
 z_upper_wheel = z_center + wheel_sep / 2   # center of upper wheel
 z_lower_wheel = z_center - wheel_sep / 2   # center of lower wheel
