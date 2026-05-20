@@ -30,9 +30,9 @@ wheel_sep   =  30.0   # mm — distance between wheel centers  ← PARAMETRIC
 wheel_thick =  4.0   # mm — friction wheel height
 
 # Rubber ring (arandela de goma) — sits on the inward face of each wheel
-rubber_thick =   3.0  # mm — ring thickness
+rubber_thick =   2.0  # mm — ring thickness
 rubber_id    =  18.0  # mm — inner diameter (clears hub body)
-rubber_od    =  54.0  # mm — outer diameter (contact zone for clutch wheel)
+rubber_od    =  60.0  # mm — outer diameter (= wheel_dia, covers full face)
 
 # Standard flanged shaft hub (generic AliExpress/Amazon 8mm flanged hub)
 # ← Update these when the physical hub arrives
@@ -40,9 +40,11 @@ hub_body_dia    = 16.0   # mm — hub cylindrical body outer diameter
 hub_body_h      = 10.0   # mm — hub cylindrical body height
 hub_flange_dia  = 32.0   # mm — flange outer diameter
 hub_flange_h    =  3.0   # mm — flange thickness
-hub_bolt_circle = 22.0   # mm — bolt circle diameter  ← measure when hub arrives
+hub_bolt_circle = 24.0   # mm — bolt circle diameter
 hub_bolt_count  =  4     # number of bolts on flange
-hub_bolt_dia    =  3.3   # mm — M3 clearance hole in wheel (3.0 mm in hub)
+hub_bolt_dia    =  3.3   # mm — M3 clearance hole (shaft)
+m3_hex_af       =  5.5   # mm — M3 hex head across flats
+m3_head_h       =  2.0   # mm — M3 hex head height
 
 tol         =   0.2   # mm — print tolerance (added to holes/seats)
 
@@ -97,6 +99,22 @@ def make_plate(z_base, bearing_from_top):
     return base.cut(bearing_pocket).cut(shaft_hole)
 
 
+def make_hex_pocket(af, height, cx, cy, z_base, angle_offset=0):
+    """
+    Hexagonal prism to subtract — creates a hex bolt head recess.
+    af: across-flats dimension (+ tolerance added here).
+    angle_offset: rotation in degrees. Use (bolt_angle_deg - 30) so that
+    a flat face points toward the wheel center, keeping clear of the inner hole.
+    """
+    R = (af + tol) / math.sqrt(3)   # circumradius from across-flats
+    pts = [App.Vector(cx + R * math.cos(math.radians(angle_offset + i * 60)),
+                      cy + R * math.sin(math.radians(angle_offset + i * 60)),
+                      z_base) for i in range(6)]
+    pts.append(pts[0])
+    face = Part.Face(Part.makePolygon(pts))
+    return face.extrude(App.Vector(0, 0, height))
+
+
 def make_friction_wheel():
     """
     Flat disc that mounts on the flanged shaft hub.
@@ -111,21 +129,23 @@ def make_friction_wheel():
         App.Vector(0, 0, -1)
     )
 
-    # M3 bolt holes on hub bolt circle
-    bolt_holes = []
+    # Hex head pockets (inward face, z=0) + shaft through-holes
     for i in range(hub_bolt_count):
-        a = math.radians(i * 360 / hub_bolt_count)
-        hole = Part.makeCylinder(
+        a_deg = i * 360 / hub_bolt_count
+        a     = math.radians(a_deg)
+        bx    = hub_bolt_circle / 2 * math.cos(a)
+        by    = hub_bolt_circle / 2 * math.sin(a)
+        # Hex pocket: rotate so a flat face points toward wheel center
+        # (angle_offset = a_deg - 30 puts the inward flat perpendicular to radius)
+        disc = disc.cut(make_hex_pocket(m3_hex_af, m3_head_h, bx, by, 0,
+                                        angle_offset=a_deg - 30))
+        # Clearance hole for bolt shaft through full wheel
+        disc = disc.cut(Part.makeCylinder(
             hub_bolt_dia / 2, wheel_thick + 2,
-            App.Vector(hub_bolt_circle / 2 * math.cos(a),
-                       hub_bolt_circle / 2 * math.sin(a), -1)
-        )
-        bolt_holes.append(hole)
+            App.Vector(bx, by, -1)
+        ))
 
-    result = disc.cut(hub_hole)
-    for hole in bolt_holes:
-        result = result.cut(hole)
-    return result
+    return disc.cut(hub_hole)
 
 
 def make_rubber_ring_ref():
