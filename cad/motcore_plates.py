@@ -26,7 +26,7 @@ bearing_w   =   7.0   # mm — 608 bearing width
 plate_thick =   8.0   # mm — top/bottom plate thickness
 
 wheel_dia   =  40.0   # mm — friction wheel outer diameter   ← PARAMETRIC
-wheel_sep   =  30.0   # mm — distance between wheel centers  ← PARAMETRIC
+wheel_sep   =  40.0   # mm — distance between wheel centers  ← PARAMETRIC
 wheel_thick =  4.0   # mm — friction wheel height
 
 # Rubber ring (arandela de goma) — sits on the inward face of each wheel
@@ -64,21 +64,30 @@ z_upper_wheel = z_center + wheel_sep / 2   # center of upper wheel
 z_lower_wheel = z_center - wheel_sep / 2   # center of lower wheel
 
 # Conical clutch wheel geometry
-# Orientation: small face (tip, ⌀16 mm) points INWARD toward the friction wheels.
-#              large face (base, ⌀18 mm) faces outward toward the UJ pivot.
-# Contact:     the large-face RIM (r = cone_r_large = 9 mm) is what presses against
-#              the rubber ring inner edge (also r = rubber_id/2 = 9 mm) when the shaft tilts.
-# z_clearance: in neutral the large-face rim's top (z_center + cone_r_large) is 2 mm below
-#              the rubber ring face — this is the gap the shaft tilt must close.
-cone_r_large = rubber_id / 2                          # = 9 mm  (= rubber ring inner radius)
-cone_r_small = hub_body_dia / 2                        # = 8 mm  (matches shaft diameter)
-uj_y         = -(hs - plate_thick)                    # world Y of UJ pivot
-cone_tip_y   = -(rubber_id / 2)                        # world Y of the SMALL FACE (tip) — inward end
-                                                       # value = 9 mm chosen so rim aligns with rubber_id
-arm_length   = abs(cone_tip_y - uj_y)                 # UJ → tip distance along neutral shaft axis (= 33 mm)
-z_clearance  = wheel_sep / 2 - wheel_thick / 2 - rubber_thick - cone_r_large  # = 2 mm gap to rubber ring face
-cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # ≈ 3.5° shaft tilt to engage
-cone_h       = (cone_r_large - cone_r_small) / math.tan(math.radians(cone_angle))  # frustum height ≈ 16 mm
+# ─────────────────────────────────────────────────────────────────────
+# Transmission ratio  i = r_fw / r_cw  where:
+#   r_fw = |cone_tip_y|  — contact radius on friction wheel (from Z axis)
+#   r_cw = wheel_sep/2 - wheel_thick/2 - rubber_thick  — contact radius on cone (from Y shaft)
+# For 1:1 we need r_fw = r_cw  →  cone_tip_y = -r_cw  (derived below).
+#
+# Four-cone cross clearance:  adjacent cones (front + lateral) come closest at their
+# tip rims; minimum gap = √2 × (|cone_tip_y| − cone_r_small) = √2 × (z_clr + taper).
+# With z_clr=2 mm and taper=1 mm → gap ≈ 4.2 mm regardless of wheel_sep.
+#
+# Orientation: small face (tip) points INWARD; large face outward toward UJ.
+# ─────────────────────────────────────────────────────────────────────
+_z_clr_nominal = 2.0                                   # mm — neutral Z-gap between large-face rim and rubber ring
+_cone_taper    = 1.0                                   # mm — radius difference large→small face
+
+r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm (contact radius on cone wheel Y-axis)
+cone_r_large = r_cw - _z_clr_nominal                  # = 14 mm (large face radius; fits in gap with 2 mm clearance)
+cone_r_small = cone_r_large - _cone_taper              # = 13 mm (small face / tip radius)
+uj_y         = -(hs - plate_thick)                    # world Y of UJ pivot  (= −42 mm)
+cone_tip_y   = -r_cw                                  # world Y of tip — set equal to r_cw for 1:1 ratio (= −16 mm)
+arm_length   = abs(cone_tip_y - uj_y)                 # UJ → tip (= 26 mm)
+z_clearance  = r_cw - cone_r_small                    # gap from small-face rim to rubber ring in neutral (= 3 mm)
+cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # shaft tilt to engage (≈ 6.6°)
+cone_h       = _cone_taper / math.tan(math.radians(cone_angle))    # frustum height (≈ 8.6 mm)
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS

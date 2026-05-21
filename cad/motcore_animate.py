@@ -23,23 +23,19 @@ plate_thick  =   8.0
 hs           = cube_size / 2           # = 50 mm
 z_center     = cube_size / 2           # = 50 mm  (vertical centre of the cube)
 
-wheel_sep    =  30.0
+wheel_sep    =  40.0
 wheel_thick  =   4.0
 rubber_thick =   2.0
-rubber_id    =  18.0
-hub_body_dia =  16.0
 shaft_dia    =   8.0
 
-cone_r_large = rubber_id   / 2                           # = 9 mm
-cone_r_small = hub_body_dia / 2                          # = 8 mm
-uj_y         = -(hs - plate_thick)                       # = −42 mm
-cone_tip_y   = -(rubber_id / 2)                          # = −9 mm
-arm_length   = abs(cone_tip_y - uj_y)                    # = 33 mm
-z_clearance  = (wheel_sep / 2
-                - wheel_thick  / 2
-                - rubber_thick
-                - cone_r_large)                          # = 2 mm
-cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # ≈ 3.5°
+r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm
+cone_r_large = r_cw - 2.0                                  # = 14 mm
+cone_r_small = cone_r_large - 1.0                          # = 13 mm
+uj_y         = -(hs - plate_thick)                         # = −42 mm
+cone_tip_y   = -r_cw                                       # = −16 mm  (1:1 ratio)
+arm_length   = abs(cone_tip_y - uj_y)                      # = 26 mm
+z_clearance  = r_cw - cone_r_small                         # = 3 mm (small-face rim to rubber ring)
+cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # ≈ 6.6°
 
 # Rotation used when the parts were placed (local +Z → world −Y)
 rot_out_y    = App.Rotation(App.Vector(1, 0, 0), 90)
