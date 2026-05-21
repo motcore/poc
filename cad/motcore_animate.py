@@ -1,8 +1,8 @@
 """
-motcore_animate.py — Motcore output-axis tilt animation
-========================================================
-Rocks the cone wheel + pivoting D-shaft back and forth around the UJ pivot
-point so you can see how the clutch engages the friction-wheel rubber rings.
+motcore_animate.py — Motcore v0.3 bevel-cone engagement animation
+=================================================================
+Tilts the clutch cone + output shaft around the shared apex (UJ pivot at
+cube centre) to show how the clutch cone surface meets the motor cone surface.
 
 Run AFTER motcore_plates.py has already built the FreeCAD document.
 
@@ -18,70 +18,56 @@ import time
 # ═══════════════════════════════════════════════════════════════════
 # PARAMETERS  (keep in sync with motcore_plates.py)
 # ═══════════════════════════════════════════════════════════════════
-cube_size    = 100.0
-plate_thick  =   8.0
-hs           = cube_size / 2           # = 50 mm
-z_center     = cube_size / 2           # = 50 mm  (vertical centre of the cube)
+cube_size         = 100.0
+plate_thick       =   8.0
+hs                = cube_size / 2    # = 50 mm
+z_center          = cube_size / 2    # = 50 mm
 
-wheel_sep    =  40.0
-wheel_thick  =   4.0
-wheel_dia    =  40.0
-rubber_thick =   2.0
-shaft_dia    =   8.0
+cone_engage_angle = 5.0              # deg — shaft tilt to engage
+alpha             = (90.0 - cone_engage_angle) / 2.0   # = 42.5°
 
-r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm
-cone_r_large = r_cw - 2.0                                  # = 14 mm
-cone_r_small = cone_r_large - 1.0                          # = 13 mm
-uj_y         = -(hs - plate_thick)                         # = −42 mm
-z_clearance  = r_cw - cone_r_small                         # = 3 mm (small-face rim to rubber ring)
-
-# Large face at outer friction-wheel rim — same iterative solve as motcore_plates.py
-_cone_tip_y = -(wheel_dia / 2)
-for _i in range(12):
-    _arm = abs(_cone_tip_y - uj_y)
-    _ca  = math.asin(z_clearance / _arm)
-    _cone_tip_y = -(wheel_dia / 2) + 1.0 / math.tan(_ca)
-cone_tip_y  = _cone_tip_y                                  # ≈ −9 mm  (step-down ratio ≈ 0.57)
-arm_length  = abs(cone_tip_y - uj_y)                       # ≈ 33 mm
-cone_angle  = math.degrees(math.asin(z_clearance / arm_length))    # ≈ 5.2°
-
-# Rotation used when the parts were placed (local +Z → world −Y)
-rot_out_y    = App.Rotation(App.Vector(1, 0, 0), 90)
+# UJ pivot = shared apex = cube centre
+uj_y = 0.0
+PIVOT = App.Vector(0, uj_y, z_center)   # = (0, 0, 50)
 
 # ═══════════════════════════════════════════════════════════════════
 # ANIMATION SETTINGS
 # ═══════════════════════════════════════════════════════════════════
 FRAMES       = 80     # frames per full oscillation cycle
-CYCLES       = 3      # how many times to rock back and forth
-FRAME_DELAY  = 0.04   # seconds between frames  (≈ 25 fps)
-PAUSE_AT_END = 0.25   # extra pause at the engaged position (shows contact)
+CYCLES       = 3      # oscillations
+FRAME_DELAY  = 0.04   # seconds (≈ 25 fps)
+PAUSE_AT_END = 0.30   # extra pause at full engagement
 
-# Tilt slightly past the contact angle so it's clear the cone touches the ring
-MAX_ANGLE    = cone_angle * 1.15
+# Tilt slightly past the contact angle so contact is clearly visible
+MAX_ANGLE    = cone_engage_angle * 1.15
 
-# Parts created by motcore_plates.py that move together as a rigid body
-MOVING_PARTS = ["ConeWheel_Front", "OutputShaft_Pivot_REF"]
+# Parts created by motcore_plates.py that move as a rigid body
+MOVING_PARTS = ["ClutchCone_Front", "OutputShaft_REF"]
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
 # ═══════════════════════════════════════════════════════════════════
 
-# Neutral placement shared by cone wheel and pivoting shaft
-NEUTRAL_PL = App.Placement(App.Vector(0, cone_tip_y, z_center), rot_out_y)
+# Rotation that places local +Z along world −Y (output shaft direction)
+rot_out_y  = App.Rotation(App.Vector(1, 0, 0), 90)
 
-# UJ pivot point in world coordinates
-PIVOT = App.Vector(0, uj_y, z_center)
+# Neutral placement: apex at cube centre, shaft along −Y
+NEUTRAL_PL = App.Placement(App.Vector(0, 0, z_center), rot_out_y)
 
 
 def tilt_placement(base_pl, angle_deg):
     """
     Return a new Placement produced by rotating `base_pl` by `angle_deg`
-    around the global X-axis (YZ-plane tilt) centred on the UJ pivot point.
-    Positive angle → cone tip moves toward +Z (upper friction wheel).
+    around the global X-axis, centred on PIVOT (shared apex / UJ point).
+    Positive angle → clutch cone tilts toward +Z (upper motor cone).
+
+    Because PIVOT == base_pl.Base (the apex IS the pivot), the position
+    stays fixed and only the orientation changes — the apex is always at
+    the cube centre regardless of tilt angle.
     """
     rot     = App.Rotation(App.Vector(1, 0, 0), angle_deg)
-    delta   = base_pl.Base - PIVOT
-    new_pos = PIVOT + rot.multVec(delta)
+    delta   = base_pl.Base - PIVOT          # = (0,0,0) for our geometry
+    new_pos = PIVOT + rot.multVec(delta)    # = PIVOT  (apex stays put)
     new_rot = rot.multiply(base_pl.Rotation)
     return App.Placement(new_pos, new_rot)
 
@@ -115,34 +101,30 @@ if missing:
         "Run motcore_plates.py first."
     )
 
-# Save original placements so we can restore them afterwards
 saved_placements = {n: doc.getObject(n).Placement for n in MOVING_PARTS}
 
-print("=" * 55)
-print(f"Motcore tilt animation")
-print(f"  UJ pivot    : y = {uj_y:.1f} mm")
-print(f"  Arm length  : {arm_length:.1f} mm")
-print(f"  Cone angle  : ±{cone_angle:.2f}°  (contact at ±{z_clearance:.1f} mm in Z)")
-print(f"  Max tilt    : ±{MAX_ANGLE:.2f}°")
-print(f"  Cycles      : {CYCLES}  ×  {FRAMES} frames @ {1/FRAME_DELAY:.0f} fps")
-print("=" * 55)
+print("=" * 58)
+print("Motcore v0.3 — bevel-cone engagement animation")
+print(f"  Shared apex (UJ):  (0, {uj_y}, {z_center}) mm")
+print(f"  Cone half-angle:   α = {alpha:.2f}°  (both cones)")
+print(f"  Engagement tilt:   {cone_engage_angle}°")
+print(f"  Max tilt shown:    {MAX_ANGLE:.2f}°")
+print(f"  Cycles:            {CYCLES} × {FRAMES} frames @ {1/FRAME_DELAY:.0f} fps")
+print("=" * 58)
 
 try:
     for cycle in range(CYCLES):
         for frame in range(FRAMES):
-            # Smooth sine oscillation: neutral → up → neutral → down → neutral
-            t     = frame / FRAMES                        # 0 … 1
+            t     = frame / FRAMES
             angle = MAX_ANGLE * math.sin(2 * math.pi * t)
             apply_tilt(doc, angle)
 
-            # Brief pause when the cone reaches the extreme (contact) position
             if abs(t - 0.25) < (1 / FRAMES) or abs(t - 0.75) < (1 / FRAMES):
                 time.sleep(PAUSE_AT_END)
             else:
                 time.sleep(FRAME_DELAY)
 
 finally:
-    # Always restore parts to neutral, even if the user presses Escape / an error occurs
     for name, pl in saved_placements.items():
         obj = doc.getObject(name)
         if obj:
