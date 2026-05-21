@@ -67,27 +67,38 @@ z_lower_wheel = z_center - wheel_sep / 2   # center of lower wheel
 # ─────────────────────────────────────────────────────────────────────
 # Transmission ratio  i = r_fw / r_cw  where:
 #   r_fw = |cone_tip_y|  — contact radius on friction wheel (from Z axis)
-#   r_cw = wheel_sep/2 - wheel_thick/2 - rubber_thick  — contact radius on cone (from Y shaft)
-# For 1:1 we need r_fw = r_cw  →  cone_tip_y = -r_cw  (derived below).
+#   r_cw = wheel_sep/2 - wheel_thick/2 - rubber_thick  — axial half-gap to rubber ring face
+# Design intent: large face sits at the outer rim of the friction wheel (y = −wheel_dia/2)
+# so the full rubber ring width is available at engagement.  This gives a step-down ratio
+# r_fw/r_cw ≈ 0.57  (output slower, higher torque — desirable for a robot joint).
 #
-# Four-cone cross clearance:  adjacent cones (front + lateral) come closest at their
-# tip rims; minimum gap = √2 × (|cone_tip_y| − cone_r_small) = √2 × (z_clr + taper).
-# With z_clr=2 mm and taper=1 mm → gap ≈ 4.2 mm regardless of wheel_sep.
+# Four-cone cross clearance: adjacent cones come closest at their small-face rims.
+# Gap = √2 × |cone_r_small − |cone_tip_y||.
+# Minimum gap is 0 when |cone_tip_y| = cone_r_small; moving tip either way increases it.
 #
 # Orientation: small face (tip) points INWARD; large face outward toward UJ.
 # ─────────────────────────────────────────────────────────────────────
 _z_clr_nominal = 2.0                                   # mm — neutral Z-gap between large-face rim and rubber ring
 _cone_taper    = 1.0                                   # mm — radius difference large→small face
 
-r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm (contact radius on cone wheel Y-axis)
-cone_r_large = r_cw - _z_clr_nominal                  # = 14 mm (large face radius; fits in gap with 2 mm clearance)
+r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm (axial half-gap to rubber ring face)
+cone_r_large = r_cw - _z_clr_nominal                  # = 14 mm (large face radius; 2 mm from rubber ring at neutral)
 cone_r_small = cone_r_large - _cone_taper              # = 13 mm (small face / tip radius)
 uj_y         = -(hs - plate_thick)                    # world Y of UJ pivot  (= −42 mm)
-cone_tip_y   = -r_cw                                  # world Y of tip — set equal to r_cw for 1:1 ratio (= −16 mm)
-arm_length   = abs(cone_tip_y - uj_y)                 # UJ → tip (= 26 mm)
 z_clearance  = r_cw - cone_r_small                    # gap from small-face rim to rubber ring in neutral (= 3 mm)
-cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # shaft tilt to engage (≈ 6.6°)
-cone_h       = _cone_taper / math.tan(math.radians(cone_angle))    # frustum height (≈ 8.6 mm)
+
+# cone_tip_y is chosen so the large face lands at the friction-wheel outer rim:
+#   cone_tip_y − cone_h = −wheel_dia/2
+# Since cone_h depends on arm_length which depends on cone_tip_y, solve iteratively.
+_cone_tip_y = -(wheel_dia / 2)                        # initial guess
+for _i in range(12):
+    _arm = abs(_cone_tip_y - uj_y)
+    _ca  = math.asin(z_clearance / _arm)
+    _cone_tip_y = -(wheel_dia / 2) + _cone_taper / math.tan(_ca)
+cone_tip_y  = _cone_tip_y                             # ≈ −9 mm  →  r_fw/r_cw ≈ 0.57 (step-down)
+arm_length  = abs(cone_tip_y - uj_y)                  # UJ → tip  (≈ 33 mm)
+cone_angle  = math.degrees(math.asin(z_clearance / arm_length))    # shaft tilt to engage (≈ 5.2°)
+cone_h      = _cone_taper / math.tan(math.radians(cone_angle))     # frustum height (≈ 11 mm)
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
@@ -338,8 +349,8 @@ add_part(doc, "FlangedHub_Lower_REF", hub, color=(0.75, 0.75, 0.75),
 # ── Output axis — front face (−Y direction) ─────────────────────────
 # Rotation: local +Z  →  world −Y  (axis points outward through front face).
 # With this rotation:
-#   • cone small tip  (local z=0)      is at the INWARD end  (y = cone_tip_y = −9 mm)
-#   • cone large face (local z=cone_h) is outward             (y ≈ cone_tip_y − cone_h ≈ −25 mm)
+#   • cone small tip  (local z=0)      is at the INWARD end  (y = cone_tip_y ≈ −9 mm)
+#   • cone large face (local z=cone_h) is outward             (y ≈ −wheel_dia/2 = −20 mm)
 #   • shaft continues large face → UJ pivot                   (y = uj_y = −42 mm)
 rot_out_y = App.Rotation(App.Vector(1, 0, 0), 90)
 

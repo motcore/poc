@@ -25,6 +25,7 @@ z_center     = cube_size / 2           # = 50 mm  (vertical centre of the cube)
 
 wheel_sep    =  40.0
 wheel_thick  =   4.0
+wheel_dia    =  40.0
 rubber_thick =   2.0
 shaft_dia    =   8.0
 
@@ -32,10 +33,17 @@ r_cw         = wheel_sep/2 - wheel_thick/2 - rubber_thick  # = 16 mm
 cone_r_large = r_cw - 2.0                                  # = 14 mm
 cone_r_small = cone_r_large - 1.0                          # = 13 mm
 uj_y         = -(hs - plate_thick)                         # = −42 mm
-cone_tip_y   = -r_cw                                       # = −16 mm  (1:1 ratio)
-arm_length   = abs(cone_tip_y - uj_y)                      # = 26 mm
 z_clearance  = r_cw - cone_r_small                         # = 3 mm (small-face rim to rubber ring)
-cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # ≈ 6.6°
+
+# Large face at outer friction-wheel rim — same iterative solve as motcore_plates.py
+_cone_tip_y = -(wheel_dia / 2)
+for _i in range(12):
+    _arm = abs(_cone_tip_y - uj_y)
+    _ca  = math.asin(z_clearance / _arm)
+    _cone_tip_y = -(wheel_dia / 2) + 1.0 / math.tan(_ca)
+cone_tip_y  = _cone_tip_y                                  # ≈ −9 mm  (step-down ratio ≈ 0.57)
+arm_length  = abs(cone_tip_y - uj_y)                       # ≈ 33 mm
+cone_angle  = math.degrees(math.asin(z_clearance / arm_length))    # ≈ 5.2°
 
 # Rotation used when the parts were placed (local +Z → world −Y)
 rot_out_y    = App.Rotation(App.Vector(1, 0, 0), 90)
