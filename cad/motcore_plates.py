@@ -1,4 +1,4 @@
-# Motcore v0.2 — Top/Bottom Plates + Friction Wheel Hubs
+# Motcore v0.2 — Top/Bottom Plates + Friction Wheels + Output Axis (Cone Wheel)
 # FreeCAD Python Macro
 #
 # Run from FreeCAD: Macro → Macros → motcore_plates.py → Execute
@@ -47,6 +47,9 @@ m3_head_h       =  2.0   # mm — M3 hex head height
 
 tol         =   0.2   # mm — print tolerance (added to holes/seats)
 
+# Conical clutch wheel (rueda cónica) — D-bore + M3 set screw on the output axis
+m3_tap_dia  =  2.5   # mm — M3 tap drill diameter (for set-screw / prisionero)
+
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED VALUES  (auto-calculated — do not edit)
 # ═══════════════════════════════════════════════════════════════════
@@ -60,14 +63,22 @@ rubber_od = wheel_dia   # always covers full wheel face
 z_upper_wheel = z_center + wheel_sep / 2   # center of upper wheel
 z_lower_wheel = z_center - wheel_sep / 2   # center of lower wheel
 
-# Cone angle of the clutch wheel:
-#   UJ is at the outer wall (x = hs from shaft axis)
-#   Contact point is at mid-radius of rubber ring
-#   Vertical displacement = from output axis (z_center) to inward wheel face
-r_contact = (rubber_od / 2 + rubber_id / 2) / 2       # mid-radius of rubber ring
-L         = hs - r_contact                              # horiz. distance UJ → contact
-dz        = wheel_sep / 2 - wheel_thick / 2             # vert. displacement to face
-cone_angle = math.degrees(math.atan2(dz, L))            # degrees
+# Conical clutch wheel geometry
+# Orientation: small face (tip, ⌀16 mm) points INWARD toward the friction wheels.
+#              large face (base, ⌀18 mm) faces outward toward the UJ pivot.
+# Contact:     the large-face RIM (r = cone_r_large = 9 mm) is what presses against
+#              the rubber ring inner edge (also r = rubber_id/2 = 9 mm) when the shaft tilts.
+# z_clearance: in neutral the large-face rim's top (z_center + cone_r_large) is 2 mm below
+#              the rubber ring face — this is the gap the shaft tilt must close.
+cone_r_large = rubber_id / 2                          # = 9 mm  (= rubber ring inner radius)
+cone_r_small = hub_body_dia / 2                        # = 8 mm  (matches shaft diameter)
+uj_y         = -(hs - plate_thick)                    # world Y of UJ pivot
+cone_tip_y   = -(rubber_id / 2)                        # world Y of the SMALL FACE (tip) — inward end
+                                                       # value = 9 mm chosen so rim aligns with rubber_id
+arm_length   = abs(cone_tip_y - uj_y)                 # UJ → tip distance along neutral shaft axis (= 33 mm)
+z_clearance  = wheel_sep / 2 - wheel_thick / 2 - rubber_thick - cone_r_large  # = 2 mm gap to rubber ring face
+cone_angle   = math.degrees(math.asin(z_clearance / arm_length))   # ≈ 3.5° shaft tilt to engage
+cone_h       = (cone_r_large - cone_r_small) / math.tan(math.radians(cone_angle))  # frustum height ≈ 16 mm
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
@@ -194,6 +205,74 @@ def make_hub_ref():
     return result
 
 
+def make_d_shaft_seg(length):
+    """
+    D-shaft segment extruded along local +Z for `length` mm.
+    Cross-section: circle of shaft_dia/2 with a 1.5 mm flat on the +Y side.
+    The flat orientation matches the D-bore in make_cone_wheel() so the shaft
+    slides cleanly into the cone wheel when both are placed with rot_out_y.
+    """
+    r        = shaft_dia / 2                        # = 4.0 mm
+    flat_dep = 1.5                                  # same depth as the bore flat
+    y_flat   = r - flat_dep                         # = 2.5 mm from axis
+    x_flat   = math.sqrt(r**2 - y_flat**2)         # half-chord = 3.12 mm
+
+    p_right  = App.Vector( x_flat, y_flat, 0)
+    p_bottom = App.Vector(0,      -r,       0)
+    p_left   = App.Vector(-x_flat, y_flat, 0)
+    arc_edge  = Part.Arc(p_right, p_bottom, p_left).toShape()
+    line_edge = Part.LineSegment(p_left, p_right).toShape()
+    wire      = Part.Wire([arc_edge, line_edge])
+    face      = Part.Face(wire)
+    return face.extrude(App.Vector(0, 0, length))
+
+
+def make_cone_wheel():
+    """
+    Conical clutch wheel — D-bore + M3 set screw (prisionero).
+    Mounts directly on the 8 mm output shaft; no flanged hub needed.
+
+    Local z=0      : small face / tip (⌀16 mm) — inward, points toward the friction wheels.
+                     Placed at y = cone_tip_y (world Y).  When the shaft tilts ±cone_angle
+                     around the UJ pivot the tip face swings ±z_clearance to press against
+                     the rubber ring flat face (horizontal contact).
+    Local z=cone_h : large face (⌀18 mm) — outward, toward the UJ pivot.
+    Centre hole    : D-bore for 8 mm shaft (round hole + flat on one side).
+    Set screw      : M3 tap hole, radial, 2 mm from the large face (z = cone_h − 2).
+    """
+    cone = Part.makeCone(cone_r_small, cone_r_large, cone_h)
+
+    # D-bore shaft hole — built as a 2D profile (arc + flat line) extruded along Z.
+    # A cylinder-minus-box approach cuts the cone wall on the sides (omega artefact);
+    # an extruded profile avoids that entirely.
+    r_bore   = (shaft_dia + tol) / 2          # = 4.1 mm
+    d_flat_h = 1.5                             # mm removed from one side
+    y_flat   = r_bore - d_flat_h              # flat chord position from axis = 2.6 mm
+    x_flat   = math.sqrt(r_bore**2 - y_flat**2)  # half-width of chord = 3.17 mm
+
+    # Arc through bottom (p_right → p_bottom → p_left) then straight line back
+    p_right  = App.Vector( x_flat, y_flat, 0)
+    p_bottom = App.Vector(0,      -r_bore,  0)
+    p_left   = App.Vector(-x_flat, y_flat, 0)
+    arc_edge  = Part.Arc(p_right, p_bottom, p_left).toShape()
+    line_edge = Part.LineSegment(p_left, p_right).toShape()
+    wire      = Part.Wire([arc_edge, line_edge])
+    face      = Part.Face(wire)
+    d_bore    = face.extrude(App.Vector(0, 0, cone_h + 2))
+    d_bore.translate(App.Vector(0, 0, -1))
+    cone = cone.cut(d_bore)
+
+    # M3 set-screw tap hole — radial, 2 mm from large face (outward end)
+    setscrew = Part.makeCylinder(
+        m3_tap_dia / 2, cone_r_large * 2 + 2,
+        App.Vector(-cone_r_large - 1, 0, cone_h - 2),
+        App.Vector(1, 0, 0)
+    )
+    cone = cone.cut(setscrew)
+
+    return cone
+
+
 # ═══════════════════════════════════════════════════════════════════
 # BUILD DOCUMENT
 # ═══════════════════════════════════════════════════════════════════
@@ -247,6 +326,37 @@ add_part(doc, "FlangedHub_Lower_REF", hub, color=(0.75, 0.75, 0.75),
          placement=App.Placement(
              App.Vector(0, 0, z_lower_top - wheel_thick - hub_flange_h), rot_norm))
 
+# ── Output axis — front face (−Y direction) ─────────────────────────
+# Rotation: local +Z  →  world −Y  (axis points outward through front face).
+# With this rotation:
+#   • cone small tip  (local z=0)      is at the INWARD end  (y = cone_tip_y = −9 mm)
+#   • cone large face (local z=cone_h) is outward             (y ≈ cone_tip_y − cone_h ≈ −25 mm)
+#   • shaft continues large face → UJ pivot                   (y = uj_y = −42 mm)
+rot_out_y = App.Rotation(App.Vector(1, 0, 0), 90)
+
+# Cone wheel: small tip at (0, cone_tip_y, z_center)
+pl_cone = App.Placement(App.Vector(0, cone_tip_y, z_center), rot_out_y)
+add_part(doc, "ConeWheel_Front", make_cone_wheel(),
+         color=(1.00, 0.60, 0.15), placement=pl_cone)
+
+# Output axis — two D-shaft segments that meet at the UJ pivot point (y = uj_y).
+# Both use rot_out_y so the flat (local +Y side) faces the same direction on both
+# segments — they represent one continuous D-shaft passing through the UJ.
+#
+# ── Pivoting segment: cone tip → UJ pivot  (tilts to engage)
+add_part(doc, "OutputShaft_Pivot_REF",
+         make_d_shaft_seg(arm_length),
+         color=(1.00, 0.80, 0.30),   # amber — moves
+         placement=App.Placement(App.Vector(0, cone_tip_y, z_center), rot_out_y))
+
+# ── Fixed segment: UJ pivot → 15 mm outside cube  (stays still, round shaft)
+# No D-flat here: this part runs through the side-wall bearing and is a plain cylinder.
+fixed_shaft_len = hs + 15 + uj_y   # = 50 + 15 − 42 = 23 mm
+add_part(doc, "OutputShaft_Fixed_REF",
+         Part.makeCylinder(shaft_dia / 2, fixed_shaft_len),
+         color=(0.70, 0.70, 0.70),   # grey — fixed
+         placement=App.Placement(App.Vector(0, uj_y, z_center), rot_out_y))
+
 # ── Spreadsheet ──────────────────────────────────────────────────────
 sheet = doc.addObject("Spreadsheet::Sheet", "Parameters")
 rows = [
@@ -265,10 +375,16 @@ rows = [
     ("",               "",                         "",     ""),
     ("z_upper_wheel",  z_upper_wheel,              "mm",   "Upper wheel center Z (auto)"),
     ("z_lower_wheel",  z_lower_wheel,              "mm",   "Lower wheel center Z (auto)"),
-    ("r_contact",      round(r_contact, 1),        "mm",   "Contact radius on rubber ring (auto)"),
-    ("L",              round(L, 1),                "mm",   "UJ to contact point distance (auto)"),
-    ("dz",             round(dz, 1),               "mm",   "Vertical displacement to face (auto)"),
-    ("cone_angle",     round(cone_angle, 1),       "deg",  "Clutch wheel cone angle (auto)"),
+    ("",               "",                         "",     ""),
+    ("m3_tap_dia",     m3_tap_dia,                  "mm",   "M3 set-screw tap drill diameter"),
+    ("cone_r_large",   round(cone_r_large, 1),     "mm",   "Cone large face radius (=rubber_id/2)"),
+    ("cone_r_small",   round(cone_r_small, 1),     "mm",   "Cone small face radius (=shaft_dia/2)"),
+    ("cone_tip_y",     round(cone_tip_y, 1),      "mm",   "Cone tip (small face) world Y — inward end"),
+    ("uj_y",           round(uj_y, 1),              "mm",   "UJ world Y position (auto)"),
+    ("arm_length",     round(arm_length, 1),        "mm",   "UJ to cone tip distance (auto)"),
+    ("z_clearance",    round(z_clearance, 1),       "mm",   "Z gap to rubber ring in neutral (auto)"),
+    ("cone_angle",     round(cone_angle, 1),        "deg",  "Shaft tilt to engage rubber ring (auto)"),
+    ("cone_h",         round(cone_h, 1),            "mm",   "Cone frustum height (auto)"),
 ]
 cols = ["A", "B", "C", "D"]
 for i, row in enumerate(rows, start=1):
@@ -289,4 +405,6 @@ print(f"  Shaft:        ⌀{shaft_dia} mm  |  Bearing 608")
 print(f"  Wheel dia:    ⌀{wheel_dia} mm  |  sep: {wheel_sep} mm")
 print(f"  Rubber ring:  ⌀{rubber_id}–{rubber_od} mm  ×  {rubber_thick} mm thick")
 print(f"  Cone angle:   {cone_angle:.1f}°  (clutch wheel cone)")
+print(f"  Cone wheel:   tip ⌀{cone_r_small*2:.1f} → base ⌀{cone_r_large*2:.1f} mm  h={cone_h:.1f} mm  tilt={cone_angle:.1f}°")
+print(f"  Pivot point:  y={uj_y:.1f} mm  |  tip y={cone_tip_y:.1f} mm  |  arm={arm_length:.1f} mm  gap={z_clearance:.1f} mm")
 print("=" * 60)
