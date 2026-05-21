@@ -57,11 +57,21 @@ alpha_rad = math.radians(alpha)
 motor_cone_r  = motor_cone_h  * math.tan(alpha_rad)   # large-face radius, motor cone  (≈ 18.3 mm)
 clutch_cone_r = clutch_cone_h * math.tan(alpha_rad)   # large-face radius, clutch cone (≈ 18.3 mm)
 
-# UJ pivot = apex of both cones = intersection of Z-axis and output Y-axis = cube centre
-uj_y = 0.0   # world Y of UJ pivot (and clutch cone apex)
+# UJ pivot — same as original design: close to the cube wall
+uj_y       = -(hs - plate_thick)   # = −42 mm  (8 mm inside the side wall)
 
-# Output shaft: from UJ pivot (y=0) through side wall (y=−hs) + 15 mm stub outside
-output_shaft_len = hs + 15.0   # = 65 mm
+# Clutch cone apex sits at the inner end of the arm, at y = 0 (Z axis).
+# When the shaft tilts cone_engage_angle around the UJ, the apex traces an arc
+# and arrives at approximately (0, 0, z_apex_motor) on the Z axis — exactly
+# where the motor cone apex must sit for the two apices to coincide at engagement.
+arm_length   = abs(0.0 - uj_y)                              # = 42 mm  (apex → UJ)
+z_apex_motor = z_center + arm_length * math.sin(alpha_rad * 2 * cone_engage_angle / (90 - cone_engage_angle))
+# Simpler exact formula: at tilt θ, apex z = z_center + arm * sin(θ)
+z_apex_motor = z_center + arm_length * math.sin(math.radians(cone_engage_angle))
+# ≈ 50 + 42 * sin(5°) ≈ 53.7 mm
+
+# Output shaft segments
+fixed_shaft_len = (hs - abs(uj_y)) + 15.0   # UJ → wall + 15 mm stub  (= 23 mm)
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
@@ -209,34 +219,41 @@ add_part(doc, "InputShaft_REF",
          color=(0.55, 0.55, 0.55))
 
 # ── Motor cone (upper) ───────────────────────────────────────────────
-# Apex at (0, 0, z_center), large face at (0, 0, z_center + motor_cone_h).
-# Placed with identity rotation — cone already aligned with +Z.
+# Apex at (0, 0, z_apex_motor) — shifted above z_center so that at engagement
+# tilt the two apices coincide on the Z axis.
+# Large face at (0, 0, z_apex_motor + motor_cone_h).
 add_part(doc, "MotorCone_Upper",
          make_motor_cone(),
          color=(1.00, 0.60, 0.15),
-         placement=App.Placement(App.Vector(0, 0, z_center), App.Rotation()))
+         placement=App.Placement(App.Vector(0, 0, z_apex_motor), App.Rotation()))
 
 # ── Output axis — front face (−Y direction) ─────────────────────────
 # rot_out_y: local +Z → world −Y.
-# With this rotation and placement at (0, 0, z_center):
-#   • clutch cone apex  (local z=0)             → world (0, 0,              z_center)  = UJ pivot
-#   • clutch cone base  (local z=clutch_cone_h) → world (0, −clutch_cone_h, z_center)
-#   • shaft far end     (local z=output_shaft_len)→ world (0, −output_shaft_len, z_center)
-#
-# Both the clutch cone and the output shaft are placed at the UJ pivot (y=0).
-# They rotate together around the pivot when the servo tilts the shaft.
+# The clutch cone apex is at world (0, 0, z_center); local z=0 maps there.
+# The UJ pivot is at (0, uj_y, z_center) = (0, −42, 50) — same as original.
+# The servo tilts the shaft around the UJ; the apex swings in an arc and
+# arrives at the Z axis (y≈0, z≈z_apex_motor) at cone_engage_angle tilt.
 rot_out_y = App.Rotation(App.Vector(1, 0, 0), 90)
 apex_pl   = App.Placement(App.Vector(0, 0, z_center), rot_out_y)
 
+# Clutch cone: apex at (0, 0, z_center), large face at y = −clutch_cone_h
 add_part(doc, "ClutchCone_Front",
          make_clutch_cone(),
          color=(1.00, 0.75, 0.20),
          placement=apex_pl)
 
-add_part(doc, "OutputShaft_REF",
-         make_d_shaft_seg(output_shaft_len),
-         color=(0.75, 0.75, 0.75),
+# Pivoting D-shaft: from clutch cone apex (y=0) to UJ pivot (y=uj_y=−42 mm)
+# This segment tilts with the servo — amber colour to match original convention.
+add_part(doc, "OutputShaft_Pivot_REF",
+         make_d_shaft_seg(arm_length),
+         color=(1.00, 0.80, 0.30),
          placement=apex_pl)
+
+# Fixed segment: plain cylinder from UJ pivot outward through the side wall
+add_part(doc, "OutputShaft_Fixed_REF",
+         Part.makeCylinder(shaft_dia / 2, fixed_shaft_len),
+         color=(0.70, 0.70, 0.70),
+         placement=App.Placement(App.Vector(0, uj_y, z_center), rot_out_y))
 
 # ── Spreadsheet ──────────────────────────────────────────────────────
 sheet = doc.addObject("Spreadsheet::Sheet", "Parameters")
@@ -255,8 +272,10 @@ rows = [
     ("clutch_cone_h",       clutch_cone_h,                    "mm",    "Clutch cone height along output shaft"),
     ("clutch_cone_r",       round(clutch_cone_r, 2),          "mm",    "Clutch cone large-face radius (auto)"),
     ("",                    "",                               "",      ""),
-    ("uj_y",                uj_y,                             "mm",    "UJ pivot world Y = shared apex"),
-    ("output_shaft_len",    output_shaft_len,                 "mm",    "Output shaft total length"),
+    ("uj_y",                uj_y,                             "mm",    "UJ pivot world Y (near cube wall)"),
+    ("arm_length",          arm_length,                       "mm",    "Apex → UJ distance"),
+    ("z_apex_motor",        round(z_apex_motor, 2),           "mm",    "Motor cone apex Z (above z_center)"),
+    ("fixed_shaft_len",     fixed_shaft_len,                  "mm",    "Fixed shaft stub length"),
     ("",                    "",                               "",      ""),
     ("ratio",               "1:1",                            "",      "sin(alpha)/sin(alpha) = 1"),
     ("diff_slip",           "zero",                           "",      "Shared apex → pure rolling contact"),
@@ -280,6 +299,7 @@ print(f"  Engagement tilt:   {cone_engage_angle}°")
 print(f"  Cone half-angle:   α = {alpha:.2f}°  (both cones)")
 print(f"  Motor cone:        apex ⌀0 → base ⌀{motor_cone_r*2:.1f} mm  h = {motor_cone_h} mm")
 print(f"  Clutch cone:       apex ⌀0 → base ⌀{clutch_cone_r*2:.1f} mm  h = {clutch_cone_h} mm")
-print(f"  Shared apex:       (0, 0, {z_center}) mm  [cube centre]")
+print(f"  UJ pivot:          y = {uj_y:.1f} mm  (arm = {arm_length:.1f} mm)")
+print(f"  Motor cone apex:   z = {z_apex_motor:.2f} mm  (apex at engagement on Z axis)")
 print(f"  Ratio:             1:1  |  Differential slip: zero")
 print("=" * 60)

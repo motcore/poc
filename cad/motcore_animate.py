@@ -26,9 +26,9 @@ z_center          = cube_size / 2    # = 50 mm
 cone_engage_angle = 5.0              # deg — shaft tilt to engage
 alpha             = (90.0 - cone_engage_angle) / 2.0   # = 42.5°
 
-# UJ pivot = shared apex = cube centre
-uj_y = 0.0
-PIVOT = App.Vector(0, uj_y, z_center)   # = (0, 0, 50)
+# UJ pivot — close to the cube wall, same as original design
+uj_y = -(hs - plate_thick)          # = −42 mm
+PIVOT = App.Vector(0, uj_y, z_center)   # = (0, −42, 50)
 
 # ═══════════════════════════════════════════════════════════════════
 # ANIMATION SETTINGS
@@ -42,7 +42,7 @@ PAUSE_AT_END = 0.30   # extra pause at full engagement
 MAX_ANGLE    = cone_engage_angle * 1.15
 
 # Parts created by motcore_plates.py that move as a rigid body
-MOVING_PARTS = ["ClutchCone_Front", "OutputShaft_REF"]
+MOVING_PARTS = ["ClutchCone_Front", "OutputShaft_Pivot_REF"]
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
@@ -105,7 +105,7 @@ saved_placements = {n: doc.getObject(n).Placement for n in MOVING_PARTS}
 
 print("=" * 58)
 print("Motcore v0.3 — bevel-cone engagement animation")
-print(f"  Shared apex (UJ):  (0, {uj_y}, {z_center}) mm")
+print(f"  UJ pivot:          (0, {uj_y}, {z_center}) mm")
 print(f"  Cone half-angle:   α = {alpha:.2f}°  (both cones)")
 print(f"  Engagement tilt:   {cone_engage_angle}°")
 print(f"  Max tilt shown:    {MAX_ANGLE:.2f}°")
