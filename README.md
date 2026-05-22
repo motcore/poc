@@ -214,6 +214,14 @@ cd poc
 | [3D Models](docs/3d-models.md) | FreeCAD parametric design (v0.2) |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 
+### 🛠️ Design Tools
+
+| Tool | Description |
+|------|-------------|
+| [Bevel Clutch Geometry Visualizer](https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry.html) | Interactive Y-Z cross-section of the bevel friction clutch at engagement. Adjust parameters A, B, C, D with live sliders. |
+| [FreeCAD Macro — Plates](cad/motcore_plates.py) | Generates top/bottom plates, motor cone, clutch cone and shaft references in FreeCAD. |
+| [FreeCAD Macro — Animation](cad/motcore_animate.py) | Animates clutch engagement by tilting the output shaft around the UJ pivot. Run after the plates macro. |
+
 ---
 
 ## 🗺️ Roadmap
