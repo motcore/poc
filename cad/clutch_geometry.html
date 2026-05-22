@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motcore — Bevel Clutch Geometry</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Arial, sans-serif; padding: 16px; }
+    h1 { font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 14px; letter-spacing: 0.04em; }
+    #wrap { display: flex; gap: 16px; align-items: flex-start; }
+    canvas { background: #111827; border-radius: 8px; flex-shrink: 0; }
+    #panel { display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
+    .sp { background: #1f2937; border-radius: 6px; padding: 10px 12px; }
+    .sp label { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 4px; }
+    .sp .lbl-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .sp .param-name { font-size: 13px; font-weight: 700; }
+    .sp .param-val  { font-size: 13px; font-weight: 700; }
+    input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #60a5fa; }
+    #derived { background: #1f2937; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #9ca3af; line-height: 1.8; }
+    #derived b { color: #e5e7eb; }
+    footer { margin-top: 12px; font-size: 10px; color: #4b5563; }
+  </style>
+</head>
+<body>
+  <h1>Motcore v0.3 — Bevel Clutch Geometry (engaged position, Y-Z cross-section)</h1>
+  <div id="wrap">
+    <canvas id="cvs" width="560" height="440"></canvas>
+    <div id="panel">
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#facc15">A</span>
+          <span class="param-val"  style="color:#facc15" id="vA">8°</span>
+        </div>
+        <label>engagement angle</label>
+        <input type="range" id="slA" min="2" max="25" step="0.5" value="8">
+      </div>
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#34d399">B</span>
+          <span class="param-val"  style="color:#34d399" id="vB">35 mm</span>
+        </div>
+        <label>UJ → clutch large face distance (along shaft)</label>
+        <input type="range" id="slB" min="10" max="70" step="1" value="35">
+      </div>
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#22d3ee">C</span>
+          <span class="param-val"  style="color:#22d3ee" id="vC">9 mm</span>
+        </div>
+        <label>clutch cone large face radius</label>
+        <input type="range" id="slC" min="3" max="25" step="0.5" value="9">
+      </div>
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#fb923c">D</span>
+          <span class="param-val"  style="color:#fb923c" id="vD">9 mm</span>
+        </div>
+        <label>motor cone large face radius</label>
+        <input type="range" id="slD" min="3" max="25" step="0.5" value="9">
+      </div>
+      <div id="derived"></div>
+    </div>
+  </div>
+  <footer>
+    Geometry: shared apex at the intersection of the output shaft axis and the input shaft (Z) axis.<br>
+    Contact edge (red) is the common generator of both cones. L = distance UJ → input shaft axis.
+  </footer>
+
+  <script>
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
+
+    function geom() {
+      const Ad = parseFloat(document.getElementById('slA').value);
+      const B  = parseFloat(document.getElementById('slB').value);
+      const C  = parseFloat(document.getElementById('slC').value);
+      const D  = parseFloat(document.getElementById('slD').value);
+      const A  = Ad * Math.PI / 180;
+      const cA = Math.cos(A), sA = Math.sin(A), tA = Math.tan(A);
+
+      // UJ at world origin (0, 0).  Y = right (toward input shaft),  Z = up.
+      // Input shaft (Z-axis) at y = L.
+      const L = D + B * cA - C * sA;
+
+      // Shared apex: where the output shaft axis meets the input shaft (Z) axis.
+      const apex = { y: L, z: L * tA };
+
+      // Clutch cone large face centre (distance B from UJ along tilted shaft).
+      const lfc = { y: B * cA, z: B * sA };
+
+      // Perpendicular to shaft axis: (-sA, cA) toward motor cone.
+      const upper = { y: B * cA - C * sA, z: B * sA + C * cA }; // contact edge
+      const lower = { y: B * cA + C * sA, z: B * sA - C * cA }; // far edge
+
+      // Motor cone large face.
+      const zLF   = B * sA + C * cA;   // = upper.z
+      const mLeft = { y: L - D, z: zLF };  // = contact point
+      const mRight= { y: L + D, z: zLF };
+
+      // Cone half-angles.
+      const hMotor = zLF - apex.z;
+      const distApexToLFC = Math.hypot(lfc.y - apex.y, lfc.z - apex.z);
+      const aC = Math.atan2(C, distApexToLFC) * 180 / Math.PI;
+      const aM = Math.atan2(D, hMotor)        * 180 / Math.PI;
+
+      return { A, Ad, B, C, D, L, apex, lfc, upper, lower, mLeft, mRight, zLF, hMotor, aC, aM };
+    }
+
+    function draw() {
+      const g = geom();
+      const W = cvs.width, H = cvs.height;
+      const MARGIN = 46;
+      const wallExt = 35;
+
+      const allPts = [
+        { y: 0, z: 0 },
+        { y: -wallExt, z: -wallExt * Math.tan(g.A) },
+        g.apex, g.upper, g.lower, g.mLeft, g.mRight,
+        { y: g.L, z: g.zLF + 18 },
+        { y: g.L, z: g.apex.z - 10 }
+      ];
+      const minY = Math.min(...allPts.map(p => p.y)) - 5;
+      const maxY = Math.max(...allPts.map(p => p.y)) + 10;
+      const minZ = Math.min(...allPts.map(p => p.z)) - 8;
+      const maxZ = Math.max(...allPts.map(p => p.z)) + 10;
+
+      const sc = Math.min(
+        (W - 2 * MARGIN) / (maxY - minY),
+        (H - 2 * MARGIN) / (maxZ - minZ),
+        9
+      );
+      const ox = MARGIN - minY * sc;
+      const oy = H - MARGIN + minZ * sc;
+      const c = ({ y, z }) => ({ x: ox + y * sc, y: oy - z * sc });
+
+      // Clear
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, W, H);
+
+      // Grid
+      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+      for (let y = Math.floor(minY / 10) * 10; y <= maxY + 10; y += 10) {
+        const a = c({ y, z: minZ }), b = c({ y, z: maxZ });
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      for (let z = Math.floor(minZ / 10) * 10; z <= maxZ + 10; z += 10) {
+        const a = c({ y: minY, z }), b = c({ y: maxY, z });
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+
+      // Input shaft (vertical, blue)
+      ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      const sh1 = c({ y: g.L, z: minZ + 2 }), sh2 = c({ y: g.L, z: maxZ - 2 });
+      ctx.beginPath(); ctx.moveTo(sh1.x, sh1.y); ctx.lineTo(sh2.x, sh2.y); ctx.stroke();
+      ctx.fillStyle = '#93c5fd'; ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText('input shaft', sh2.x + 5, sh2.y + 14);
+
+      // Neutral output shaft (dashed reference)
+      ctx.strokeStyle = '#374151'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(c({ y: -wallExt, z: 0 }).x, c({ y: -wallExt, z: 0 }).y);
+      ctx.lineTo(c({ y: g.L + 5, z: 0 }).x,  c({ y: g.L + 5, z: 0 }).y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Output shaft at engagement
+      const cA = Math.cos(g.A), sA = Math.sin(g.A);
+      const oe1 = c({ y: -wallExt,         z: -wallExt * sA / cA });
+      const oe2 = c({ y: g.apex.y + 2*cA,  z: g.apex.z + 2*sA  });
+      ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(oe1.x, oe1.y); ctx.lineTo(oe2.x, oe2.y); ctx.stroke();
+      const el = c({ y: -wallExt + 3, z: (-wallExt + 3) * sA / cA - 4 });
+      ctx.fillStyle = '#6ee7b7'; ctx.font = '10px Segoe UI';
+      ctx.fillText('output shaft', el.x, el.y);
+
+      // Motor cone
+      const ma = c(g.apex), ml = c(g.mLeft), mr = c(g.mRight);
+      ctx.fillStyle = 'rgba(251,146,60,0.22)'; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(ml.x, ml.y); ctx.lineTo(mr.x, mr.y); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fb923c'; ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText('motor cone', mr.x + 5, mr.y + 4);
+
+      // Clutch cone (apex = shared apex)
+      const cu = c(g.upper), cl = c(g.lower);
+      ctx.fillStyle = 'rgba(34,211,238,0.22)'; ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(cu.x, cu.y); ctx.lineTo(cl.x, cl.y); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 11px Segoe UI';
+      const ccm = c({ y: (g.upper.y + g.lower.y) / 2 - 6, z: (g.upper.z + g.lower.z) / 2 });
+      ctx.fillText('clutch cone', ccm.x - 48, ccm.y + 4);
+
+      // Shared apex dot
+      ctx.fillStyle = '#a78bfa'; ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ma.x, ma.y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#c4b5fd'; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText('apex', ma.x + 7, ma.y - 5);
+
+      // Contact edge (common generator)
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(cu.x, cu.y); ctx.stroke();
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(cu.x, cu.y, 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#fca5a5'; ctx.font = '10px Segoe UI';
+      ctx.fillText('contact', cu.x + 7, cu.y - 3);
+
+      // UJ pivot
+      const uj = c({ y: 0, z: 0 });
+      ctx.fillStyle = '#facc15'; ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(uj.x, uj.y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fef08a'; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText('UJ', uj.x - 18, uj.y + 4);
+
+      // Dim B
+      const lf = c(g.lfc);
+      ctx.strokeStyle = '#34d39966'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(uj.x, uj.y); ctx.lineTo(lf.x, lf.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const bm = c({ y: g.lfc.y / 2, z: g.lfc.z / 2 });
+      ctx.fillStyle = '#34d399'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('B', bm.x - 3, bm.y - 5);
+
+      // Dim C
+      ctx.strokeStyle = '#22d3ee88'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(lf.x, lf.y); ctx.lineTo(cu.x, cu.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const cm2 = c({ y: (g.lfc.y + g.upper.y) / 2 - 2, z: (g.lfc.z + g.upper.z) / 2 + 2 });
+      ctx.fillStyle = '#22d3ee'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('C', cm2.x + 2, cm2.y);
+
+      // Dim D
+      const mc_lf = c({ y: g.L, z: g.zLF });
+      ctx.strokeStyle = '#fb923c88'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(mc_lf.x, mc_lf.y); ctx.lineTo(ml.x, ml.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const dm = c({ y: g.L - g.D / 2, z: g.zLF + 4 });
+      ctx.fillStyle = '#fb923c'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('D', dm.x, dm.y);
+
+      // Angle A arc
+      ctx.strokeStyle = '#facc15'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(uj.x, uj.y, 20, -g.A, 0, false); ctx.stroke();
+      ctx.fillStyle = '#facc15'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('A', uj.x + 22, uj.y - 6);
+
+      // L dimension
+      const lLabel = c({ y: g.L / 2, z: -6 });
+      ctx.strokeStyle = '#9ca3af44'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(c({ y: 0,   z: -5 }).x, c({ y: 0,   z: -5 }).y);
+      ctx.lineTo(c({ y: g.L, z: -5 }).x, c({ y: g.L, z: -5 }).y);
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#9ca3af'; ctx.font = '10px Segoe UI';
+      ctx.fillText('L = ' + g.L.toFixed(1) + ' mm', lLabel.x - 14, lLabel.y + 14);
+
+      // Update slider labels
+      document.getElementById('vA').textContent = g.Ad.toFixed(1) + '°';
+      document.getElementById('vB').textContent = g.B.toFixed(0) + ' mm';
+      document.getElementById('vC').textContent = g.C.toFixed(1) + ' mm';
+      document.getElementById('vD').textContent = g.D.toFixed(1) + ' mm';
+
+      document.getElementById('derived').innerHTML =
+        '<b>α clutch</b> = ' + g.aC.toFixed(1) + '°<br>' +
+        '<b>α motor</b> = '  + g.aM.toFixed(1) + '°<br>' +
+        '<b>Σα</b> = ' + (g.aC + g.aM).toFixed(1) + '°&nbsp;&nbsp;(bevel ideal: ' + (90 - g.Ad).toFixed(0) + '°)<br>' +
+        '<b>z contact</b> = ' + g.zLF.toFixed(1) + ' mm<br>' +
+        '<b>L</b> (UJ → input shaft) = ' + g.L.toFixed(1) + ' mm';
+    }
+
+    ['slA', 'slB', 'slC', 'slD'].forEach(id =>
+      document.getElementById(id).addEventListener('input', draw));
+
+    draw();
+  </script>
+</body>
+</html>
