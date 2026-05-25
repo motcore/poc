@@ -1,8 +1,7 @@
 # Motcore Bevel Clutch — Geometry & Equations
 
-This document derives the governing equations of the bevel friction clutch used
-in Motcore v0.3. The interactive visualizer is at
-`cad/clutch_geometry.html` (also accessible via htmlpreview.github.io).
+The interactive visualizer is at `cad/clutch_geometry.html`. This document
+derives the equations implemented there.
 
 ---
 
@@ -13,17 +12,17 @@ shaft has a **bevel cone friction clutch**: a truncated cone mounted on the
 output shaft that, when the shaft is tilted by a servo, makes surface contact
 with the motor cone on the Z shaft and transmits torque by friction.
 
-The design goal is **generator-line contact** (not point, not interference) so
-that torque is distributed along a line and the clutch can disengage cleanly.
+The design goal is **generator-line contact** — both cones share a common apex
+and are tangent along a common generator line.
 
 ---
 
-## 2. The four parameters
+## 2. The four free parameters
 
 ```
 A  — engagement angle (degrees): how much the servo tilts the output shaft
-B  — arm length (mm): distance along the output shaft from the UJ pivot
-     to the large face of the clutch cone
+B  — arm length (mm): distance along the output shaft from UJ pivot to the
+     large face of the clutch cone
 C  — clutch cone large-face radius (mm)
 D  — motor cone large-face radius (mm)
 ```
@@ -32,198 +31,155 @@ All other dimensions are derived from these four.
 
 ---
 
-## 3. Geometry in the Y-Z plane
+## 3. Coordinate system
 
-In the neutral (disengaged) position the output shaft lies along −Y. When the
-servo engages, it tilts the shaft by angle A around the UJ pivot.
+The geometry is described in the Y-Z cross-section:
 
 ```
-Z
-│         apex (shared)
-│         ╱╲
-│        ╱  ╲  ← motor cone (opens downward, half-angle α)
-│       ╱    ╲
-│──────●──────── z_center = 50 mm
-│       ╲    ╱
-│        ╲  ╱  ← clutch cone (tilted A° from −Y axis, half-angle α)
-│         ╲╱
-│
-│         UJ pivot at y = −42 mm
-│
-Y ──────────────────────
+Z (up)
+│                     ╔═══════╗
+│             apex ●──╢ motor ╟── input shaft at y = L
+│            ╱    └───╚═══════╝
+│           ╱  ← contact edge (red)
+│          ╱ ← clutch cone (tilted A° from horizontal)
+│─────────●──────────────────── Y (horizontal)
+│        UJ pivot (origin)
 ```
 
-Key points (at engagement):
-- **Shared apex**: on the Z axis, at z = z_center + arm · sin(A)
-- **Contact generator**: the line along both cone surfaces from apex to the
-  shared large-face edge
+- **UJ pivot** = world origin (y=0, z=0)
+- **Y** = horizontal, pointing toward the input shaft
+- **Z** = vertical, pointing up (input shaft direction)
+- **Input shaft** sits at a horizontal distance L from the UJ (derived)
 
 ---
 
-## 4. Bevel condition
+## 4. Deriving L — the key constraint
 
-For generator-line contact, the two cone surfaces must be tangent along a
-common generator. This requires that both cones share exactly one apex, and
-that the sum of their half-angles equals the angle between their axes:
+When the output shaft is tilted by angle A, the clutch cone large face is at:
 
 ```
-α_e + α_m = angle_between_axes
+lfc_y = B·cos(A)
+lfc_z = B·sin(A)
 ```
 
-At engagement the output shaft axis makes angle (90° − A) with the Z axis
-(since A is measured from the XY plane). Therefore:
+The perpendicular to the shaft axis (pointing toward the motor) is (−sin A, cos A).
+The contact edge endpoint (where the clutch cone large face meets the motor cone) is:
 
 ```
-angle_between_axes = 90° − A
-
-→  α_e + α_m = 90° − A          [Bevel condition]
+contact_y = B·cos(A) − C·sin(A)
+contact_z = B·sin(A) + C·cos(A)
 ```
 
-**This condition is automatically satisfied** by the shared-apex construction.
-Choosing any A, B, C, D and computing the cone half-angles from them
-geometrically guarantees the bevel condition holds. You do not need to check it
-separately.
+For this point to lie on the motor cone large face, which has radius D centred
+on the input shaft at y = L, we need:
+
+```
+contact_y = L − D
+```
+
+Therefore:
+
+```
+L = D + B·cos(A) − C·sin(A)          [Key derived dimension]
+```
+
+L is not a free parameter — it is fully determined by A, B, C, D.
 
 ---
 
-## 5. Cone half-angles from the parameters
+## 5. Shared apex position
 
-The clutch cone large face is at distance B from the UJ pivot along the output
-shaft. Its large-face radius is C. Therefore:
-
-```
-α_e = arctan(C / B)
-```
-
-The motor cone large-face radius is D. For its apex to coincide with the clutch
-cone apex at engagement, the motor cone height h_m satisfies:
+The output shaft axis, tilted by A from horizontal, passes through the UJ origin
+with slope tan(A). It meets the input shaft (vertical line at y = L) at:
 
 ```
-h_m = D / tan(α_m)    →    α_m = arctan(D / h_m)
+apex_y = L
+apex_z = L · tan(A)                   [Shared apex]
 ```
 
-At engagement the apex sits at:
-
-```
-z_apex = z_center + arm_length · sin(A)
-```
-
-where `arm_length` is the UJ-pivot-to-apex distance in neutral position.
+Both cones have their apex at this point.
 
 ---
 
-## 6. 1:1 ratio condition
+## 6. Motor cone geometry
 
-Bevel gear ratio = sin(α_m) / sin(α_e).
-
-For **1:1 ratio**: α_m = α_e = α, which means C = D (equal large-face radii).
-
-Combined with the bevel condition:
+The motor cone's large face is horizontal at height contact_z, centred on the
+input shaft. Its height (from apex to large face) is:
 
 ```
-2α = 90° − A
-
-→  α = (90° − A) / 2            [Half-angle for 1:1 ratio]
+h_motor = contact_z − apex_z
+        = B·sin(A) + C·cos(A) − L·tan(A)
 ```
-
-Example: A = 40°  →  α = 25°.
 
 ---
 
-## 7. Large-face radius from cone height
-
-Given cone height h and half-angle α:
+## 7. Cone half-angles
 
 ```
-r = h · tan(α)
-```
+dist_apex_lfc = √[(lfc_y − apex_y)² + (lfc_z − apex_z)²]
 
-Motcore uses equal heights for both cones (h = 20 mm), so both radii are equal
-(C = D) and are fully determined by A.
+α_clutch = arctan( C / dist_apex_lfc )
+α_motor  = arctan( D / h_motor )
+```
 
 ---
 
-## 8. Motor cone apex position
+## 8. Bevel condition
 
-In neutral, the clutch cone apex is at world position (0, 0, z_center). The UJ
-pivot is at (0, uj_y, z_center) where uj_y = −(cube_size/2 − plate_thick).
-
-When the servo tilts the shaft by angle A, the apex traces an arc of radius
-`arm_length = |uj_y|` around the UJ pivot. Its Z coordinate becomes:
+For generator-line contact, the sum of the two half-angles must equal the angle
+between the shaft axes:
 
 ```
-z_apex_motor = z_center + arm_length · sin(A)
+α_clutch + α_motor = 90° − A          [Bevel condition]
 ```
 
-The motor cone apex must be placed at this Z coordinate so the two apices
-coincide at full engagement.
+**This is automatically satisfied** by the shared-apex construction — you do not
+need to check or enforce it. Choosing any A, B, C, D and computing L as above
+guarantees the bevel condition holds.
 
 ---
 
 ## 9. Self-locking condition
 
-The clutch must be disengageable by the servo. With a conical surface, the
-friction force has a component along the cone axis. Self-locking occurs when:
+With a conical surface, friction has a component along the cone axis. Self-locking
+occurs when the servo cannot disengage the clutch:
 
 ```
-μ ≥ tan(α)    ← clutch cannot be disengaged
+μ ≥ tan(α_clutch)    ← self-locked, cannot disengage
+
+μ < tan(α_clutch)    ← safe, servo can disengage
 ```
 
-Safe operation requires:
-
-```
-μ < tan(α)    [Self-locking avoidance condition]
-```
-
-For A = 40°, α = 25°, tan(25°) ≈ 0.47. Typical rubber-on-plastic μ ≈ 0.3–0.4,
-so the margin is comfortable.
-
-Choosing a **smaller A** (smaller α) reduces this margin. The minimum practical
-A depends on the friction material; for rubber μ ≈ 0.4, the limit is
-α > arctan(0.4) ≈ 22°, i.e. A < 46°.
+At small A (e.g. 8°), α_clutch is large (~49°), so tan(α_clutch) ≈ 1.1 — well
+above any practical friction coefficient. Self-locking is not a concern at small
+engagement angles.
 
 ---
 
-## 10. Neutral-state clearance
+## 10. Summary table
 
-For the motor cone not to overlap the clutch cone in the disengaged position,
-the motor cone large face (at z = z_apex_motor − h_m) must stay above z_center:
-
-```
-z_apex_motor − h_m > z_center
-
-→  arm_length · sin(A) > h_m
-
-→  A > arcsin(h_m / arm_length)    [Minimum engagement angle]
-```
-
-With arm_length = 42 mm, h_m = 20 mm: A_min = arcsin(20/42) ≈ 28.5°. In
-practice a margin of ~10° is advisable, giving A ≥ 37–40°.
-
----
-
-## 11. Summary table
-
-| Equation | Formula |
+| Quantity | Formula |
 |----------|---------|
-| Bevel condition | α_e + α_m = 90° − A |
-| 1:1 half-angle | α = (90° − A) / 2 |
-| Cone radius | r = h · tan(α) |
-| Apex Z at engagement | z_apex = z_center + arm · sin(A) |
-| Self-locking limit | μ < tan(α) |
-| Minimum A (clearance) | A > arcsin(h_m / arm) |
+| L (UJ to input shaft) | D + B·cos(A) − C·sin(A) |
+| Apex position | (L, L·tan(A)) in (y, z) |
+| Contact point | (L−D, B·sin(A)+C·cos(A)) |
+| Motor cone height | B·sin(A) + C·cos(A) − L·tan(A) |
+| α_clutch | arctan(C / dist(apex, lfc)) |
+| α_motor | arctan(D / h_motor) |
+| Bevel condition | α_clutch + α_motor = 90° − A (auto) |
+| Self-locking limit | μ < tan(α_clutch) |
 
 ---
 
-## 12. Reference: current values (A = 40°)
+## 11. Default parameter values
 
-| Quantity | Value |
-|----------|-------|
-| A (engagement angle) | 40° |
-| α (half-angle, both cones) | 25° |
-| B (arm length, UJ → apex) | 42 mm |
-| C = D (large-face radius) | ≈ 9.3 mm |
-| h_m = h_e (cone height) | 20 mm |
-| z_apex at engagement | ≈ 77 mm |
-| tan(α) | 0.466 |
-| Self-locking margin (μ < 0.47) | comfortable for rubber/plastic |
+| Parameter | Value |
+|-----------|-------|
+| A | 8° |
+| B | 35 mm |
+| C | 9 mm |
+| D | 9 mm |
+| L (derived) | ≈ 42.4 mm |
+| apex_z (derived) | ≈ 6.0 mm |
+| h_motor (derived) | ≈ 7.8 mm |
+| α_clutch ≈ α_motor | ≈ 49° |
