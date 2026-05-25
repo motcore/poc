@@ -17,20 +17,34 @@
     .sp .param-name { font-size: 13px; font-weight: 700; }
     .sp .param-val  { font-size: 13px; font-weight: 700; }
     input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #60a5fa; }
+    input[type=range].theta-range { accent-color: #a78bfa; }
     #derived { background: #1f2937; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #9ca3af; line-height: 1.8; }
     #derived b { color: #e5e7eb; }
+    #controls { background: #1f2937; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    #controls label { font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    #controls label input[type=checkbox] { cursor: pointer; accent-color: #a78bfa; }
+    #btnAnim {
+      background: #2d3748; border: 1px solid #4a5568; color: #e2e8f0;
+      border-radius: 5px; padding: 7px 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    #btnAnim:hover { background: #3d4f68; }
+    #btnAnim.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+    #interferenceAlert { font-size: 11px; font-weight: 700; text-align: center; min-height: 16px; }
     footer { margin-top: 12px; font-size: 10px; color: #4b5563; }
   </style>
 </head>
 <body>
-  <h1>Motcore v0.3 — Bevel Clutch Geometry (engaged position, Y-Z cross-section)</h1>
+  <h1>Motcore v0.3 — Bevel Clutch Geometry (Y-Z cross-section)</h1>
   <div id="wrap">
     <canvas id="cvs" width="560" height="440"></canvas>
     <div id="panel">
+
+      <!-- Parameters -->
       <div class="sp">
         <div class="lbl-row">
           <span class="param-name" style="color:#facc15">A</span>
-          <span class="param-val"  style="color:#facc15" id="vA">8°</span>
+          <span class="param-val" style="color:#facc15" id="vA">8°</span>
         </div>
         <label>engagement angle</label>
         <input type="range" id="slA" min="2" max="25" step="0.5" value="8">
@@ -38,15 +52,15 @@
       <div class="sp">
         <div class="lbl-row">
           <span class="param-name" style="color:#34d399">B</span>
-          <span class="param-val"  style="color:#34d399" id="vB">35 mm</span>
+          <span class="param-val" style="color:#34d399" id="vB">35 mm</span>
         </div>
-        <label>UJ → clutch large face distance (along shaft)</label>
+        <label>UJ → clutch large face (along shaft)</label>
         <input type="range" id="slB" min="10" max="70" step="1" value="35">
       </div>
       <div class="sp">
         <div class="lbl-row">
           <span class="param-name" style="color:#22d3ee">C</span>
-          <span class="param-val"  style="color:#22d3ee" id="vC">9 mm</span>
+          <span class="param-val" style="color:#22d3ee" id="vC">9 mm</span>
         </div>
         <label>clutch cone large face radius</label>
         <input type="range" id="slC" min="3" max="25" step="0.5" value="9">
@@ -54,22 +68,61 @@
       <div class="sp">
         <div class="lbl-row">
           <span class="param-name" style="color:#fb923c">D</span>
-          <span class="param-val"  style="color:#fb923c" id="vD">9 mm</span>
+          <span class="param-val" style="color:#fb923c" id="vD">9 mm</span>
         </div>
         <label>motor cone large face radius</label>
         <input type="range" id="slD" min="3" max="25" step="0.5" value="9">
       </div>
+
+      <!-- Inner radius -->
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#f472b6">r</span>
+          <span class="param-val" style="color:#f472b6" id="vR">3 mm</span>
+        </div>
+        <label>small face radius (inner)</label>
+        <input type="range" id="slR" min="0.5" max="25" step="0.25" value="3">
+      </div>
+
+      <!-- Theta slider -->
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#a78bfa">θ</span>
+          <span class="param-val" style="color:#a78bfa" id="vT">8°</span>
+        </div>
+        <label>current angle (← disengage / engage →)</label>
+        <input type="range" class="theta-range" id="slT" min="0" max="8" step="0.25" value="8">
+      </div>
+
+      <!-- Controls -->
+      <div id="controls">
+        <button id="btnAnim">▶ Animate disengagement</button>
+        <label>
+          <input type="checkbox" id="chkSweep">
+          Show full sweep
+        </label>
+        <div id="interferenceAlert"></div>
+      </div>
+
       <div id="derived"></div>
     </div>
   </div>
   <footer>
-    Geometry: shared apex at the intersection of the output shaft axis and the input shaft (Z) axis.<br>
-    Contact edge (red) is the common generator of both cones. L = distance UJ → input shaft axis.
+    Geometry: shared apex at intersection of output shaft axis and input shaft (Z axis) — only at full engagement.<br>
+    During disengagement the clutch cone rotates as a rigid body around the UJ pivot.
   </footer>
 
   <script>
     const cvs = document.getElementById('cvs');
     const ctx = cvs.getContext('2d');
+    let _transform = null; // { ox, oy, sc } set by draw()
+
+    function c({ y, z }) {
+      return { x: _transform.ox + y * _transform.sc,
+               y: _transform.oy - z * _transform.sc };
+    }
+
+    // ── Geometry ─────────────────────────────────────────────────────────────
 
     function geom() {
       const Ad = parseFloat(document.getElementById('slA').value);
@@ -77,62 +130,160 @@
       const C  = parseFloat(document.getElementById('slC').value);
       const D  = parseFloat(document.getElementById('slD').value);
       const A  = Ad * Math.PI / 180;
-      const cA = Math.cos(A), sA = Math.sin(A), tA = Math.tan(A);
+      const cA = Math.cos(A), sA = Math.sin(A);
 
-      // UJ at world origin (0, 0).  Y = right (toward input shaft),  Z = up.
-      // Input shaft (Z-axis) at y = L.
-      const L = D + B * cA - C * sA;
-
-      // Shared apex: where the output shaft axis meets the input shaft (Z) axis.
-      const apex = { y: L, z: L * tA };
-
-      // Clutch cone large face centre (distance B from UJ along tilted shaft).
-      const lfc = { y: B * cA, z: B * sA };
-
-      // Perpendicular to shaft axis: (-sA, cA) toward motor cone.
-      const upper = { y: B * cA - C * sA, z: B * sA + C * cA }; // contact edge
-      const lower = { y: B * cA + C * sA, z: B * sA - C * cA }; // far edge
-
-      // Motor cone large face.
-      const zLF   = B * sA + C * cA;   // = upper.z
-      const mLeft = { y: L - D, z: zLF };  // = contact point
+      // Engaged geometry (motor cone is fixed here)
+      const L     = D + B * cA - C * sA;
+      const apex  = { y: L, z: L * Math.tan(A) };
+      const upper = { y: B * cA - C * sA, z: B * sA + C * cA };
+      const lower = { y: B * cA + C * sA, z: B * sA - C * cA };
+      const zLF   = B * sA + C * cA;
+      const mLeft = { y: L - D, z: zLF };
       const mRight= { y: L + D, z: zLF };
-
-      // Cone half-angles.
       const hMotor = zLF - apex.z;
-      const distApexToLFC = Math.hypot(lfc.y - apex.y, lfc.z - apex.z);
-      const aC = Math.atan2(C, distApexToLFC) * 180 / Math.PI;
-      const aM = Math.atan2(D, hMotor)        * 180 / Math.PI;
 
-      return { A, Ad, B, C, D, L, apex, lfc, upper, lower, mLeft, mRight, zLF, hMotor, aC, aM };
+      const lfc = { y: B * cA, z: B * sA };
+      const dApexLfc = Math.hypot(lfc.y - apex.y, lfc.z - apex.z);
+      const aC = Math.atan2(C, dApexLfc) * 180 / Math.PI;
+      const aM = Math.atan2(D, hMotor)   * 180 / Math.PI;
+
+      return { A, Ad, B, C, D, L, cA, sA, apex, upper, lower, lfc,
+               mLeft, mRight, zLF, hMotor, aC, aM };
     }
+
+    function rInner() {
+      return parseFloat(document.getElementById('slR').value);
+    }
+
+    // Clutch cone as rigid body rotated to angle theta around UJ.
+    // apex_r = distance from UJ to apex along shaft = L / cos(A)  (apex is beyond lfc)
+    function clutchAtTheta(g, theta) {
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const { B, C, D, L, cA } = g;
+      const apexR = L / cA;
+
+      const apex  = { y: apexR * ct,      z: apexR * st };
+      const upper = { y: B * ct - C * st, z: B * st + C * ct };
+      const lower = { y: B * ct + C * st, z: B * st - C * ct };
+
+      // Truncate at same t along generator as motor cone: t_cut = r / D
+      // This guarantees upperSmall coincides with the motor cone small face contact point.
+      const t = Math.min(rInner() / D, 0.85);
+      const upperSmall = {
+        y: apex.y + t * (upper.y - apex.y),
+        z: apex.z + t * (upper.z - apex.z),
+      };
+      const lowerSmall = {
+        y: apex.y + t * (lower.y - apex.y),
+        z: apex.z + t * (lower.z - apex.z),
+      };
+
+      return { apex, lfc: { y: B * ct, z: B * st }, upper, lower, upperSmall, lowerSmall };
+    }
+
+    // Motor cone small face: truncated at t_cut = r / D along each generator from apex.
+    function motorSmallFace(g) {
+      const t = Math.min(rInner() / g.D, 0.85);
+      return {
+        left:  { y: g.apex.y + t * (g.mLeft.y  - g.apex.y),
+                  z: g.apex.z + t * (g.mLeft.z  - g.apex.z) },
+        right: { y: g.apex.y + t * (g.mRight.y - g.apex.y),
+                  z: g.apex.z + t * (g.mRight.z - g.apex.z) },
+      };
+    }
+
+    // Check if clutch cone at theta interferes with (fixed) motor cone.
+    function checkInterference(g, theta) {
+      const cc = clutchAtTheta(g, theta);
+      const { L, D, apex: mApex, zLF, hMotor } = g;
+      // Sample along apex→upper generator
+      for (let t = 0; t <= 1; t += 0.05) {
+        const py = cc.apex.y + t * (cc.upper.y - cc.apex.y);
+        const pz = cc.apex.z + t * (cc.upper.z - cc.apex.z);
+        if (pz < mApex.z - 0.1 || pz > zLF + 0.1) continue;
+        const motorR = D * (pz - mApex.z) / hMotor;
+        if ((L - py) <= motorR + 0.05) return true;
+      }
+      return false;
+    }
+
+    // ── Draw helpers ─────────────────────────────────────────────────────────
+
+    // Draw clutch cone as frustum (trapezoid: small face → large face)
+    function drawClutchCone(cc, strokeColor, fillColor, lineWidth) {
+      const us = c(cc.upperSmall), ls = c(cc.lowerSmall);
+      const cu = c(cc.upper),      cl = c(cc.lower);
+      ctx.fillStyle   = fillColor;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth   = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(us.x, us.y);
+      ctx.lineTo(cu.x, cu.y);
+      ctx.lineTo(cl.x, cl.y);
+      ctx.lineTo(ls.x, ls.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Draw motor cone as frustum (trapezoid)
+    function drawMotorCone(g, strokeColor, fillColor, lineWidth) {
+      const sf  = motorSmallFace(g);
+      const msl = c(sf.left), msr = c(sf.right);
+      const ml  = c(g.mLeft), mr = c(g.mRight);
+      ctx.fillStyle   = fillColor;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth   = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(msl.x, msl.y);
+      ctx.lineTo(ml.x,  ml.y);
+      ctx.lineTo(mr.x,  mr.y);
+      ctx.lineTo(msr.x, msr.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = strokeColor; ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText('motor cone', mr.x + 5, mr.y + 4);
+    }
+
+    // ── Main draw ────────────────────────────────────────────────────────────
 
     function draw() {
       const g = geom();
+      const thetaDeg = parseFloat(document.getElementById('slT').value);
+      const theta    = thetaDeg * Math.PI / 180;
+      const cc       = clutchAtTheta(g, theta);
+      const atEngaged = Math.abs(thetaDeg - g.Ad) < 0.01;
+      const showSweep = document.getElementById('chkSweep').checked;
+
       const W = cvs.width, H = cvs.height;
       const MARGIN = 46;
-      const wallExt = 35;
 
-      const allPts = [
-        { y: 0, z: 0 },
-        { y: -wallExt, z: -wallExt * Math.tan(g.A) },
-        g.apex, g.upper, g.lower, g.mLeft, g.mRight,
+      // Bounding box from fixed elements + both extreme positions (θ=A and θ=0)
+      // so the transform never changes as theta moves.
+      const cc0 = clutchAtTheta(g, 0);
+      const pts = [
+        { y: 0, z: 0 }, // UJ
+        g.apex, g.upper, g.lower, g.mLeft, g.mRight,  // motor cone + engaged clutch
+        cc0.apex, cc0.upper, cc0.lower,                // clutch at θ=0
         { y: g.L, z: g.zLF + 18 },
         { y: g.L, z: g.apex.z - 10 }
       ];
-      const minY = Math.min(...allPts.map(p => p.y)) - 5;
-      const maxY = Math.max(...allPts.map(p => p.y)) + 10;
-      const minZ = Math.min(...allPts.map(p => p.z)) - 8;
-      const maxZ = Math.max(...allPts.map(p => p.z)) + 10;
+      const minY = Math.min(...pts.map(p => p.y)) - 5;
+      const maxY = Math.max(...pts.map(p => p.y)) + 10;
+      const minZ = Math.min(...pts.map(p => p.z)) - 8;
+      const maxZ = Math.max(...pts.map(p => p.z)) + 10;
 
       const sc = Math.min(
         (W - 2 * MARGIN) / (maxY - minY),
         (H - 2 * MARGIN) / (maxZ - minZ),
         9
       );
-      const ox = MARGIN - minY * sc;
-      const oy = H - MARGIN + minZ * sc;
-      const c = ({ y, z }) => ({ x: ox + y * sc, y: oy - z * sc });
+      _transform = {
+        ox: MARGIN - minY * sc,
+        oy: H - MARGIN + minZ * sc,
+        sc
+      };
 
       // Clear
       ctx.clearRect(0, 0, W, H);
@@ -150,87 +301,114 @@
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
 
-      // Input shaft (vertical, blue)
+      // ── Sweep overlay ──
+      let anyInterference = false;
+      if (showSweep) {
+        const N = 14;
+        for (let i = 0; i <= N; i++) {
+          const t = g.A * i / N;
+          const interferes = checkInterference(g, t);
+          if (interferes) anyInterference = true;
+          ctx.globalAlpha = 0.45;
+          drawClutchCone(
+            clutchAtTheta(g, t),
+            interferes ? '#ef4444' : '#22d3ee',
+            interferes ? 'rgba(239,68,68,0.15)' : 'rgba(34,211,238,0.07)',
+            1
+          );
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // ── Input shaft (fixed, blue vertical line) ──
       ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-      const sh1 = c({ y: g.L, z: minZ + 2 }), sh2 = c({ y: g.L, z: maxZ - 2 });
-      ctx.beginPath(); ctx.moveTo(sh1.x, sh1.y); ctx.lineTo(sh2.x, sh2.y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(c({ y: g.L, z: minZ + 2 }).x, c({ y: g.L, z: minZ + 2 }).y);
+      ctx.lineTo(c({ y: g.L, z: maxZ - 2 }).x, c({ y: g.L, z: maxZ - 2 }).y);
+      ctx.stroke();
       ctx.fillStyle = '#93c5fd'; ctx.font = 'bold 11px Segoe UI';
+      const sh2 = c({ y: g.L, z: maxZ - 2 });
       ctx.fillText('input shaft', sh2.x + 5, sh2.y + 14);
 
-      // Neutral output shaft (dashed reference)
-      ctx.strokeStyle = '#374151'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(c({ y: -wallExt, z: 0 }).x, c({ y: -wallExt, z: 0 }).y);
-      ctx.lineTo(c({ y: g.L + 5, z: 0 }).x,  c({ y: g.L + 5, z: 0 }).y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Output shaft at engagement
-      const cA = Math.cos(g.A), sA = Math.sin(g.A);
-      const oe1 = c({ y: -wallExt,         z: -wallExt * sA / cA });
-      const oe2 = c({ y: g.apex.y + 2*cA,  z: g.apex.z + 2*sA  });
-      ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(oe1.x, oe1.y); ctx.lineTo(oe2.x, oe2.y); ctx.stroke();
-      const el = c({ y: -wallExt + 3, z: (-wallExt + 3) * sA / cA - 4 });
-      ctx.fillStyle = '#6ee7b7'; ctx.font = '10px Segoe UI';
-      ctx.fillText('output shaft', el.x, el.y);
-
-      // Motor cone
-      const ma = c(g.apex), ml = c(g.mLeft), mr = c(g.mRight);
-      ctx.fillStyle = 'rgba(251,146,60,0.22)'; ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(ml.x, ml.y); ctx.lineTo(mr.x, mr.y); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#fb923c'; ctx.font = 'bold 11px Segoe UI';
-      ctx.fillText('motor cone', mr.x + 5, mr.y + 4);
-
-      // Clutch cone (apex = shared apex)
-      const cu = c(g.upper), cl = c(g.lower);
-      ctx.fillStyle = 'rgba(34,211,238,0.22)'; ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(cu.x, cu.y); ctx.lineTo(cl.x, cl.y); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 11px Segoe UI';
-      const ccm = c({ y: (g.upper.y + g.lower.y) / 2 - 6, z: (g.upper.z + g.lower.z) / 2 });
-      ctx.fillText('clutch cone', ccm.x - 48, ccm.y + 4);
-
-      // Shared apex dot
-      ctx.fillStyle = '#a78bfa'; ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(ma.x, ma.y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#c4b5fd'; ctx.font = 'bold 10px Segoe UI';
-      ctx.fillText('apex', ma.x + 7, ma.y - 5);
-
-      // Contact edge (common generator)
-      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(ma.x, ma.y); ctx.lineTo(cu.x, cu.y); ctx.stroke();
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath(); ctx.arc(cu.x, cu.y, 5, 0, 2 * Math.PI); ctx.fill();
-      ctx.fillStyle = '#fca5a5'; ctx.font = '10px Segoe UI';
-      ctx.fillText('contact', cu.x + 7, cu.y - 3);
-
-      // UJ pivot
+      // ── Output shaft — from UJ toward clutch cone ──
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const shaftEnd = { y: cc.lfc.y + 8 * ct, z: cc.lfc.z + 8 * st }; // a bit past large face
       const uj = c({ y: 0, z: 0 });
+      const se = c(shaftEnd);
+      ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(uj.x, uj.y); ctx.lineTo(se.x, se.y); ctx.stroke();
+      // Label near midpoint
+      const smid = c({ y: cc.lfc.y * 0.4, z: cc.lfc.z * 0.4 });
+      ctx.fillStyle = '#6ee7b7'; ctx.font = '10px Segoe UI';
+      ctx.fillText('output shaft', smid.x - 20, smid.y - 7);
+
+      // ── Motor cone (always at engagement position — fixed in space) ──
+      drawMotorCone(g, '#fb923c', 'rgba(251,146,60,0.22)', 2);
+      const ma_e = c(g.apex), ml = c(g.mLeft), mr = c(g.mRight);
+
+      // ── Clutch cone at current theta ──
+      const interferesCurrent = !atEngaged && checkInterference(g, theta);
+      drawClutchCone(
+        cc,
+        interferesCurrent ? '#ef4444' : '#22d3ee',
+        interferesCurrent ? 'rgba(239,68,68,0.25)' : 'rgba(34,211,238,0.22)',
+        2
+      );
+      // Label
+      ctx.fillStyle = interferesCurrent ? '#ef4444' : '#22d3ee';
+      ctx.font = 'bold 11px Segoe UI';
+      const ccMid = c({ y: (cc.upper.y + cc.lower.y) / 2 - 5,
+                         z: (cc.upper.z + cc.lower.z) / 2 });
+      ctx.fillText('clutch cone', ccMid.x - 48, ccMid.y + 4);
+
+      // ── Small face of clutch cone (replaces apex dot) ──
+      const us2 = c(cc.upperSmall), ls2 = c(cc.lowerSmall);
+      ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(us2.x, us2.y); ctx.lineTo(ls2.x, ls2.y); ctx.stroke();
+      if (atEngaged) {
+        ctx.fillStyle = '#c4b5fd'; ctx.font = 'bold 10px Segoe UI';
+        ctx.fillText('shared apex', us2.x + 6, us2.y - 4);
+      }
+
+      // ── Contact edge — only at full engagement (from small face to large face) ──
+      if (atEngaged) {
+        const cu  = c(g.upper);
+        const ccE = clutchAtTheta(g, g.A);
+        const cus = c(ccE.upperSmall);
+        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(cus.x, cus.y); ctx.lineTo(cu.x, cu.y); ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(cu.x, cu.y, 5, 0, 2 * Math.PI); ctx.fill();
+        ctx.fillStyle = '#fca5a5'; ctx.font = '10px Segoe UI';
+        ctx.fillText('contact', cu.x + 7, cu.y - 3);
+      }
+
+      // ── UJ pivot ──
       ctx.fillStyle = '#facc15'; ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(uj.x, uj.y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#fef08a'; ctx.font = 'bold 10px Segoe UI';
       ctx.fillText('UJ', uj.x - 18, uj.y + 4);
 
-      // Dim B
-      const lf = c(g.lfc);
+      // ── Dim B (at current theta) ──
+      const lf = c(cc.lfc);
       ctx.strokeStyle = '#34d39966'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(uj.x, uj.y); ctx.lineTo(lf.x, lf.y); ctx.stroke();
       ctx.setLineDash([]);
-      const bm = c({ y: g.lfc.y / 2, z: g.lfc.z / 2 });
+      const bm = c({ y: cc.lfc.y * 0.5, z: cc.lfc.z * 0.5 });
       ctx.fillStyle = '#34d399'; ctx.font = 'italic bold 13px Segoe UI';
       ctx.fillText('B', bm.x - 3, bm.y - 5);
 
-      // Dim C
+      // ── Dim C (at current theta) ──
+      const cu2 = c(cc.upper);
       ctx.strokeStyle = '#22d3ee88'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.moveTo(lf.x, lf.y); ctx.lineTo(cu.x, cu.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lf.x, lf.y); ctx.lineTo(cu2.x, cu2.y); ctx.stroke();
       ctx.setLineDash([]);
-      const cm2 = c({ y: (g.lfc.y + g.upper.y) / 2 - 2, z: (g.lfc.z + g.upper.z) / 2 + 2 });
+      const cm = c({ y: (cc.lfc.y + cc.upper.y) / 2 - 2,
+                      z: (cc.lfc.z + cc.upper.z) / 2 + 2 });
       ctx.fillStyle = '#22d3ee'; ctx.font = 'italic bold 13px Segoe UI';
-      ctx.fillText('C', cm2.x + 2, cm2.y);
+      ctx.fillText('C', cm.x + 2, cm.y);
 
-      // Dim D
+      // ── Dim D (always at engagement) ──
       const mc_lf = c({ y: g.L, z: g.zLF });
       ctx.strokeStyle = '#fb923c88'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(mc_lf.x, mc_lf.y); ctx.lineTo(ml.x, ml.y); ctx.stroke();
@@ -239,13 +417,21 @@
       ctx.fillStyle = '#fb923c'; ctx.font = 'italic bold 13px Segoe UI';
       ctx.fillText('D', dm.x, dm.y);
 
-      // Angle A arc
-      ctx.strokeStyle = '#facc15'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(uj.x, uj.y, 20, -g.A, 0, false); ctx.stroke();
+      // ── Angle A arc (at UJ, reference) ──
+      ctx.strokeStyle = '#facc1588'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(uj.x, uj.y, 22, -g.A, 0, false); ctx.stroke();
       ctx.fillStyle = '#facc15'; ctx.font = 'italic bold 13px Segoe UI';
-      ctx.fillText('A', uj.x + 22, uj.y - 6);
+      ctx.fillText('A', uj.x + 25, uj.y - 6);
 
-      // L dimension
+      // ── Angle θ arc (at UJ, current) ──
+      if (!atEngaged && theta > 0.01) {
+        ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(uj.x, uj.y, 32, -theta, 0, false); ctx.stroke();
+        ctx.fillStyle = '#a78bfa'; ctx.font = 'italic bold 12px Segoe UI';
+        ctx.fillText('θ', uj.x + 34, uj.y - 10);
+      }
+
+      // ── L dimension ──
       const lLabel = c({ y: g.L / 2, z: -6 });
       ctx.strokeStyle = '#9ca3af44'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
       ctx.beginPath();
@@ -255,22 +441,98 @@
       ctx.fillStyle = '#9ca3af'; ctx.font = '10px Segoe UI';
       ctx.fillText('L = ' + g.L.toFixed(1) + ' mm', lLabel.x - 14, lLabel.y + 14);
 
-      // Update slider labels
+      // ── Update labels ──
       document.getElementById('vA').textContent = g.Ad.toFixed(1) + '°';
       document.getElementById('vB').textContent = g.B.toFixed(0) + ' mm';
       document.getElementById('vC').textContent = g.C.toFixed(1) + ' mm';
       document.getElementById('vD').textContent = g.D.toFixed(1) + ' mm';
+      document.getElementById('vR').textContent = rInner().toFixed(2) + ' mm';
+      document.getElementById('vT').textContent = thetaDeg.toFixed(1) + '°';
+
+      // Keep theta slider max in sync with A
+      const slT = document.getElementById('slT');
+      if (parseFloat(slT.max) !== g.Ad) {
+        slT.max = g.Ad;
+        if (parseFloat(slT.value) > g.Ad) slT.value = g.Ad;
+      }
 
       document.getElementById('derived').innerHTML =
         '<b>α clutch</b> = ' + g.aC.toFixed(1) + '°<br>' +
         '<b>α motor</b> = '  + g.aM.toFixed(1) + '°<br>' +
-        '<b>Σα</b> = ' + (g.aC + g.aM).toFixed(1) + '°&nbsp;&nbsp;(bevel ideal: ' + (90 - g.Ad).toFixed(0) + '°)<br>' +
+        '<b>Σα</b> = ' + (g.aC + g.aM).toFixed(1) +
+          '°&nbsp;&nbsp;(bevel: ' + (90 - g.Ad).toFixed(0) + '°)<br>' +
         '<b>z contact</b> = ' + g.zLF.toFixed(1) + ' mm<br>' +
-        '<b>L</b> (UJ → input shaft) = ' + g.L.toFixed(1) + ' mm';
+        '<b>L</b> = ' + g.L.toFixed(1) + ' mm';
+
+      // Interference alert
+      const alert = document.getElementById('interferenceAlert');
+      if (showSweep) {
+        alert.textContent = anyInterference ? '⚠ Interference in sweep' : '✓ No interference';
+        alert.style.color = anyInterference ? '#ef4444' : '#34d399';
+      } else if (!atEngaged) {
+        alert.textContent = interferesCurrent ? '⚠ Interference at θ=' + thetaDeg.toFixed(1) + '°' : '✓ Clear';
+        alert.style.color = interferesCurrent ? '#ef4444' : '#34d399';
+      } else {
+        alert.textContent = '';
+      }
     }
 
-    ['slA', 'slB', 'slC', 'slD'].forEach(id =>
-      document.getElementById(id).addEventListener('input', draw));
+    // ── Animation ─────────────────────────────────────────────────────────────
+
+    let animating = false, animRaf = null, lastTime = null;
+    const SPEED = 8; // deg/s
+
+    function animStep(ts) {
+      if (!animating) return;
+      if (!lastTime) lastTime = ts;
+      const dt = (ts - lastTime) / 1000;
+      lastTime = ts;
+      const slT = document.getElementById('slT');
+      const g   = geom();
+      let val = parseFloat(slT.value) - SPEED * dt;
+      if (val <= 0) {
+        val = 0;
+        stopAnim();
+        slT.value = val; draw();
+        return;
+      }
+      slT.value = val;
+      draw();
+      animRaf = requestAnimationFrame(animStep);
+    }
+
+    function startAnim() {
+      const slT = document.getElementById('slT');
+      const g   = geom();
+      slT.value = g.Ad; // start from engaged
+      animating = true; lastTime = null;
+      document.getElementById('btnAnim').textContent = '■ Stop';
+      document.getElementById('btnAnim').classList.add('active');
+      document.getElementById('chkSweep').checked = false;
+      animRaf = requestAnimationFrame(animStep);
+    }
+
+    function stopAnim() {
+      animating = false;
+      if (animRaf) cancelAnimationFrame(animRaf);
+      document.getElementById('btnAnim').textContent = '▶ Animate disengagement';
+      document.getElementById('btnAnim').classList.remove('active');
+    }
+
+    document.getElementById('btnAnim').addEventListener('click', () => {
+      animating ? stopAnim() : startAnim();
+    });
+
+    document.getElementById('chkSweep').addEventListener('change', () => {
+      if (animating) stopAnim();
+      draw();
+    });
+
+    ['slA', 'slB', 'slC', 'slD', 'slR', 'slT'].forEach(id =>
+      document.getElementById(id).addEventListener('input', () => {
+        if (animating && id !== 'slT') stopAnim();
+        draw();
+      }));
 
     draw();
   </script>
