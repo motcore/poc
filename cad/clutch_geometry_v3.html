@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motcore v3 — O-ring Clutch Geometry</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Arial, sans-serif; padding: 16px; }
+    h1 { font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 14px; letter-spacing: 0.04em; }
+    #wrap { display: flex; gap: 16px; align-items: flex-start; }
+    canvas { background: #111827; border-radius: 8px; flex-shrink: 0; }
+    #panel { display: flex; flex-direction: column; gap: 10px; min-width: 230px; }
+    .sp { background: #1f2937; border-radius: 6px; padding: 10px 12px; }
+    .sp label { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 4px; }
+    .sp .lbl-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .sp .param-name { font-size: 13px; font-weight: 700; }
+    .sp .param-val  { font-size: 13px; font-weight: 700; }
+    input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #60a5fa; }
+    input[type=range].theta-range { accent-color: #a78bfa; }
+    #derived { background: #1f2937; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #9ca3af; line-height: 1.9; }
+    #derived b { color: #e5e7eb; }
+    #controls { background: #1f2937; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    #controls label { font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    #controls label input[type=checkbox] { cursor: pointer; accent-color: #a78bfa; }
+    #btnAnim {
+      background: #2d3748; border: 1px solid #4a5568; color: #e2e8f0;
+      border-radius: 5px; padding: 7px 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    #btnAnim:hover { background: #3d4f68; }
+    #btnAnim.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+    .alert-line { font-size: 11px; font-weight: 700; text-align: center; min-height: 16px; }
+    footer { margin-top: 12px; font-size: 10px; color: #4b5563; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <h1>Motcore v3 — O-ring Clutch Geometry (Y-Z cross-section)</h1>
+  <div id="wrap">
+    <canvas id="cvs" width="620" height="480"></canvas>
+    <div id="panel">
+
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#facc15">A</span>
+          <span class="param-val"  style="color:#facc15" id="vA">8°</span>
+        </div>
+        <label>engagement angle</label>
+        <input type="range" id="slA" min="2" max="25" step="0.5" value="3">
+      </div>
+
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#34d399">B</span>
+          <span class="param-val"  style="color:#34d399" id="vB">35 mm</span>
+        </div>
+        <label>UJ → output wheel centre (along shaft)</label>
+        <input type="range" id="slB" min="10" max="70" step="1" value="35">
+      </div>
+
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#fb923c">R</span>
+          <span class="param-val"  style="color:#fb923c" id="vR">20 mm</span>
+        </div>
+        <label>contact radius (output wheel &amp; O-ring outer edge)</label>
+        <input type="range" id="slR" min="5" max="50" step="0.5" value="20">
+      </div>
+
+
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#f472b6">d</span>
+          <span class="param-val"  style="color:#f472b6" id="vD">2.5 mm</span>
+        </div>
+        <label>O-ring wire diameter</label>
+        <input type="range" id="slDw" min="1" max="6" step="0.25" value="2.5">
+      </div>
+
+      <div class="sp">
+        <div class="lbl-row">
+          <span class="param-name" style="color:#a78bfa">θ</span>
+          <span class="param-val"  style="color:#a78bfa" id="vT">8°</span>
+        </div>
+        <label>current angle (← disengage / engage →)</label>
+        <input type="range" class="theta-range" id="slT" min="0" max="3" step="0.25" value="3">
+      </div>
+
+
+      <div id="controls">
+        <button id="btnAnim">▶ Animate disengagement</button>
+        <label><input type="checkbox" id="chkSweep"> Show full sweep</label>
+        <div class="alert-line" id="geomAlert"></div>
+      </div>
+
+      <div id="derived"></div>
+    </div>
+  </div>
+
+  <footer>
+    v3: output shaft carries a disc (radius R) with an O-ring in a groove on its rim.<br>
+    At engagement (θ = A) the O-ring presses against the flat face of the motor disc (also radius R).<br>
+    Both discs share the same radius R. Motor shaft is vertical; output shaft tilts from UJ.
+  </footer>
+
+  <script>
+    const cvs = document.getElementById('cvs');
+    const ctx  = cvs.getContext('2d');
+    let _T = null;
+
+    function px({ y, z }) {
+      return { x: _T.ox + y * _T.sc, y: _T.oy - z * _T.sc };
+    }
+
+    // ── Geometry ──────────────────────────────────────────────────────────────
+    //
+    // Coordinate system (Y-Z cross-section):
+    //   UJ pivot  = origin (0, 0)              — left
+    //   Y axis    = rightward toward motor disc
+    //   Z axis    = upward (motor shaft direction)
+    //
+    // Output shaft at angle θ from horizontal:
+    //   Wheel centre = (B·cosθ, B·sinθ)
+    //   Wheel is perpendicular to shaft, radius R
+    //   Upper rim  = wheel centre + R·(−sinθ,  cosθ)
+    //   Lower rim  = wheel centre + R·( sinθ, −cosθ)
+    //
+    // At full engagement (θ = A):
+    //   Upper rim = (B·cosA − R·sinA,  B·sinA + R·cosA)   ← O-ring contact point
+    //
+    // Motor disc:
+    //   Face horizontal at z = B·sinA + R·cosA  (= z of upper rim at engagement)
+    //   Motor shaft at y = (B·cosA − R·sinA) + R  (outer rim aligned with contact)
+    //   Disc spans y ∈ [motorY − R, motorY + R]
+
+    function geom() {
+      const Ad = parseFloat(document.getElementById('slA').value);
+      const B  = parseFloat(document.getElementById('slB').value);
+      const R  = parseFloat(document.getElementById('slR').value);
+      const dw = parseFloat(document.getElementById('slDw').value);
+      const A  = Ad * Math.PI / 180;
+      const cA = Math.cos(A), sA = Math.sin(A);
+
+      // R  = contact radius (output shaft axis → O-ring outer edge = motor contact point).
+      // Rm = motor disc radius (Rm ≥ R). Motor shaft is at R from the contact point.
+      const contactY = B * cA - R * sA;
+      const contactZ = B * sA + R * cA;
+
+      const zDisc  = contactZ;
+      const motorY = contactY + R;
+
+      const wheelThick = dw * WHEEL_THICK_FACTOR;
+      return { A, Ad, B, R, dw, wheelThick, cA, sA, contactY, contactZ, zDisc, motorY,
+               zDiscBot: -contactZ };  // bottom disc face (mirror)
+    }
+
+    const WHEEL_THICK_FACTOR = 3.2; // groove width 1.2×d + 2× walls of 1.0×d
+
+    // Output wheel at angle theta: returns centre, rim corners, and O-ring mid positions
+    function outputWheel(g, theta) {
+      const ct = Math.cos(theta), st = Math.sin(theta);
+      const Rw  = g.R - 0.4 * g.dw;        // wheel rim radius (groove lip)
+      const Ror = g.R - 0.5 * g.dw;        // O-ring centre radius (0.1d inside rim, protrudes 0.4d)
+      const wc = { y: g.B * ct,           z: g.B * st              };
+      const ur = { y: g.B * ct - Rw  * st, z: g.B * st + Rw  * ct };
+      const lr = { y: g.B * ct + Rw  * st, z: g.B * st - Rw  * ct };
+      const urMid = { y: g.B * ct - Ror * st, z: g.B * st + Ror * ct };
+      const lrMid = { y: g.B * ct + Ror * st, z: g.B * st - Ror * ct };
+      return { center: wc, upper: ur, lower: lr, upperMid: urMid, lowerMid: lrMid, ct, st };
+    }
+
+    // ── Draw helpers ──────────────────────────────────────────────────────────
+
+    function circle(pt, r_mm, fill, stroke, lw) {
+      const p = px(pt);
+      const r = r_mm * _T.sc;
+      ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+      ctx.fill(); if (lw > 0) ctx.stroke();
+    }
+
+    // Draw output wheel as a filled disc (rectangle cross-section) perpendicular to shaft
+    function drawOutputWheel(wh, fillColor, strokeColor, lw) {
+      const { upper: ur, lower: lr, ct, st } = wh;
+      const g   = geom();
+      const T   = g.wheelThick;
+
+      // Rim is at B (wheel centre). Body extends ±T/2 along shaft.
+      const h  = T / 2;
+      const ub = { y: ur.y + h * ct, z: ur.z + h * st }; // front face (toward motor)
+      const lb = { y: lr.y + h * ct, z: lr.z + h * st };
+      const uf = { y: ur.y - h * ct, z: ur.z - h * st }; // back face (toward UJ)
+      const lf = { y: lr.y - h * ct, z: lr.z - h * st };
+
+      // Wheel body
+      ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = lw;
+      ctx.beginPath();
+      [px(ub), px(uf), px(lf), px(lb)].forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)
+      );
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    }
+
+    // ── Main draw ─────────────────────────────────────────────────────────────
+
+    function draw() {
+      const g        = geom();
+      const thetaDeg = parseFloat(document.getElementById('slT').value);
+      const theta    = thetaDeg * Math.PI / 180;
+      const wh       = outputWheel(g, theta);
+      const whA      = outputWheel(g, g.A);
+      const whAneg   = outputWheel(g, -g.A);
+      const atEngTop = Math.abs(thetaDeg - g.Ad)  < 0.02;
+      const atEngBot = Math.abs(thetaDeg + g.Ad)  < 0.02;
+      const atEng    = atEngTop || atEngBot;
+      const showSwp  = document.getElementById('chkSweep').checked;
+      const mVR      = g.R + g.wheelThick / 2;  // motor disc visual radius
+
+      const W = cvs.width, H = cvs.height, M = 52;
+
+      // ── Stable bounding box (covers θ = -A … +A) ──
+      const wh0 = outputWheel(g, 0);
+      const pts = [
+        { y: 0, z: 0 },
+        wh0.upper, wh0.lower, wh0.center,
+        whA.upper,    whA.lower,    whA.center,
+        whAneg.upper, whAneg.lower, whAneg.center,
+        { y: g.motorY - mVR - 4, z: g.zDisc              },
+        { y: g.motorY + mVR + 4, z: g.zDisc + g.wheelThick },
+        { y: g.motorY + mVR + 4, z: g.zDiscBot             },
+        { y: g.motorY - mVR - 4, z: g.zDiscBot - g.wheelThick },
+        { y: g.motorY, z: g.zDisc + 20 },
+        { y: g.motorY, z: g.zDiscBot - 20 },
+      ];
+      const minY = Math.min(...pts.map(q => q.y)) - 8;
+      const maxY = Math.max(...pts.map(q => q.y)) + 10;
+      const minZ = Math.min(...pts.map(q => q.z)) - 10;
+      const maxZ = Math.max(...pts.map(q => q.z)) + 14;
+
+      const sc = Math.min(
+        (W - 2 * M) / (maxY - minY),
+        (H - 2 * M) / (maxZ - minZ),
+        8.5
+      );
+      _T = { ox: M - minY * sc, oy: H - M + minZ * sc, sc };
+
+      // ── Clear + grid ──
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+      for (let y = Math.floor(minY / 10) * 10; y <= maxY + 10; y += 10) {
+        const a = px({ y, z: minZ }), b = px({ y, z: maxZ });
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      for (let z = Math.floor(minZ / 10) * 10; z <= maxZ + 10; z += 10) {
+        const a = px({ y: minY, z }), b = px({ y: maxY, z });
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+
+      // ── Motor disc ──
+      // Contact face at z = zDisc (bottom). Body extends upward by g.wheelThick.
+      // Outer rim (left, y = motorY - R) = contact point. Same thickness as output wheel.
+      const mBotL = px({ y: g.motorY - mVR, z: g.zDisc              });
+      const mBotR = px({ y: g.motorY + mVR, z: g.zDisc              });
+      const mTopL = px({ y: g.motorY - mVR, z: g.zDisc + g.wheelThick });
+      const mTopR = px({ y: g.motorY + mVR, z: g.zDisc + g.wheelThick });
+
+      ctx.fillStyle = 'rgba(251,146,60,0.18)';
+      ctx.beginPath();
+      ctx.moveTo(mBotL.x, mBotL.y); ctx.lineTo(mBotR.x, mBotR.y);
+      ctx.lineTo(mTopR.x, mTopR.y); ctx.lineTo(mTopL.x, mTopL.y);
+      ctx.closePath(); ctx.fill();
+
+      // All 4 sides — contact face (bottom) highlighted
+      ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mBotL.x, mBotL.y); ctx.lineTo(mBotR.x, mBotR.y);
+      ctx.lineTo(mTopR.x, mTopR.y); ctx.lineTo(mTopL.x, mTopL.y);
+      ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = '#fb923c'; ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText('motor disc', mBotR.x + 6, mBotR.y + 4);
+
+      // ── Bottom motor disc (mirror in Z) ──
+      const bBotL = px({ y: g.motorY - mVR, z: g.zDiscBot              });
+      const bBotR = px({ y: g.motorY + mVR, z: g.zDiscBot              });
+      const bTopL = px({ y: g.motorY - mVR, z: g.zDiscBot - g.wheelThick });
+      const bTopR = px({ y: g.motorY + mVR, z: g.zDiscBot - g.wheelThick });
+      ctx.fillStyle = 'rgba(251,146,60,0.18)';
+      ctx.beginPath();
+      ctx.moveTo(bBotL.x, bBotL.y); ctx.lineTo(bBotR.x, bBotR.y);
+      ctx.lineTo(bTopR.x, bTopR.y); ctx.lineTo(bTopL.x, bTopL.y);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bBotL.x, bBotL.y); ctx.lineTo(bBotR.x, bBotR.y);
+      ctx.lineTo(bTopR.x, bTopR.y); ctx.lineTo(bTopL.x, bTopL.y);
+      ctx.closePath(); ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(bBotL.x, bBotL.y); ctx.lineTo(bBotR.x, bBotR.y); ctx.stroke();
+
+      // ── Motor shaft (continuous through both discs) ──
+      const msTopPt = px({ y: g.motorY, z: maxZ - 4              });
+      const msLoPt  = px({ y: g.motorY, z: minZ + 4              });
+      const msT1    = px({ y: g.motorY, z: g.zDisc               });
+      const msT2    = px({ y: g.motorY, z: g.zDisc + g.wheelThick });
+      const msB1    = px({ y: g.motorY, z: g.zDiscBot            });
+      const msB2    = px({ y: g.motorY, z: g.zDiscBot - g.wheelThick });
+      ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(msTopPt.x, msTopPt.y); ctx.lineTo(msT2.x, msT2.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(msT1.x, msT1.y);       ctx.lineTo(msB1.x, msB1.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(msB2.x, msB2.y);       ctx.lineTo(msLoPt.x, msLoPt.y); ctx.stroke();
+      ctx.fillStyle = '#93c5fd'; ctx.font = 'bold 11px Segoe UI';
+      ctx.fillText('motor shaft', msTopPt.x + 5, msTopPt.y + 14);
+
+      // ── R dimension on top disc ──
+      const axM  = px({ y: g.motorY,       z: g.zDisc });
+      const ctPt = px({ y: g.motorY - g.R, z: g.zDisc });
+      ctx.strokeStyle = '#fb923c88'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(axM.x, axM.y); ctx.lineTo(ctPt.x, ctPt.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const rLbl = px({ y: g.motorY - g.R / 2, z: g.zDisc - 6 });
+      ctx.fillStyle = '#fb923c'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('R', rLbl.x, rLbl.y);
+
+      // ── Sweep overlay ──
+      if (showSwp) {
+        for (let i = 0; i <= 32; i++) {
+          const t  = -g.A + g.A * 2 * i / 32;
+          const sw = outputWheel(g, t);
+          ctx.globalAlpha = 0.15;
+          drawOutputWheel(sw, 'rgba(34,211,238,0.3)', '#22d3ee', 0.5);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // ── Output shaft ──
+      const ujPx = px({ y: 0, z: 0 });
+      const shTip = px({ y: wh.center.y + 6 * wh.ct, z: wh.center.z + 6 * wh.st });
+      ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ujPx.x, ujPx.y); ctx.lineTo(shTip.x, shTip.y); ctx.stroke();
+      const smid = px({ y: wh.center.y * 0.35, z: wh.center.z * 0.35 });
+      ctx.fillStyle = '#6ee7b7'; ctx.font = '10px Segoe UI';
+      ctx.fillText('output shaft', smid.x - 22, smid.y - 8);
+
+      // ── Output wheel ──
+      drawOutputWheel(wh, 'rgba(34,211,238,0.20)', '#22d3ee', 2);
+      ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 10px Segoe UI';
+      const wcPx = px(wh.center);
+      ctx.fillText('output wheel', wcPx.x + 6, wcPx.y + 4);
+
+      // ── O-ring ──
+      const r2      = g.dw / 2;
+      const oStroke = atEng ? '#ef4444' : '#f472b6';
+      const oFill   = atEng ? 'rgba(239,68,68,0.7)' : 'rgba(244,114,182,0.6)';
+      circle(wh.upperMid, r2, oFill, oStroke, 1.5);
+      circle(wh.lowerMid, r2, oFill, oStroke, 1.5);
+      const urPx2 = px(wh.upperMid);
+      ctx.fillStyle = oStroke; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText('O-ring', urPx2.x - 50, urPx2.y - 6);
+
+      // ── Contact indicators ──
+      function drawContact(cY, cZ, arrowDir) {
+        const cPt = px({ y: cY, z: cZ });
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(cPt.x, cPt.y, 5, 0, 2 * Math.PI); ctx.fill();
+        ctx.fillStyle = '#fca5a5'; ctx.font = '10px Segoe UI';
+        ctx.fillText('contact', cPt.x + 7, cPt.y - 3);
+        const arT = px({ y: cY, z: cZ + arrowDir * 10 });
+        const arB = px({ y: cY, z: cZ + arrowDir });
+        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(arT.x, arT.y); ctx.lineTo(arB.x, arB.y); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(arB.x, arB.y);
+        ctx.lineTo(arB.x - 4, arB.y - arrowDir * 7);
+        ctx.lineTo(arB.x + 4, arB.y - arrowDir * 7);
+        ctx.closePath(); ctx.fillStyle = '#ef4444'; ctx.fill();
+        ctx.fillStyle = '#fca5a5'; ctx.font = '10px Segoe UI';
+        ctx.fillText('N', arT.x + 5, arT.y + 4);
+      }
+      if (atEngTop) drawContact(g.contactY,  g.contactZ,  1);
+      if (atEngBot) drawContact(g.contactY, -g.contactZ, -1);
+
+      // ── UJ pivot ──
+      ctx.fillStyle = '#facc15'; ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ujPx.x, ujPx.y, 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fef08a'; ctx.font = 'bold 10px Segoe UI';
+      ctx.fillText('UJ', ujPx.x - 22, ujPx.y + 4);
+
+      // ── Dimension B ──
+      const ocPx = px(wh.center);
+      ctx.strokeStyle = '#34d39966'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(ujPx.x, ujPx.y); ctx.lineTo(ocPx.x, ocPx.y); ctx.stroke();
+      ctx.setLineDash([]);
+      const bm = px({ y: wh.center.y * 0.42, z: wh.center.z * 0.42 });
+      ctx.fillStyle = '#34d399'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('B', bm.x - 3, bm.y - 6);
+
+      // ── Angle arcs ──
+      ctx.strokeStyle = '#facc1588'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ujPx.x, ujPx.y, 22, -g.A, g.A, false); ctx.stroke();
+      ctx.fillStyle = '#facc15'; ctx.font = 'italic bold 13px Segoe UI';
+      ctx.fillText('A', ujPx.x + 25, ujPx.y - 5);
+      ctx.fillText('A', ujPx.x + 25, ujPx.y + 14);
+
+      if (!atEng && Math.abs(theta) > 0.01) {
+        ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 1.5;
+        const tStart = theta > 0 ? -theta : 0;
+        const tEnd   = theta > 0 ? 0      : -theta;
+        ctx.beginPath(); ctx.arc(ujPx.x, ujPx.y, 34, tStart, tEnd, false); ctx.stroke();
+        ctx.fillStyle = '#a78bfa'; ctx.font = 'italic bold 12px Segoe UI';
+        ctx.fillText('θ', ujPx.x + 37, ujPx.y + (theta < 0 ? 14 : -10));
+      }
+
+      // ── Panel labels ──
+      document.getElementById('vA').textContent = g.Ad.toFixed(1) + '°';
+      document.getElementById('vB').textContent = g.B.toFixed(0)  + ' mm';
+      document.getElementById('vR').textContent = g.R.toFixed(1)  + ' mm';
+      document.getElementById('vD').textContent = g.dw.toFixed(2) + ' mm';
+      document.getElementById('vT').textContent = thetaDeg.toFixed(1) + '°';
+
+      const slT = document.getElementById('slT');
+      if (parseFloat(slT.max) !== g.Ad || parseFloat(slT.min) !== -g.Ad) {
+        slT.max = g.Ad; slT.min = -g.Ad;
+        const v = parseFloat(slT.value);
+        if (v > g.Ad) slT.value = g.Ad;
+        if (v < -g.Ad) slT.value = -g.Ad;
+      }
+
+      document.getElementById('derived').innerHTML =
+        '<b>contact y</b> = ' + g.contactY.toFixed(1) + ' mm<br>' +
+        '<b>contact z</b> = ±' + g.contactZ.toFixed(1) + ' mm<br>' +
+        '<b>motor shaft</b> at y = ' + g.motorY.toFixed(1) + ' mm<br>' +
+        '<b>T_out</b> = μ · (τ/B) · ' + g.contactY.toFixed(1) + ' mm<br>' +
+        '<b>groove depth</b> = ' + (g.dw * 0.6).toFixed(2) + ' mm';
+
+      document.getElementById('geomAlert').textContent = '✓ O-ring contacts disc at R from motor shaft';
+      document.getElementById('geomAlert').style.color = '#34d399';
+    }
+
+    // ── Animation: sweeps from +A → −A ────────────────────────────────────────
+
+    let animating = false, animRaf = null, lastTs = null, animDir = -1;
+    const SPEED = 4; // deg/s
+
+    function animStep(ts) {
+      if (!animating) return;
+      if (!lastTs) lastTs = ts;
+      const dt  = (ts - lastTs) / 1000; lastTs = ts;
+      const slT = document.getElementById('slT');
+      const g   = geom();
+      let val   = parseFloat(slT.value) + animDir * SPEED * dt;
+      if (val <= -g.Ad) { val = -g.Ad; stopAnim(); }
+      if (val >=  g.Ad) { val =  g.Ad; stopAnim(); }
+      slT.value = val; draw();
+      if (animating) animRaf = requestAnimationFrame(animStep);
+    }
+
+    function startAnim() {
+      const slT = document.getElementById('slT');
+      const g   = geom();
+      // Direction: if at top engaged go down; if at bottom go up; else go down
+      animDir = parseFloat(slT.value) <= -g.Ad + 0.1 ? 1 : -1;
+      if (animDir === -1) slT.value =  g.Ad;
+      else                slT.value = -g.Ad;
+      document.getElementById('chkSweep').checked = false;
+      animating = true; lastTs = null;
+      document.getElementById('btnAnim').textContent = '■ Stop';
+      document.getElementById('btnAnim').classList.add('active');
+      animRaf = requestAnimationFrame(animStep);
+    }
+
+    function stopAnim() {
+      animating = false;
+      if (animRaf) cancelAnimationFrame(animRaf);
+      document.getElementById('btnAnim').textContent = '▶ Animate disengagement';
+      document.getElementById('btnAnim').classList.remove('active');
+    }
+
+    document.getElementById('btnAnim').addEventListener('click', () =>
+      animating ? stopAnim() : startAnim()
+    );
+    document.getElementById('chkSweep').addEventListener('change', () => {
+      if (animating) stopAnim(); draw();
+    });
+    ['slA','slB','slR','slDw','slT'].forEach(id =>
+      document.getElementById(id).addEventListener('input', () => {
+        if (animating && id !== 'slT') stopAnim(); draw();
+      })
+    );
+
+    draw();
+  </script>
+</body>
+</html>
