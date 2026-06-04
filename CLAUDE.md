@@ -42,13 +42,18 @@ Each output axis clutch works as follows:
 - The **motor disc** is a smooth flat disc (PETG or metal) on the central Z shaft.
   It rotates continuously. No groove, no O-ring on the disc.
 - The **output shaft** carries a **wheel** with an O-ring in a toroidal groove on its rim.
-- A **servo + spring** tilts the output shaft around the UJ pivot by angle A.
-  The servo compresses a spring; spring deflection controls normal force.
+- A **servo + spring** tilts the output shaft around the pivot by angle A:
+  - **Neutral**: servo at centre → spring relaxed → O-ring clears both disc faces.
+  - **Engage**: servo moves → spring compresses → O-ring presses disc face.
+  - **Torque control**: more servo travel → more spring compression → more normal
+    force → more friction torque transmitted. The spring decouples servo position
+    from reaction forces while the shaft is spinning.
   When tilted +A: O-ring presses against **top** disc face → torque in one direction.
   When tilted −A: O-ring presses against **bottom** disc face → torque reversed.
-  At θ = 0 (neutral): O-ring clears both faces → disengaged.
-- The **output shaft has a flexible neck** (thin cross-section near the UJ) that acts
-  as the elastic return element — no separate spring needed for prototyping.
+- The **output shaft has two thin cylindrical necks in series** centred at the pivot
+  point. Each neck bends only A/2, halving bending stress and improving fatigue life.
+  The necks transmit output torque; they are sized for torsional strength, not as
+  return springs (the servo+spring handles return to neutral).
 
 The bevel cone geometry is **superseded**. Differential slip is not a concern with
 point/line contact.

@@ -37,6 +37,11 @@ shaft_dia     = 5.0   # mm   — output shaft diameter
 motor_shaft_d = 8.0   # mm   — motor (Z) shaft diameter
 cube_h        = 70.0  # mm   — cube internal height (top/bottom plates not modelled yet)
 
+neck_dia      = 1.8   # mm   — neck diameter (size for torsion strength)
+neck_len      = 6.0   # mm   — length of each neck (two in series → each bends A/2)
+neck_gap      = 3.0   # mm   — rigid spacer between the two necks (full shaft_dia)
+lever_len     = 15.0  # mm   — fixed shaft stub beyond wall (servo lever arm side)
+
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED  (do not edit)
 # ═══════════════════════════════════════════════════════════════════
@@ -46,27 +51,31 @@ cA  = math.cos(A)
 sA  = math.sin(A)
 
 WT  = 3.2 * dw        # wheel / disc thickness (groove walls + groove width)
-Rw  = R - 0.4 * dw    # structural wheel radius (O-ring outer edge sits at R)
 
-# Visualiser geometry (Y = along output shaft toward motor, Z = up):
-#   contact point at engagement: (contactY, contactZ) from UJ
-#   motor shaft at motorY from UJ
-contactY = B * cA - R * sA
-contactZ = B * sA + R * cA
-motorY   = contactY + R   # = distance from UJ to motor shaft axis
-
-# 3D world: motor shaft at (0,0). UJ for each axis at ±motorY from centre.
-uj_dist   = motorY                       # UJ distance from cube centre
-cube_half = uj_dist + wall_thick         # half cube side (outer wall)
+# ── Motor disc geometry (driven by R, the motor disc radius) ──────────────
+contactY = B * cA - R * sA       # 1:1 contact Y from UJ (used to fix motorY)
+motorY   = contactY + R           # motor shaft distance from UJ
+uj_dist  = motorY
+cube_half = uj_dist + wall_thick
 cube_size = 2 * cube_half
+disc_vr   = R + WT / 2            # motor disc visual radius
 
-# Motor disc spans ±contactZ in Z (top face = +contactZ, bottom face = −contactZ)
-disc_vr = R + WT / 2     # visual radius (slightly larger, geometry unchanged)
-disc_bot = -contactZ      # bottom face Z
-disc_h   = 2 * contactZ   # total disc height
+# ── Output wheel centre ───────────────────────────────────────────────────
+wc_dist = uj_dist - B             # wheel centre distance from cube centre
 
-# Output wheel centre: at B from UJ toward cube centre
-wc_dist = uj_dist - B     # distance from cube centre to wheel centre
+# ── Output wheel radius — square no-overlap condition ─────────────────────
+# Top view: each wheel is a rectangle (width WT, height 2·Rw).
+# No-overlap: outer rim Rw ≤ inner face of adjacent wheel at wc_dist − WT/2.
+# → R_out = wc_dist − WT/2  (exact square; subtract gap for clearance)
+wheel_gap = 0.5                   # mm clearance at corners between adjacent wheels
+R_out = wc_dist - WT / 2 - wheel_gap   # output wheel contact radius (< R, breaks 1:1)
+Rw    = R_out - 0.4 * dw          # structural wheel radius
+
+# ── Contact geometry uses R_out ───────────────────────────────────────────
+# Motor disc faces are where the O-ring actually contacts them.
+contactZ = B * sA + R_out * cA    # engagement height (was B·sinA + R·cosA in 1:1)
+disc_bot  = -contactZ
+disc_h    = 2 * contactZ
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -96,9 +105,14 @@ def av(axis, dist):
 
 
 def make_motor_disc():
-    disc = cyl(disc_vr, disc_h, v(0, 0, disc_bot))
-    bore = cyl(motor_shaft_d / 2 + 0.1, disc_h + 2, v(0, 0, disc_bot - 1))
-    return disc.cut(bore)
+    bore_r = motor_shaft_d / 2 + 0.1
+    # Upper disc: contact face at z = +contactZ (bottom of disc), body extends upward
+    top_disc = cyl(disc_vr, WT, v(0, 0, contactZ))
+    top_bore = cyl(bore_r, WT + 2, v(0, 0, contactZ - 1))
+    # Lower disc: contact face at z = -contactZ (top of disc), body extends downward
+    bot_disc = cyl(disc_vr, WT, v(0, 0, -contactZ - WT))
+    bot_bore = cyl(bore_r, WT + 2, v(0, 0, -contactZ - WT - 1))
+    return top_disc.cut(top_bore).fuse(bot_disc.cut(bot_bore))
 
 
 def make_output_wheel(axis):
@@ -124,15 +138,45 @@ def make_output_wheel(axis):
     return disc.cut(bore).cut(groove)
 
 
+def make_oring(axis):
+    Ror = R_out - 0.5 * dw   # O-ring centre radius (0.1·dw inside rim, protrudes 0.4·dw)
+    wc  = av(axis, wc_dist)
+    return Part.makeTorus(Ror, dw / 2, wc, axis)
+
+
 def make_output_shaft(axis):
     """
-    Shaft stub from UJ toward wheel centre and slightly beyond.
-    Goes in -axis direction from UJ (toward cube centre).
+    Output shaft with two thin cylindrical necks in series centred at UJ.
+    Each neck bends A/2 → half the bending stress per neck → better fatigue life.
+    Torsion (output torque) passes through both necks; sized by neck_dia.
+    Servo+spring actuates the tilt from the outer lever arm side.
     """
-    uj   = av(axis, uj_dist)
-    length = B + WT / 2 + 6
-    neg_axis = v(-axis.x, -axis.y, -axis.z)
-    return cyl(shaft_dia / 2, length, uj, neg_axis)
+    uj    = av(axis, uj_dist)
+    neg   = v(-axis.x, -axis.y, -axis.z)
+    total = B + WT / 2 + 6
+    half  = neck_gap / 2
+
+    # Rigid spacer centred at UJ (full shaft diameter, short)
+    spacer_start = av(axis, uj_dist - half)
+    spacer = cyl(shaft_dia / 2, neck_gap, spacer_start, axis)
+
+    # Outer neck: from spacer outer edge toward wall
+    outer_neck_start = av(axis, uj_dist + half)
+    neck_out = cyl(neck_dia / 2, neck_len, outer_neck_start, axis)
+
+    # Inner neck: from spacer inner edge toward wheel
+    inner_neck_start = av(axis, uj_dist - half)
+    neck_in  = cyl(neck_dia / 2, neck_len, inner_neck_start, neg)
+
+    # Inner shaft body: from inner neck end to past wheel centre
+    body_start = av(axis, uj_dist - half - neck_len)
+    body = cyl(shaft_dia / 2, total - half - neck_len, body_start, neg)
+
+    # Outer fixed shaft: lever arm for servo, from outer neck end through wall
+    lever_start = av(axis, uj_dist + half + neck_len)
+    outer = cyl(shaft_dia / 2, wall_thick + lever_len - half - neck_len, lever_start, axis)
+
+    return spacer.fuse(neck_out).fuse(neck_in).fuse(body).fuse(outer)
 
 
 def make_uj_marker(axis):
@@ -140,21 +184,29 @@ def make_uj_marker(axis):
 
 
 def make_cube_wall(axis):
-    """Thin wall plate on one face of the cube."""
-    n   = v(axis.x, axis.y, axis.z)   # outward normal
-    cx  = cube_half if n.x > 0 else (-cube_half - wall_thick if n.x < 0 else -cube_half)
-    cy  = cube_half if n.y > 0 else (-cube_half - wall_thick if n.y < 0 else -cube_half)
-
+    """Symmetric wall — same size on all 4 faces (cube_size × wall_thick × cube_h)."""
     if abs(axis.x) > 0.5:
-        # Wall perpendicular to X
         x0 = cube_half if axis.x > 0 else -cube_half - wall_thick
         return Part.makeBox(wall_thick, cube_size, cube_h,
                             v(x0, -cube_half, -cube_h / 2))
     else:
-        # Wall perpendicular to Y
         y0 = cube_half if axis.y > 0 else -cube_half - wall_thick
-        return Part.makeBox(cube_size + 2 * wall_thick, wall_thick, cube_h,
-                            v(-cube_half - wall_thick, y0, -cube_h / 2))
+        return Part.makeBox(cube_size, wall_thick, cube_h,
+                            v(-cube_half, y0, -cube_h / 2))
+
+
+def make_corner_bevel(sx, sy):
+    """45° triangular prism filling the gap at corner (sx, sy)."""
+    x0 = sx * cube_half
+    y0 = sy * cube_half
+    z0 = -cube_h / 2
+    p1 = v(x0,                  y0,                  z0)
+    p2 = v(x0 + sx * wall_thick, y0,                  z0)
+    p3 = v(x0,                  y0 + sy * wall_thick, z0)
+    wire = Part.Wire([Part.makeLine(p1, p2),
+                      Part.makeLine(p2, p3),
+                      Part.makeLine(p3, p1)])
+    return Part.Face(wire).extrude(v(0, 0, cube_h))
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -188,6 +240,9 @@ for name, axis in AXES:
     add(doc, f"OutputWheel_{name}",
         make_output_wheel(axis),
         color=(0.20, 0.80, 0.60))
+    add(doc, f"Oring_{name}",
+        make_oring(axis),
+        color=(0.90, 0.20, 0.50))
     add(doc, f"OutputShaft_{name}",
         make_output_shaft(axis),
         color=(0.45, 0.75, 0.65))
@@ -198,6 +253,12 @@ for name, axis in AXES:
         make_cube_wall(axis),
         color=(0.45, 0.55, 0.75),
         transparency=70)
+
+# 45° corner bevels — one per corner, same transparency as walls
+for sx, sy in [(1, 1), (1, -1), (-1, 1), (-1, -1)]:
+    label = f"Corner_{'P' if sx > 0 else 'N'}X_{'P' if sy > 0 else 'N'}Y"
+    add(doc, label, make_corner_bevel(sx, sy),
+        color=(0.45, 0.55, 0.75), transparency=70)
 
 doc.recompute()
 
@@ -213,7 +274,9 @@ print(f"  Arm length:         B  = {B} mm")
 print(f"  Contact radius:     R  = {R} mm")
 print(f"  O-ring wire:        dw = {dw} mm")
 print(f"  Wheel thickness:    WT = {WT:.1f} mm  (3.2 × dw)")
-print(f"  Wheel radius:       Rw = {Rw:.1f} mm  (R − 0.4·dw)")
+print(f"  Output wheel R_out: {R_out:.1f} mm  (wc_dist − WT/2 − {wheel_gap} mm gap)")
+print(f"  Wheel radius:       Rw = {Rw:.1f} mm  (R_out − 0.4·dw)")
+print(f"  Transmission ratio: {R_out/R:.3f}  (R_out / R,  ω_out ≈ {R/R_out:.3f} · ω_motor)")
 print(f"  contactZ:           {contactZ:.2f} mm  → disc height = {disc_h:.1f} mm")
 print(f"  Motor disc vr:      {disc_vr:.1f} mm  (R + WT/2)")
 print(f"  UJ distance:        {uj_dist:.1f} mm from centre")

@@ -150,8 +150,19 @@
       const motorY = contactY + R;
 
       const wheelThick = dw * WHEEL_THICK_FACTOR;
-      return { A, Ad, B, R, dw, wheelThick, cA, sA, contactY, contactZ, zDisc, motorY,
-               zDiscBot: -contactZ };  // bottom disc face (mirror)
+
+      // Motor disc uses R. Output wheel uses R_out (breaks 1:1 to avoid adjacent overlap).
+      // Top-view square condition: outer rim Rw ≤ inner face of adjacent wheel at wc_dist−WT/2.
+      const wc_dist  = motorY - B;
+      const WHEEL_GAP = 0.5;                              // mm clearance at corners
+      const Rout     = wc_dist - wheelThick / 2 - WHEEL_GAP;  // output wheel contact radius
+
+      // contactZ now uses Rout — where the O-ring actually meets the disc face
+      const contactZout = B * sA + Rout * cA;
+
+      return { A, Ad, B, R, dw, wheelThick, cA, sA, contactY, motorY, wc_dist,
+               Rout, contactZ: contactZout,
+               zDisc: contactZout, zDiscBot: -contactZout };
     }
 
     const WHEEL_THICK_FACTOR = 3.2; // groove width 1.2×d + 2× walls of 1.0×d
@@ -159,8 +170,8 @@
     // Output wheel at angle theta: returns centre, rim corners, and O-ring mid positions
     function outputWheel(g, theta) {
       const ct = Math.cos(theta), st = Math.sin(theta);
-      const Rw  = g.R - 0.4 * g.dw;        // wheel rim radius (groove lip)
-      const Ror = g.R - 0.5 * g.dw;        // O-ring centre radius (0.1d inside rim, protrudes 0.4d)
+      const Rw  = g.Rout - 0.4 * g.dw;      // wheel rim radius (groove lip)
+      const Ror = g.Rout - 0.5 * g.dw;     // O-ring centre radius
       const wc = { y: g.B * ct,           z: g.B * st              };
       const ur = { y: g.B * ct - Rw  * st, z: g.B * st + Rw  * ct };
       const lr = { y: g.B * ct + Rw  * st, z: g.B * st - Rw  * ct };
@@ -428,11 +439,12 @@
       }
 
       document.getElementById('derived').innerHTML =
-        '<b>contact y</b> = ' + g.contactY.toFixed(1) + ' mm<br>' +
+        '<b>R_out</b> = ' + g.Rout.toFixed(1) + ' mm  (output wheel)<br>' +
+        '<b>ratio</b> ω_out/ω_m ≈ ' + (g.R / g.Rout).toFixed(3) + '<br>' +
         '<b>contact z</b> = ±' + g.contactZ.toFixed(1) + ' mm<br>' +
         '<b>motor shaft</b> at y = ' + g.motorY.toFixed(1) + ' mm<br>' +
-        '<b>T_out</b> = μ · (τ/B) · ' + g.contactY.toFixed(1) + ' mm<br>' +
-        '<b>groove depth</b> = ' + (g.dw * 0.6).toFixed(2) + ' mm';
+        '<b>groove depth</b> = ' + (g.dw * 0.6).toFixed(2) + ' mm<br>' +
+        '<b>wc_dist</b> = ' + g.wc_dist.toFixed(1) + ' mm';
 
       document.getElementById('geomAlert').textContent = '✓ O-ring contacts disc at R from motor shaft';
       document.getElementById('geomAlert').style.color = '#34d399';
