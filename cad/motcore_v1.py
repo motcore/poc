@@ -1,4 +1,4 @@
-﻿# Motcore v1 — O-ring Friction Clutch
+# Motcore v1 — O-ring Friction Clutch
 # FreeCAD Python Macro
 #
 # Flat motor disc on vertical Z-shaft.
@@ -43,6 +43,14 @@ head_gap      = 2.0   # mm   — clearance between wheel outer face and bracket 
 head_depth    = 8.0   # mm   — bracket head bearing length
 lever_len     = 15.0  # mm   — fixed shaft stub beyond wall (servo lever arm side)
 
+# ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
+plate_t       = 4.0   # mm   — plate thickness (top and bottom)
+post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
+post_d        =  5.0  # mm   — post depth in axis direction (thin face)
+post_side_gap = 1.5   # mm   — clearance between blade outer edge and post
+pivot_z       =  0.0  # mm   — lever pivot socket Z (0 = shaft height = cube mid)
+trun_r        =  2.1  # mm   — trunnion socket radius (Ø4 mm trunnion + 0.1 clearance)
+
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED  (do not edit)
 # ═══════════════════════════════════════════════════════════════════
@@ -80,7 +88,10 @@ disc_h    = 2 * contactZ
 
 # ── Bracket head and shaft neck geometry ─────────────────────────────────
 head_y0    = wc_dist + WT / 2 + head_gap   # head inner face (just past wheel)
-head_y1    = head_y0 + head_depth          # head outer face
+head_y1    = head_y0 + head_depth          # head outer face / blade root
+blade_gap  = shaft_dia + 1.0               # gap between blades in pa (shaft clears)
+blade_w_g  = 6.0                           # blade width in pa
+bw_half    = blade_gap / 2 + blade_w_g     # bracket half-width in pa = 9 mm
 # Single compliant neck centred in the free span between head and wall
 neck_start = head_y1 + (cube_half - head_y1 - neck_len) / 2
 neck_end   = neck_start + neck_len
@@ -269,6 +280,76 @@ def make_shaft_bracket(axis):
         shape = shape.rotate(v(0, 0, 0), v(0, 0, 1), angle)
     return shape
 
+def make_frame():
+    """
+    Single-piece frame: top plate + bottom plate + lever pivot posts.
+
+    Posts sit at the blade-root / head junction (y = head_y1 in the canonical
+    frame), one on each ±pa side just outside the bracket width.  This location
+    clears the output wheels (head_y1 > wheel outer face), the motor disc
+    (radius ≈ 34 mm from Z-axis >> disc_vr = 24 mm), and the blades.
+
+    The trunnion socket is a horizontal through-hole along pa at pivot_z.
+    """
+    # Post centre offset along axis = head_y1 (blade root)
+    # Post centre offset in pa     = bw_half + gap + half post width
+    post_pa_off = bw_half + post_side_gap + post_w / 2   # centre offset in pa
+
+    z_top  =  cube_h / 2
+    z_bot  = -(cube_h / 2 + plate_t)
+    post_h =  cube_h + plate_t           # z_bot → z_top
+
+    # Top plate omitted for visualisation — set SHOW_TOP = True to restore
+    SHOW_TOP = False
+
+    # Bottom plate with motor shaft clearance hole
+    bot = Part.makeBox(cube_size, cube_size, plate_t,
+                       v(-cube_half, -cube_half, z_bot))
+    bot = bot.cut(cyl(motor_shaft_d / 2 + 1.0, plate_t + 2,
+                      v(0, 0, z_bot - 1)))
+
+    frame = bot
+
+    if SHOW_TOP:
+        top = Part.makeBox(cube_size, cube_size, plate_t,
+                           v(-cube_half, -cube_half, z_top))
+        top = top.cut(cyl(motor_shaft_d / 2 + 1.0, plate_t + 2,
+                          v(0, 0, z_top - 1)))
+        frame = frame.fuse(top)
+
+    # Two posts per output axis, at blade-root / head junction
+    for axis, pa in [
+        (v( 0,  1, 0), v(1, 0, 0)),   # +Y shaft  →  pa = +X
+        (v( 0, -1, 0), v(1, 0, 0)),   # −Y shaft  →  pa = +X
+        (v( 1,  0, 0), v(0, 1, 0)),   # +X shaft  →  pa = +Y
+        (v(-1,  0, 0), v(0, 1, 0)),   # −X shaft  →  pa = +Y
+    ]:
+        for sign in [1, -1]:
+            cx = axis.x * head_y1 + pa.x * sign * post_pa_off
+            cy = axis.y * head_y1 + pa.y * sign * post_pa_off
+
+            # post_d along pa (trunnion direction), post_w along axis
+            post = Part.makeBox(
+                abs(pa.x) * post_d + abs(axis.x) * post_w,
+                abs(pa.y) * post_d + abs(axis.y) * post_w,
+                post_h,
+                v(cx - abs(pa.x)*post_d/2 - abs(axis.x)*post_w/2,
+                  cy - abs(pa.y)*post_d/2 - abs(axis.y)*post_w/2,
+                  z_bot))
+
+            # Trunnion socket: through-hole along pa at pivot_z
+            hole = cyl(trun_r, post_d + 2,
+                       v(cx + pa.x * (post_d / 2 + 1),
+                         cy + pa.y * (post_d / 2 + 1),
+                         pivot_z),
+                       v(-pa.x, -pa.y, 0))
+            post = post.cut(hole)
+
+            frame = frame.fuse(post)
+
+    return frame
+
+
 # ═══════════════════════════════════════════════════════════════════
 # BUILD DOCUMENT
 # ═══════════════════════════════════════════════════════════════════
@@ -313,6 +394,11 @@ for name, axis in AXES:
         make_cube_wall(axis),
         color=(0.45, 0.55, 0.75),
         transparency=70)
+
+add(doc, "Frame",
+    make_frame(),
+    color=(0.70, 0.55, 0.85),
+    transparency=40)
 
 # 45° corner bevels — one per corner, same transparency as walls
 for sx, sy in [(1, 1), (1, -1), (-1, 1), (-1, -1)]:
