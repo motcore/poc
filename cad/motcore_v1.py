@@ -1,4 +1,4 @@
-# Motcore v1 — O-ring Friction Clutch
+﻿# Motcore v1 — O-ring Friction Clutch
 # FreeCAD Python Macro
 #
 # Flat motor disc on vertical Z-shaft.
@@ -37,9 +37,10 @@ shaft_dia     = 5.0   # mm   — output shaft diameter
 motor_shaft_d = 8.0   # mm   — motor (Z) shaft diameter
 cube_h        = 70.0  # mm   — cube internal height (top/bottom plates not modelled yet)
 
-neck_dia      = 1.8   # mm   — neck diameter (size for torsion strength)
-neck_len      = 6.0   # mm   — length of each neck (two in series → each bends A/2)
-neck_gap      = 3.0   # mm   — rigid spacer between the two necks (full shaft_dia)
+neck_dia      = 2.5   # mm   — neck diameter (torsion strength + stiffness match)
+neck_len      = 13.0  # mm   — neck length (matched to combined blade stiffness)
+head_gap      = 2.0   # mm   — clearance between wheel outer face and bracket head
+head_depth    = 8.0   # mm   — bracket head bearing length
 lever_len     = 15.0  # mm   — fixed shaft stub beyond wall (servo lever arm side)
 
 # ═══════════════════════════════════════════════════════════════════
@@ -76,6 +77,13 @@ Rw    = R_out - 0.4 * dw          # structural wheel radius
 contactZ = B * sA + R_out * cA    # engagement height (was B·sinA + R·cosA in 1:1)
 disc_bot  = -contactZ
 disc_h    = 2 * contactZ
+
+# ── Bracket head and shaft neck geometry ─────────────────────────────────
+head_y0    = wc_dist + WT / 2 + head_gap   # head inner face (just past wheel)
+head_y1    = head_y0 + head_depth          # head outer face
+# Single compliant neck centred in the free span between head and wall
+neck_start = head_y1 + (cube_half - head_y1 - neck_len) / 2
+neck_end   = neck_start + neck_len
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -146,37 +154,27 @@ def make_oring(axis):
 
 def make_output_shaft(axis):
     """
-    Output shaft with two thin cylindrical necks in series centred at UJ.
-    Each neck bends A/2 → half the bending stress per neck → better fatigue life.
-    Torsion (output torque) passes through both necks; sized by neck_dia.
-    Servo+spring actuates the tilt from the outer lever arm side.
+    Output shaft — uniform shaft_dia with a single compliant neck.
+
+    The neck is centred in the free span between the bracket head and the wall.
+    Its stiffness matches the two flexure blades (equal tilt contribution A/2 each).
+    The shaft rotates in Y (output torque); the neck flexes in Z (tilt A/2).
     """
-    uj    = av(axis, uj_dist)
-    neg   = v(-axis.x, -axis.y, -axis.z)
-    total = B + WT / 2 + 6
-    half  = neck_gap / 2
+    neg = v(-axis.x, -axis.y, -axis.z)
 
-    # Rigid spacer centred at UJ (full shaft diameter, short)
-    spacer_start = av(axis, uj_dist - half)
-    spacer = cyl(shaft_dia / 2, neck_gap, spacer_start, axis)
+    # Inner body: from just past wheel bore inward end to neck_start
+    inner_len = neck_start - (wc_dist - WT / 2 - 2.0)
+    inner_start = av(axis, neck_start)
+    inner = cyl(shaft_dia / 2, inner_len, inner_start, neg)
 
-    # Outer neck: from spacer outer edge toward wall
-    outer_neck_start = av(axis, uj_dist + half)
-    neck_out = cyl(neck_dia / 2, neck_len, outer_neck_start, axis)
+    # Compliant neck (neck_dia, neck_len) — centred in free span
+    neck = cyl(neck_dia / 2, neck_len, av(axis, neck_start), axis)
 
-    # Inner neck: from spacer inner edge toward wheel
-    inner_neck_start = av(axis, uj_dist - half)
-    neck_in  = cyl(neck_dia / 2, neck_len, inner_neck_start, neg)
+    # Outer body: from neck_end through wall to lever arm tip
+    outer_len = cube_half + wall_thick + lever_len - neck_end
+    outer = cyl(shaft_dia / 2, outer_len, av(axis, neck_end), axis)
 
-    # Inner shaft body: from inner neck end to past wheel centre
-    body_start = av(axis, uj_dist - half - neck_len)
-    body = cyl(shaft_dia / 2, total - half - neck_len, body_start, neg)
-
-    # Outer fixed shaft: lever arm for servo, from outer neck end through wall
-    lever_start = av(axis, uj_dist + half + neck_len)
-    outer = cyl(shaft_dia / 2, wall_thick + lever_len - half - neck_len, lever_start, axis)
-
-    return spacer.fuse(neck_out).fuse(neck_in).fuse(body).fuse(outer)
+    return inner.fuse(neck).fuse(outer)
 
 
 def make_uj_marker(axis):
@@ -184,15 +182,27 @@ def make_uj_marker(axis):
 
 
 def make_cube_wall(axis):
-    """Symmetric wall — same size on all 4 faces (cube_size × wall_thick × cube_h)."""
+    """Wall with integrated compliant flexure bracket (one-piece print).
+    Includes a through-bore for the output shaft lever arm.
+    """
+    shaft_hole_r = shaft_dia / 2 + 0.4   # clearance fit for rotating shaft
+
     if abs(axis.x) > 0.5:
         x0 = cube_half if axis.x > 0 else -cube_half - wall_thick
-        return Part.makeBox(wall_thick, cube_size, cube_h,
+        wall = Part.makeBox(wall_thick, cube_size, cube_h,
                             v(x0, -cube_half, -cube_h / 2))
+        # Shaft bore along X through the wall at (y=0, z=0)
+        hole_base = v(x0 - 1, 0, 0)
+        wall = wall.cut(cyl(shaft_hole_r, wall_thick + 2, hole_base, v(1, 0, 0)))
     else:
         y0 = cube_half if axis.y > 0 else -cube_half - wall_thick
-        return Part.makeBox(cube_size, wall_thick, cube_h,
+        wall = Part.makeBox(cube_size, wall_thick, cube_h,
                             v(-cube_half, y0, -cube_h / 2))
+        # Shaft bore along Y through the wall at (x=0, z=0)
+        hole_base = v(0, y0 - 1, 0)
+        wall = wall.cut(cyl(shaft_hole_r, wall_thick + 2, hole_base, v(0, 1, 0)))
+
+    return wall.fuse(make_shaft_bracket(axis))
 
 
 def make_corner_bevel(sx, sy):
@@ -208,6 +218,56 @@ def make_corner_bevel(sx, sy):
                       Part.makeLine(p3, p1)])
     return Part.Face(wire).extrude(v(0, 0, cube_h))
 
+
+def make_shaft_bracket(axis):
+    """
+    Compliant flexure mount - output shaft support.
+
+    Head  : block near the wheel with a bearing bore for the shaft.
+    Blades: two thin flat strips running from head to wall, one on each
+            pa side of the shaft (+-pa), lying at z = 0 (shaft height).
+              - Thin in Z  -> bend easily -> allow +-A tilt in vertical plane
+              - Wide in pa -> stiff in-plane -> constrain horizontal rotation
+    One-piece print. No pin, no assembly.
+    Blade spring stiffness provides the return-to-neutral force.
+
+    Canonical frame: shaft = +Y, pa (pin axis) = +X.
+    """
+    blade_t     = 1.5              # blade thickness in Z — matched to neck stiffness
+    blade_w     = 6.0              # blade width in pa (horizontal stiffness)
+    blade_gap   = shaft_dia + 1.0  # gap between blades in pa (shaft clears through)
+    head_z_half = shaft_dia / 2 + 3.5  # head half-height in Z
+
+    bore_r = shaft_dia / 2 + 0.25  # bearing bore radius
+
+    # head_y0, head_y1 from global DERIVED (shared with make_output_shaft)
+    blade_len = cube_half - head_y1
+
+    bw_half = blade_gap / 2 + blade_w  # half total bracket width in pa
+
+    # Head block with bearing bore
+    head = Part.makeBox(2 * bw_half, head_depth, 2 * head_z_half,
+                        v(-bw_half, head_y0, -head_z_half))
+    head = head.cut(cyl(bore_r, head_depth + 2,
+                        v(0, head_y0 - 1, 0),  v(0, 1, 0)))
+
+    # Right blade (+pa side): lies flat at z=0, thin in Z, wide in pa
+    blade_r = Part.makeBox(blade_w, blade_len, blade_t,
+                           v( blade_gap / 2,              head_y1, -blade_t / 2))
+    # Left blade (-pa side)
+    blade_l = Part.makeBox(blade_w, blade_len, blade_t,
+                           v(-(blade_gap / 2 + blade_w),  head_y1, -blade_t / 2))
+
+    shape = head.fuse(blade_r).fuse(blade_l)
+
+    # Rotate canonical (+Y) to actual axis
+    if   axis.x >  0.5: angle = -90.0
+    elif axis.x < -0.5: angle =  90.0
+    elif axis.y < -0.5: angle = 180.0
+    else:               angle =   0.0
+    if angle:
+        shape = shape.rotate(v(0, 0, 0), v(0, 0, 1), angle)
+    return shape
 
 # ═══════════════════════════════════════════════════════════════════
 # BUILD DOCUMENT

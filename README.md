@@ -224,6 +224,63 @@ cd poc
 
 ---
 
+## 🔩 v0.2 Design Notes (In Progress)
+
+Current work is in `cad/motcore_v1.py` — a FreeCAD Python macro that generates the full O-ring clutch geometry. Run it from FreeCAD: *Macro → Macros → motcore_v1.py → Execute*.
+
+### Compliant Flexure Mechanism
+
+The engagement system uses a **compliant mechanism** instead of a traditional pin-based UJ pivot. Each wall is a single printed part that integrates the wall, the flexure blades, and the bearing head.
+
+```
+Side view (Y-Z plane, one output axis):
+
+  wheel   [===head===]────blade────wall
+  O-ring  bearing bore   (flexes)  fused
+
+  blade: thin in Z (bends for ±A tilt), wide in X (stiff horizontally)
+```
+
+**How it works:**
+- Two thin flat blades connect the bearing head (near the wheel) to the wall
+- Blades flex ±A/2 to tilt the shaft into engagement
+- The output shaft has a single compliant neck in the free span that flexes the other ±A/2
+- The shaft rotates freely in the bearing bore (output torque)
+- No pin, no assembly — one printed part per wall
+
+### Key Design Parameters
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Engagement angle A | 3° | shaft tilt from horizontal |
+| Arm length B | 35 mm | bearing head → contact point |
+| Contact radius R | 20 mm | motor disc rim |
+| O-ring wire dw | 2.5 mm | silicone |
+| Blade thickness | 1.5 mm | in Z (bending direction) |
+| Blade width | 6.0 mm | in pa (horizontal stiffness) |
+| Neck diameter | 2.5 mm | torsion-limited (SF=1.32 vs slip) |
+| Neck length | 13.0 mm | centred in free span |
+| Cube size | ~116 × 116 mm | derived from B and R |
+
+### Performance (SG90 servo)
+
+| Metric | Value |
+|--------|-------|
+| Contact force N | 4.85 N |
+| Max output torque | ~58 N·mm (0.57 kg·cm) |
+| Speed ratio | 1.39× motor (output faster) |
+| Flexure overhead | 4.2% of servo torque |
+| Clutch slips before neck breaks | ✓ |
+
+### Pending for v0.2
+
+- [ ] Servo mount on outer wall face
+- [ ] Reduce `blade_t` to ~0.8 mm (min printable) to further reduce engagement force
+- [ ] Bearings: current design uses printed bore (adequate for v1); add counterbore for 625ZZ (ID5mm) for durability
+- [ ] Top/bottom plates
+
+---
+
 ## 🗺️ Roadmap
 
 ### v0.2 - 3D Printed Prototype (In Progress)
