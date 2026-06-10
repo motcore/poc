@@ -63,11 +63,11 @@ eng_tip_clr  =  3.0  # mm — clearance above bottom plate for YZ contact arm
 eng_slot_w   =  2.5  # mm — ranura: ancho en pa (diámetro muñón + holgura)
 eng_slot_h   =  6.0  # mm — ranura: longitud en Z (Ø pin 2.5 + subida Z a ±45° 2.3 + holgura 0.5)
 
-# ── SG90 servo ────────────────────────────────────────────────────────────────
-sg90_l        = 22.5  # mm — body depth along shaft axis (pa direction)
-sg90_h        = 22.8  # mm — body cross-section in axis (Y) direction
-sg90_w        = 12.2  # mm — body cross-section in Z direction
-sg90_sd       =  4.8  # mm — output shaft outer diameter (with spline)
+# ── MG90D servo (Tower Pro — digital, metal gears, ~0.1° resolution) ─────────
+sg90_l        = 22.8  # mm — body depth along shaft axis (pa direction)
+sg90_h        = 25.4  # mm — body cross-section in Y direction (tall axis)
+sg90_w        = 12.8  # mm — body cross-section in Z direction
+sg90_sd       =  4.8  # mm — output shaft outer diameter (with spline, same as SG90)
 sg90_sl       =  4.0  # mm — shaft protrusion beyond body face
 sg90_tol      =  0.3  # mm — pocket clearance per side
 sg90_wall     =  2.0  # mm — pocket wall thickness
