@@ -350,12 +350,16 @@ def make_shaft_bracket(axis):
     #   · Parte curva: semicilindro a lo largo de X, radio=pin_r, centro en pin_z
     slot_depth   = eng_yz_t + 2                        # profundidad del corte en X
     slot_x0      = -eng_yz_t / 2 - 1                  # arranque del corte en X
+    # Ranura en forma de estadio (oblong): dos semicilindros + rectángulo central.
+    # Altura total = eng_slot_h, sin cambiar la posición del slot.
+    slot_top_ctr = slot_z0 + eng_slot_h - pin_r      # centro semicilindro superior
     slot_rect = Part.makeBox(
-        slot_depth, eng_slot_w, eng_slot_h - pin_r,
+        slot_depth, eng_slot_w, eng_slot_h - 2 * pin_r,
         v(slot_x0, y_ctr - pin_r, pin_z)
     )
-    slot_round = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, pin_z), v(1, 0, 0))
-    eng_yz = eng_yz.cut(slot_rect.fuse(slot_round))
+    slot_round_bot = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, pin_z),        v(1, 0, 0))
+    slot_round_top = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, slot_top_ctr), v(1, 0, 0))
+    eng_yz = eng_yz.cut(slot_rect.fuse(slot_round_bot).fuse(slot_round_top))
 
     # XZ blade — chamfer bottom ±X corners
     for sx in [1, -1]:
