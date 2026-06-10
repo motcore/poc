@@ -56,7 +56,8 @@ head_trun_len =  5.0  # mm   — head trunnion pin length (sticks out from head 
 # ── Engagement lever blade (integral with bracket head, extends downward) ─────
 eng_blade_l  = 30.0  # mm — spring section length in −Z (XZ arm, free to flex)
 eng_blade_w  = 10.0  # mm — width in pa direction (centred at pa = 0)
-eng_blade_t  =  1.5  # mm — thickness (thin dimension of each blade arm)
+eng_blade_t  =  1.5  # mm — XZ arm thickness in Y (spring direction — keep thin)
+eng_yz_t     =  4.0  # mm — YZ arm thickness in X (contact arm — no need to flex)
 eng_overlap  =  8.0  # mm — how far YZ arm overlaps upward into the XZ spring section
 eng_tip_clr  =  3.0  # mm — clearance above bottom plate for YZ contact arm
 eng_slot_w   =  2.5  # mm — ranura: ancho en pa (diámetro muñón + holgura)
@@ -324,56 +325,53 @@ def make_shaft_bracket(axis):
     )
     # YZ arm — starts eng_overlap mm above spring bottom, runs to near base plate
     # Centred on the XZ arm mid-plane: y_centre = head_y1 - eng_blade_t/2
-    yz_y0 = head_y1 - eng_blade_t / 2 - eng_blade_w / 2
+    y_ctr = head_y1 - eng_blade_t / 2                 # Y centre of cross section
+    yz_y0 = y_ctr - eng_blade_w / 2
     eng_yz = Part.makeBox(
-        eng_blade_t, eng_blade_w, yz_len,
-        v(-eng_blade_t / 2, yz_y0, z_yz_bot)
+        eng_yz_t, eng_blade_w, yz_len,
+        v(-eng_yz_t / 2, yz_y0, z_yz_bot)
     )
 
     # ── Chamfer the transition corners in the overlap zone ────────────────────
-    # 45° taper: each blade narrows to the cross-intersection width at its end.
-    # chamfer_h = lateral half-overhang (= same as the 45° rise in Z).
-    chamfer_h = (eng_blade_w - eng_blade_t) / 2   # = 4.25 mm with defaults
-    y_ctr     = head_y1 - eng_blade_t / 2          # Y centre of cross section
+    # XZ side: tapers from ±eng_blade_w/2 to ±eng_blade_t/2 in X at z_spring_bot.
+    chamfer_h_xz = (eng_blade_w - eng_blade_t) / 2
+    # YZ side: tapers from ±eng_blade_w/2 to ±eng_yz_t/2 in Y at z_yz_top.
+    chamfer_h_yz = (eng_blade_w - eng_yz_t) / 2
 
     # Ranura en la lámina YZ: elongada en Z, estrecha en Y.
     # El brazo cuelga en −Z en neutro → el pin está en el FONDO de la ranura.
     # Al rotar ±α el pin sube en Z y empuja ±Y; la ranura absorbe el desplazamiento Z.
-    # El pin es un cilindro de radio pin_r = eng_slot_w/2; su CENTRO debe estar
-    # al menos pin_r por encima del borde inferior de la lámina (más 1 mm de pared).
     pin_r        = eng_slot_w / 2                      # radio del muñón
     pin_z        = z_yz_bot + pin_r + 1.0              # centro pin en neutro (fondo útil ranura)
     slot_z0      = pin_z - pin_r                       # borde inferior del corte = 1 mm sobre base
     sg90_z_shaft = pin_z + sg90_arm_r                  # eje encima del centro del pin neutro
     slot_z_ctr   = slot_z0 + eng_slot_h / 2           # centro geométrico del rectángulo a cortar
     eng_yz = eng_yz.cut(Part.makeBox(
-        eng_blade_t + 2,                               # atraviesa la lámina en X
+        eng_yz_t + 2,                                  # atraviesa la lámina en X
         eng_slot_w,                                    # estrecha en Y (Ø muñón + holgura)
         eng_slot_h,                                    # elongada en Z (recorrido del muñón)
-        v(-eng_blade_t / 2 - 1, y_ctr - eng_slot_w / 2, slot_z0)
+        v(-eng_yz_t / 2 - 1, y_ctr - eng_slot_w / 2, slot_z0)
     ))
 
-    # XZ blade — chamfer bottom ±X corners (triangles in XZ plane, extruded in Y)
-    # At z_spring_bot the blade tapers from ±eng_blade_w/2 to ±eng_blade_t/2 in X.
+    # XZ blade — chamfer bottom ±X corners
     for sx in [1, -1]:
         pts = [v(sx * eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot),
                v(sx * eng_blade_t / 2, head_y1 - eng_blade_t, z_spring_bot),
-               v(sx * eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot + chamfer_h)]
+               v(sx * eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot + chamfer_h_xz)]
         wire = Part.Wire([Part.makeLine(pts[0], pts[1]),
                           Part.makeLine(pts[1], pts[2]),
                           Part.makeLine(pts[2], pts[0])])
         eng_xz = eng_xz.cut(Part.Face(wire).extrude(v(0, eng_blade_t, 0)))
 
-    # YZ blade — chamfer top ±Y corners (triangles in YZ plane, extruded in X)
-    # At z_yz_top the blade tapers from ±eng_blade_w/2 to ±eng_blade_t/2 in Y.
+    # YZ blade — chamfer top ±Y corners (tapers to eng_yz_t in Y)
     for sy in [1, -1]:
-        pts = [v(-eng_blade_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top),
-               v(-eng_blade_t / 2, y_ctr + sy * eng_blade_t / 2, z_yz_top),
-               v(-eng_blade_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top - chamfer_h)]
+        pts = [v(-eng_yz_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top),
+               v(-eng_yz_t / 2, y_ctr + sy * eng_yz_t / 2,   z_yz_top),
+               v(-eng_yz_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top - chamfer_h_yz)]
         wire = Part.Wire([Part.makeLine(pts[0], pts[1]),
                           Part.makeLine(pts[1], pts[2]),
                           Part.makeLine(pts[2], pts[0])])
-        eng_yz = eng_yz.cut(Part.Face(wire).extrude(v(eng_blade_t, 0, 0)))
+        eng_yz = eng_yz.cut(Part.Face(wire).extrude(v(eng_yz_t, 0, 0)))
 
     eng_blade = eng_xz.fuse(eng_yz)
 
@@ -596,7 +594,7 @@ def make_sg90_ref(axis):
     arm_t   = 2.0                                    # grosor del brazo en X
     arm_w   = 4.0                                    # anchura del brazo en Y
     # Brazo centrado a 0.5 mm de la cara +X de la lámina.
-    arm_x0  = eng_blade_t / 2 + 0.5                 # cara −X del brazo
+    arm_x0  = eng_yz_t / 2 + 0.5                    # cara −X del brazo (0.5 mm libre de la lámina YZ)
     body_x0 = arm_x0 + arm_t                        # cara −X del cuerpo
 
     # ── Cuerpo del servo ──────────────────────────────────────────────────────
@@ -619,7 +617,7 @@ def make_sg90_ref(axis):
     )
 
     # ── Muñón: desde 2 mm más allá de la lámina (−X) hasta la cara −X del brazo
-    pin_x0  = -(eng_blade_t / 2 + 2.0)
+    pin_x0  = -(eng_yz_t / 2 + 2.0)
     pin_len = arm_x0 - pin_x0
     munon   = cyl(eng_slot_w / 2 - 0.15, pin_len,
                   v(pin_x0, y_shaft, pin_z),
