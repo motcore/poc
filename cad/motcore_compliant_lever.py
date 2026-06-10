@@ -74,6 +74,13 @@ sg90_wall     =  2.0  # mm — pocket wall thickness
 sg90_shaft_off =  6.0  # mm — eje desplazado desde la cara delantera del cuerpo (dimensión sg90_h)
 sg90_arm_r     =  8.0  # mm — radio del brazo del servo (pin en punta del brazo)
 
+# ── Modular foot attachment (2× M3 screws + nut traps, no tools needed) ──────
+foot_tol      = 0.2   # mm — fit clearance per side (pocket = foot + 2×foot_tol)
+m3_nut_af     = 5.7   # mm — M3 hex nut AF with print clearance (5.5 mm + 0.2)
+m3_nut_thick  = 2.6   # mm — nut trap depth (2.4 mm nut + 0.2 mm clearance)
+m3_screw_r    = 1.6   # mm — M3 clearance hole radius (Ø3.2 mm)
+foot_screw_pa = 5.0   # mm — screw centre offset in pa direction (±pa)
+
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED  (do not edit)
 # ═══════════════════════════════════════════════════════════════════
@@ -127,6 +134,10 @@ head_z_half = shaft_dia / 2 + 3.5   # = 6.0 mm with defaults
 post_pa_off  = bw_half + post_side_gap + post_w / 2  # post centre offset in pa
 head_trun_y  = head_y0 + 2.0                          # head trunnion Y (2 mm from inner face)
 head_pin_pa  = bw_half + head_trun_len / 2            # head pin midpoint in pa
+
+# ── Modular foot half-width — auto-sized to clear nut traps with 1.5 mm wall ─
+_nut_circ_r  = m3_nut_af / math.sqrt(3)              # hex circumradius
+foot_half_w  = foot_screw_pa + _nut_circ_r + 1.5     # pa + nut + 1.5 mm wall
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -245,7 +256,26 @@ def make_cube_wall(axis):
         hole_base = v(0, y0 - 1, 0)
         wall = wall.cut(cyl(shaft_hole_r, wall_thick + 2, hole_base, v(0, 1, 0)))
 
-    return wall.fuse(make_shaft_bracket(axis))
+    # ── Pocket for modular bracket foot ───────────────────────────────────────
+    # Built in canonical frame (+Y axis) then rotated to match actual axis.
+    # Pocket is 2×foot_tol oversize per side for fit clearance.
+    _pkt_w = 2 * foot_half_w + 2 * foot_tol   # width in pa
+    _pkt_h = 2 * head_z_half + 2 * foot_tol   # height in Z
+    _pocket = Part.makeBox(_pkt_w, wall_thick + 2, _pkt_h,
+                           v(-_pkt_w / 2, cube_half - 1, -_pkt_h / 2))
+    # M3 screw clearance holes through wall (in +Y canonical)
+    for _spa in [foot_screw_pa, -foot_screw_pa]:
+        _pocket = _pocket.fuse(cyl(m3_screw_r, wall_thick + 2,
+                                   v(_spa, cube_half - 1, 0), v(0, 1, 0)))
+    _angle = 0.0
+    if   axis.x >  0.5: _angle = -90.0
+    elif axis.x < -0.5: _angle =  90.0
+    elif axis.y < -0.5: _angle = 180.0
+    if _angle:
+        _pocket = _pocket.rotate(v(0, 0, 0), v(0, 0, 1), _angle)
+    wall = wall.cut(_pocket)
+
+    return wall  # bracket is a separate part; add Bracket_{name} in main loop
 
 
 def make_corner_bevel(sx, sy):
@@ -383,7 +413,31 @@ def make_shaft_bracket(axis):
 
     eng_blade = eng_xz.fuse(eng_yz)
 
-    shape = head.fuse(blade_r).fuse(blade_l).fuse(eng_blade)
+    # ── Modular attachment foot ────────────────────────────────────────────────
+    # Rectangular plug (2×foot_half_w × wall_thick × 2×head_z_half) that slides
+    # into the pocket cut in the wall.  Canonical: protrudes in +Y from cube_half.
+    # Two M3 screw clearance holes in Y + two hex nut traps open from −Y face.
+    _nut_cr = m3_nut_af / math.sqrt(3)      # hex circumradius
+    foot = Part.makeBox(
+        2 * foot_half_w, wall_thick, 2 * head_z_half,
+        v(-foot_half_w, cube_half, -head_z_half)
+    )
+    # Screw clearance holes Ø3.2 mm through full foot depth
+    for _spa in [foot_screw_pa, -foot_screw_pa]:
+        foot = foot.cut(cyl(m3_screw_r, wall_thick + 2,
+                            v(_spa, cube_half - 1, 0), v(0, 1, 0)))
+    # Hex nut traps: open from −Y face (y = cube_half), extrude in +Y by m3_nut_thick
+    for _spa in [foot_screw_pa, -foot_screw_pa]:
+        _hv = [v(_spa + _nut_cr * math.cos(i * math.pi / 3),
+                 cube_half,
+                 _nut_cr * math.sin(i * math.pi / 3)) for i in range(6)]
+        _hv.append(_hv[0])
+        _trap = Part.Face(Part.Wire(
+            [Part.makeLine(_hv[j], _hv[j + 1]) for j in range(6)]
+        )).extrude(v(0, m3_nut_thick, 0))
+        foot = foot.cut(_trap)
+
+    shape = head.fuse(blade_r).fuse(blade_l).fuse(eng_blade).fuse(foot)
 
     # Rotate canonical (+Y) to actual axis
     if   axis.x >  0.5: angle = -90.0
@@ -684,6 +738,9 @@ for name, axis in AXES:
         make_cube_wall(axis),
         color=(0.45, 0.55, 0.75),
         transparency=30)
+    add(doc, f"Bracket_{name}",
+        make_shaft_bracket(axis),
+        color=(0.30, 0.65, 0.90))
 
 add(doc, "Frame",
     make_frame(),
