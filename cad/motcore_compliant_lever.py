@@ -61,7 +61,7 @@ eng_yz_t     =  4.0  # mm — YZ arm thickness in X (contact arm — no need to 
 eng_overlap  =  8.0  # mm — how far YZ arm overlaps upward into the XZ spring section
 eng_tip_clr  =  3.0  # mm — clearance above bottom plate for YZ contact arm
 eng_slot_w   =  2.5  # mm — ranura: ancho en pa (diámetro muñón + holgura)
-eng_slot_h   = 12.0  # mm — ranura: longitud en Z (recorrido del muñón a lo largo de la ranura)
+eng_slot_h   =  6.0  # mm — ranura: longitud en Z (Ø pin 2.5 + subida Z a ±45° 2.3 + holgura 0.5)
 
 # ── SG90 servo ────────────────────────────────────────────────────────────────
 sg90_l        = 22.5  # mm — body depth along shaft axis (pa direction)
