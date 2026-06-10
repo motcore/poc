@@ -27,7 +27,7 @@ except ImportError:
 # PARAMETERS  ← edit here, then re-run
 # ═══════════════════════════════════════════════════════════════════
 
-A_deg         = 3.0   # deg  — engagement angle (shaft tilt from horizontal)
+A_deg         = 2.0   # deg  — engagement angle (shaft tilt from horizontal)
 B             = 35.0  # mm   — UJ pivot → output wheel centre (along shaft)
 R             = 20.0  # mm   — contact radius (O-ring outer edge = motor disc rim)
 dw            = 2.5   # mm   — O-ring wire diameter
