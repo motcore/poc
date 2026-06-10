@@ -68,15 +68,20 @@ eng_slot_w   =  2.5  # mm — ranura: ancho en pa (diámetro muñón + holgura)
 eng_slot_h   =  6.0  # mm — ranura: longitud en Z (Ø pin 2.5 + subida Z a ±45° 2.3 + holgura 0.5)
 
 # ── MG90D servo (Tower Pro — digital, metal gears, ~0.1° resolution) ─────────
-sg90_l        = 22.8  # mm — body depth along shaft axis (pa direction)
-sg90_h        = 25.4  # mm — body cross-section in Y direction (tall axis)
-sg90_w        = 12.8  # mm — body cross-section in Z direction
-sg90_sd       =  4.8  # mm — output shaft outer diameter (with spline, same as SG90)
-sg90_sl       =  4.0  # mm — shaft protrusion beyond body face
-sg90_tol      =  0.3  # mm — pocket clearance per side
-sg90_wall     =  2.0  # mm — pocket wall thickness
-sg90_shaft_off =  6.0  # mm — eje desplazado desde la cara delantera del cuerpo (dimensión sg90_h)
-sg90_arm_r     =  8.0  # mm — radio del brazo del servo (pin en punta del brazo)
+sg90_l        = 28.5  # mm — body length along shaft axis (pa direction)          [C=28.5]
+sg90_h        = 22.6  # mm — body cross-section in Y direction (oreja a oreja)    [B=22.6]
+sg90_w        = 12.0  # mm — body cross-section in Z direction                     [D=12.0]
+sg90_sd       =  4.8  # mm — output shaft outer diameter (with spline)
+sg90_sl       =  4.0  # mm — shaft protrusion beyond body face              [A-C=32.5-28.5]
+sg90_tol      =  0.3  # mm — mounting clearance per side
+sg90_wall     =  2.0  # mm — bracket wall thickness (legacy, kept for reference)
+sg90_shaft_off =  6.0  # mm — shaft centre from front body face (by0), estimated
+sg90_arm_r     =  8.0  # mm — servo arm radius (pin at arm tip)
+sg90_arm_t     =  4.0  # mm — arm thickness in X (was 2.0)
+sg90_ear_y     =  4.45 # mm — ear tab protrusion beyond body face (±Y)  [(E-B)/2=(31.5-22.6)/2]
+sg90_ear_t     =  2.0  # mm — ear tab thickness in X (bolt direction)
+sg90_ear_x     =  8.7  # mm — ear centre X from body_x0 (along shaft axis)  [C-F=28.5-19.8]
+sg90_m2_r      =  1.1  # mm — M2 hole radius in ear (clearance for M2 bolt)
 
 # ── Modular foot + side bars (4× M3, no tools needed) ────────────────────────
 # Foot      : plate in wall pocket, shaft clearance hole + 4 screw holes.
@@ -503,21 +508,14 @@ def make_shaft_bracket(axis):
         shape = shape.rotate(v(0, 0, 0), v(0, 0, 1), angle)
     return shape
 
-def make_frame():
+def make_frame(axes=None):
     """
-    Single-piece frame: top plate + bottom plate + lever pivot posts.
+    Single-piece frame: bottom plate + servo mount wings for each axis.
 
-    Posts sit at the blade-root / head junction (y = head_y1 in the canonical
-    frame), one on each ±pa side just outside the bracket width.  This location
-    clears the output wheels (head_y1 > wheel outer face), the motor disc
-    (radius ≈ 34 mm from Z-axis >> disc_vr = 24 mm), and the blades.
-
-    The trunnion socket is a horizontal through-hole along pa at pivot_z.
+    axes : list of (name, axis_vector) — mismo formato que AXES en BUILD DOCUMENT.
+           Si se pasa, los mounts de cada eje se fusionan aquí (una sola pieza).
     """
-    # post_pa_off is global (defined in DERIVED)
-    z_top  =  cube_h / 2
     z_bot  = -(cube_h / 2 + plate_t)
-    post_h =  cube_h + plate_t           # z_bot → z_top
 
     # Top plate omitted for visualisation — set SHOW_TOP = True to restore
     SHOW_TOP = False
@@ -531,66 +529,103 @@ def make_frame():
     frame = bot
 
     if SHOW_TOP:
+        z_top = cube_h / 2
         top = Part.makeBox(cube_size, cube_size, plate_t,
                            v(-cube_half, -cube_half, z_top))
         top = top.cut(cyl(motor_shaft_d / 2 + 1.0, plate_t + 2,
                           v(0, 0, z_top - 1)))
         frame = frame.fuse(top)
 
-    # Posts removed: servo body pockets replace them (see make_servo_mount).
+    # Servo mount wings — misma pieza que la placa inferior
+    if axes:
+        for _, axis in axes:
+            frame = frame.fuse(make_servo_mount(axis))
+
     return frame
 
 
 def make_servo_mount(axis):
     """
-    SG90 body pocket, part of the frame (fixed).
-    Canonical: shaft=+Y, pa=+X, servo on canonical -pa side (pa = -post_pa_off).
+    MG90D ear-mount bracket (structural piece, fixed to frame).
 
-    Geometry
-    --------
-    Pocket is open from the outer face (cube-corner side) so the servo slides
-    in along the pa axis.  An inner wall (sg90_wall thick) stops the body and
-    has a clearance hole for the output shaft + lever boss.
+    Geometry (canonical frame: shaft=+Y, pa=+X)
+    ─────────────────────────────────────────────
+    Servo lies with shaft along X (pa direction), body at +X from blade.
+    Ears are tabs extending ±Y beyond the body at X = body_x0 + sg90_ear_x,
+    with M2 through-holes in X direction at Z = z_shaft.
 
-    pa extent : srv_pa - sg90_l  …  srv_pa + sg90_wall
-                (open outer)         (inner wall outer face)
-    Y extent  : head_y1 ± (sg90_h/2 + sg90_tol + sg90_wall)
-    Z extent  : ±(sg90_w/2 + sg90_tol + sg90_wall)
+    The bracket has two wings (front −Y, back +Y) that capture the ear tabs.
+    Each wing: X wraps the ear (ear_xc ± sg90_ear_t/2 ± brk_wall),
+               Y covers ear tab + brk_wall outward,
+               Z = full servo body Z extent.
+    A base plate (below servo body in Z) connects both wings for rigidity.
+    M2 through-holes in X let the servo slide in from +X; bolts lock it in place.
     """
-    srv_pa = -post_pa_off                        # canonical servo-side shaft pa
+    # ── Reproduce ear positions from make_sg90_ref ────────────────────────────
+    blade_y_ctr = head_y1 - eng_blade_t / 2
+    z_yz_bot_r  = -(cube_half - eng_tip_clr)
+    pin_r_ref   = eng_slot_w / 2
+    pin_z       = z_yz_bot_r + pin_r_ref + 1.0
+    z_shaft     = pin_z + sg90_arm_r
+    y_shaft     = blade_y_ctr
+    arm_t       = sg90_arm_t
+    arm_x0      = eng_yz_t / 2 + 0.5
+    body_x0     = arm_x0 + arm_t
 
-    pkt_x  = sg90_l   + sg90_tol                 # pocket depth  (body + tol)
-    pkt_y  = sg90_h   + 2 * sg90_tol             # pocket width  in Y
-    pkt_z  = sg90_w   + 2 * sg90_tol             # pocket height in Z
+    by0 = y_shaft - sg90_shaft_off      # body front face Y
+    by1 = by0 + sg90_h                  # body back face Y
+    bz0 = z_shaft - sg90_w / 2         # body bottom Z
+    bz1 = bz0 + sg90_w                 # body top Z
 
-    # Boss outer radius (lever socket) — inner wall hole sized to match
-    boss_r = sg90_sd / 2 + 2.0                   # = 4.4 mm
+    ear_xc  = body_x0 + sg90_ear_x     # ear centre X
+    ear_x0e = ear_xc - sg90_ear_t / 2  # ear inner X face
+    ear_x1e = ear_xc + sg90_ear_t / 2  # ear outer X face
 
-    # Mount block extents
-    blk_x0 = srv_pa - pkt_x                      # outer (open) face
-    blk_x1 = srv_pa + sg90_wall                   # inner wall outer face
-    blk_y0 = head_y1 - pkt_y / 2 - sg90_wall
-    blk_y1 = head_y1 + pkt_y / 2 + sg90_wall
-    blk_z0 = -(pkt_z / 2 + sg90_wall)
-    blk_z1 = +(pkt_z / 2 + sg90_wall)
+    brk_wall = 2.5                           # bracket wall thickness (X and outer-Y)
+    z_base   = -(cube_h / 2 + plate_t)      # fondo de la placa inferior del frame
 
-    blk = Part.makeBox(blk_x1 - blk_x0,
-                       blk_y1 - blk_y0,
-                       blk_z1 - blk_z0,
-                       v(blk_x0, blk_y0, blk_z0))
+    # ── X span: wraps the ear ─────────────────────────────────────────────────
+    bx0    = ear_x0e - brk_wall              # −X face of bracket wing
+    bx1    = ear_x1e + brk_wall              # +X face of bracket wing
+    bx_len = bx1 - bx0
 
-    # Pocket cut (open from outer face at blk_x0)
-    pocket = Part.makeBox(pkt_x, pkt_y, pkt_z,
-                          v(blk_x0, head_y1 - pkt_y / 2, -pkt_z / 2))
-    blk = blk.cut(pocket)
+    # ── Alas verticales: desde el fondo de la placa hasta la cima del cuerpo ──
+    # Se fusionan con la placa inferior de make_frame (geometría coincidente).
+    wing_f = Part.makeBox(bx_len, sg90_ear_y + brk_wall, bz1 - z_base,
+                          v(bx0, by0 - sg90_ear_y - brk_wall, z_base))
 
-    # Shaft + boss clearance hole through inner wall
-    boss_hole = cyl(boss_r + sg90_tol,
-                    sg90_wall + 2,
-                    v(srv_pa, head_y1, 0), v(1, 0, 0))
-    blk = blk.cut(boss_hole)
+    # Ala trasera: llega hasta la cara interior de la pared (cube_half)
+    # → columna de unión entre el suelo del frame y la pared
+    wing_b = Part.makeBox(bx_len, cube_half - by1, bz1 - z_base,
+                          v(bx0, by1, z_base))
 
-    # Rotate canonical (+Y) → actual axis
+    # ── Ranuras para orejas — abiertas por +X (el servo entra deslizando) ─────
+    # Longitud del corte: desde cara interior de la oreja hasta cara +X del ala
+    slot_x0  = ear_x0e - sg90_tol          # un poco antes del borde interno de la oreja
+    slot_len = bx1 + 1 - slot_x0           # llega hasta +X y sale 1 mm (corte limpio)
+    slot_z0  = bz0 - sg90_tol
+    slot_z1  = bz1 + sg90_tol
+
+    # Hueco oreja frontal (en wing_f, abierto en su cara +Y = by0)
+    slot_f = Part.makeBox(slot_len, sg90_ear_y + sg90_tol, slot_z1 - slot_z0,
+                          v(slot_x0, by0 - sg90_ear_y - sg90_tol, slot_z0))
+    wing_f = wing_f.cut(slot_f)
+
+    # Hueco oreja trasera (en wing_b, abierto en su cara −Y = by1)
+    slot_b = Part.makeBox(slot_len, sg90_ear_y + sg90_tol, slot_z1 - slot_z0,
+                          v(slot_x0, by1, slot_z0))
+    wing_b = wing_b.cut(slot_b)
+
+    blk = wing_f.fuse(wing_b)
+
+    # ── M2 through-holes in X direction (at Z = z_shaft, Y = ear centre) ─────
+    m2_f = cyl(sg90_m2_r + sg90_tol, bx_len + 2,
+               v(bx0 - 1, by0 - sg90_ear_y / 2, z_shaft), v(1, 0, 0))
+    m2_b = cyl(sg90_m2_r + sg90_tol, bx_len + 2,
+               v(bx0 - 1, by1 + sg90_ear_y / 2, z_shaft), v(1, 0, 0))
+    blk = blk.cut(m2_f).cut(m2_b)
+
+    # ── Rotate canonical (+Y) → actual axis ──────────────────────────────────
     if   axis.x >  0.5: angle = -90.0
     elif axis.x < -0.5: angle =  90.0
     elif axis.y < -0.5: angle = 180.0
@@ -708,19 +743,19 @@ def make_sg90_ref(axis):
     # Centro del bloque en x_arm; cara −X del bloque a 0.5 mm de la cara +X de la lámina.
     # Cuerpo: cara −X a x_arm + arm_t/2 (tangente al bloque, sin solapar).
     # Eje (stub): desde body_x0 hacia −X, cortado antes de llegar a la lámina.
-    arm_t   = 2.0                                    # grosor del brazo en X
+    arm_t   = sg90_arm_t                               # grosor del brazo en X
     arm_w   = 4.0                                    # anchura del brazo en Y
     # Brazo centrado a 0.5 mm de la cara +X de la lámina.
     arm_x0  = eng_yz_t / 2 + 0.5                    # cara −X del brazo (0.5 mm libre de la lámina YZ)
     body_x0 = arm_x0 + arm_t                        # cara −X del cuerpo
 
+    # Derived body faces
+    by0 = y_shaft - sg90_shaft_off      # body front face Y
+    by1 = by0 + sg90_h                  # body back face Y
+    bz0 = z_shaft - sg90_w / 2         # body bottom Z
+
     # ── Cuerpo del servo ──────────────────────────────────────────────────────
-    body = Part.makeBox(
-        sg90_l, sg90_h, sg90_w,
-        v(body_x0,
-          y_shaft - sg90_shaft_off,
-          z_shaft - sg90_w / 2)
-    )
+    body = Part.makeBox(sg90_l, sg90_h, sg90_w, v(body_x0, by0, bz0))
 
     # ── Eje: a ras de la cara −X del brazo, longitud = grosor del brazo ───────
     shaft_stub = cyl(sg90_sd / 2, arm_t,
@@ -740,7 +775,22 @@ def make_sg90_ref(axis):
                   v(pin_x0, y_shaft, pin_z),
                   v(1, 0, 0))
 
-    shape = body.fuse(shaft_stub).fuse(arm_block).fuse(munon)
+    # ── Orejas de montaje: tabs en ±Y, agujero M2 en dirección X ─────────────
+    # Centradas en X a sg90_ear_x desde la cara del shaft (body_x0)
+    ear_xc  = body_x0 + sg90_ear_x          # centro X de la oreja
+    ear_x0e = ear_xc - sg90_ear_t / 2       # cara −X de la oreja
+    ear_x1e = ear_xc + sg90_ear_t / 2       # cara +X de la oreja
+    ear_f   = Part.makeBox(sg90_ear_t, sg90_ear_y, sg90_w,
+                           v(ear_x0e, by0 - sg90_ear_y, bz0))  # oreja frontal (−Y)
+    ear_b   = Part.makeBox(sg90_ear_t, sg90_ear_y, sg90_w,
+                           v(ear_x0e, by1,               bz0))  # oreja trasera (+Y)
+    # Agujeros M2 en X a Z = z_shaft (centro del cuerpo en Z)
+    m2_hole = cyl(sg90_m2_r, sg90_ear_t + 2, v(ear_x0e - 1, by0 - sg90_ear_y / 2, z_shaft), v(1, 0, 0))
+    ear_f   = ear_f.cut(m2_hole)
+    m2_hole = cyl(sg90_m2_r, sg90_ear_t + 2, v(ear_x0e - 1, by1 + sg90_ear_y / 2, z_shaft), v(1, 0, 0))
+    ear_b   = ear_b.cut(m2_hole)
+
+    shape = body.fuse(shaft_stub).fuse(arm_block).fuse(munon).fuse(ear_f).fuse(ear_b)
 
     # Rotar al eje real
     if   axis.x >  0.5: angle = -90.0
@@ -772,9 +822,7 @@ add(doc, "MotorDisc",
     color=(1.0, 0.60, 0.15))
 
 # Single axis for clarity — all four are identical rotated 90°
-AXES = [
-    ("PosY", v( 0,  1, 0)),
-]
+AXES = [("PosY", v(0, 1, 0))]
 
 for name, axis in AXES:
     add(doc, f"OutputWheel_{name}",
@@ -798,7 +846,7 @@ for name, axis in AXES:
         color=(0.30, 0.65, 0.90))
 
 add(doc, "Frame",
-    make_frame(),
+    make_frame(AXES),
     color=(0.70, 0.55, 0.85),
     transparency=40)
 
