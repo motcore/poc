@@ -41,7 +41,11 @@ neck_dia      = 2.5   # mm   — neck diameter (torsion strength + stiffness mat
 neck_len      = 13.0  # mm   — neck length (matched to combined blade stiffness)
 head_gap      = 2.0   # mm   — clearance between wheel outer face and bracket head
 head_depth    = 8.0   # mm   — bracket head bearing length
-lever_len     = 15.0  # mm   — fixed shaft stub beyond wall (servo lever arm side)
+lever_len     = 25.0  # mm   — fixed shaft stub beyond wall (increased for UJ clearance)
+
+# ── Universal joint (purchased, metal, Ø11×23 mm, 5 mm bore) ─────────────────
+uj_od         = 11.0  # mm — UJ outer diameter
+uj_len        = 23.0  # mm — UJ total length (both hubs + cross)
 
 # ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
 plate_t       = 4.0   # mm   — plate thickness (top and bottom)
@@ -132,9 +136,15 @@ head_y1    = head_y0 + head_depth          # head outer face / blade root
 blade_gap  = shaft_dia + 1.0               # gap between blades in pa (shaft clears)
 blade_w_g  = 6.0                           # blade width in pa
 bw_half    = blade_gap / 2 + blade_w_g     # bracket half-width in pa = 9 mm
-# Single compliant neck centred in the free span between head and wall
+# Single compliant neck centred in the free span (kept for reference; shaft now uses UJ)
 neck_start = head_y1 + (cube_half - head_y1 - neck_len) / 2
 neck_end   = neck_start + neck_len
+
+# ── Universal joint position ───────────────────────────────────────────────
+# Cross (pivot) at wall inner face; cylinder straddles the wall ±uj_len/2.
+uj_center  = cube_half               # UJ cross centre (= wall inner face)
+uj_inner_y = uj_center - uj_len / 2  # inner hub end  ≈ 46.8 mm from cube centre
+uj_outer_y = uj_center + uj_len / 2  # outer hub end  ≈ 69.8 mm (7.5 mm past wall face)
 
 # ── Bracket head half-height in Z (shared with make_lever) ───────────────
 head_z_half = shaft_dia / 2 + 3.5   # = 6.0 mm with defaults
@@ -144,13 +154,14 @@ post_pa_off  = bw_half + post_side_gap + post_w / 2  # post centre offset in pa
 head_trun_y  = head_y0 + 2.0                          # head trunnion Y (2 mm from inner face)
 head_pin_pa  = bw_half + head_trun_len / 2            # head pin midpoint in pa
 
-# ── Modular foot + boss block dimensions ──────────────────────────────────────
+# ── Modular foot + side-bar dimensions ────────────────────────────────────────
 # Screws at (±foot_screw_pa, ±foot_screw_z) — clear of all blades (Z≈0 ±0.75 mm).
-# Each screw has its own small boss block on the wall inner face; the four blocks
-# are separated by a central gap that lets the bracket body (±9 mm wide) slide
-# through during assembly.  Gap = 2×(foot_screw_pa − boss_pad) ≥ 18.4 mm > 18 mm ✓
+# Side bars: inner edge at (foot_screw_pa − boss_pad) from centre, outer edge at
+#            (foot_screw_pa + bar_outer_w) — extend toward the wall edge for grip.
+#            Central gap = 2×(foot_screw_pa − boss_pad) ≈ 18.4 mm > 18 mm ✓
 _nut_circ_r   = m3_nut_af / math.sqrt(3)             # hex circumradius ≈ 3.29 mm
-boss_pad      = _nut_circ_r + 1.5                     # ≈ 4.8 mm  — material around nut
+boss_pad      = _nut_circ_r + 1.5                     # ≈ 4.8 mm — material around nut
+bar_ext       = 5.0                                    # mm — extra reach in pa (outward) and Z (both ends)
 foot_half_w   = foot_screw_pa + m3_screw_r + 1.5     # = 17.1 mm (wider to clear blades)
 foot_z_half   = foot_screw_z  + m3_screw_r + 1.5     # = 12.1 mm
 
@@ -223,38 +234,40 @@ def make_oring(axis):
 
 def make_output_shaft(axis):
     """
-    Output shaft — uniform shaft_dia with a single compliant neck.
+    Output shaft — two solid Ø5 mm segments, split at the UJ.
 
-    The neck is centred in the free span between the bracket head and the wall.
-    Its stiffness matches the two flexure blades (equal tilt contribution A/2 each).
-    The shaft rotates in Y (output torque); the neck flexes in Z (tilt A/2).
+    Inner shaft : wheel end → UJ inner face (uj_inner_y ≈ 46.8 mm).
+    Outer shaft : UJ outer face (uj_outer_y ≈ 69.8 mm) → lever arm tip.
+    No compliant neck — the UJ (make_uj_body) provides the tilt pivot.
     """
     neg = v(-axis.x, -axis.y, -axis.z)
 
-    # Inner body: from just past wheel bore inward end to neck_start
-    inner_len = neck_start - (wc_dist - WT / 2 - 2.0)
-    inner_start = av(axis, neck_start)
+    # Inner shaft: from just past wheel bore inward end to UJ inner face
+    inner_len   = uj_inner_y - (wc_dist - WT / 2 - 2.0)
+    inner_start = av(axis, uj_inner_y)
     inner = cyl(shaft_dia / 2, inner_len, inner_start, neg)
 
-    # Compliant neck (neck_dia, neck_len) — centred in free span
-    neck = cyl(neck_dia / 2, neck_len, av(axis, neck_start), axis)
+    # Outer shaft: from UJ outer face to lever arm tip
+    outer_len   = cube_half + wall_thick + lever_len - uj_outer_y
+    outer_start = av(axis, uj_outer_y)
+    outer = cyl(shaft_dia / 2, outer_len, outer_start, axis)
 
-    # Outer body: from neck_end through wall to lever arm tip
-    outer_len = cube_half + wall_thick + lever_len - neck_end
-    outer = cyl(shaft_dia / 2, outer_len, av(axis, neck_end), axis)
-
-    return inner.fuse(neck).fuse(outer)
+    return inner.fuse(outer)
 
 
-def make_uj_marker(axis):
-    return Part.makeSphere(2.5, av(axis, uj_dist))
+def make_uj_body(axis):
+    """Universal joint — reference cylinder Ø{uj_od} × {uj_len} mm.
+    Cross (pivot) at cube_half (wall inner face); straddles the wall.
+    Represents the purchased metal UJ (5 mm bore each side).
+    """
+    return cyl(uj_od / 2, uj_len, av(axis, uj_inner_y), axis)
 
 
 def make_cube_wall(axis):
     """Wall with integrated compliant flexure bracket (one-piece print).
     Includes a through-bore for the output shaft lever arm.
     """
-    shaft_hole_r = shaft_dia / 2 + 0.4   # clearance fit for rotating shaft
+    shaft_hole_r = uj_od / 2 + 0.5       # clearance bore for UJ body (Ø11 + 1 mm)
 
     if abs(axis.x) > 0.5:
         x0 = cube_half if axis.x > 0 else -cube_half - wall_thick
@@ -287,18 +300,22 @@ def make_cube_wall(axis):
 
     # ── Two vertical side bars ("solapas laterales") ───────────────────────────
     # One bar at +pa, one at −pa.  Each bar:
-    #   pa width  = 2 × boss_pad  ≈ 9.6 mm
-    #   Z height  = 2 × (foot_screw_z + boss_pad) ≈ 27.6 mm  (spans both screw rows)
-    #   Y depth   = flange_depth = 5 mm  (flush against wall inner face)
-    # Central gap between bars = 2 × (foot_screw_pa − boss_pad) ≈ 18.4 mm  > 18 mm ✓
+    #   inner edge : foot_screw_pa − boss_pad          ≈  9.2 mm from centre
+    #   outer edge : foot_screw_pa + boss_pad + bar_ext ≈ 23.8 mm from centre
+    #   Z half-height: foot_screw_z + boss_pad + bar_ext ≈ 18.8 mm
+    #   Y depth    : flange_depth = 5 mm  (flush against wall inner face)
+    # Central gap between bars = 2×(foot_screw_pa − boss_pad) ≈ 18.4 mm > 18 mm ✓
     # 2 nut traps per bar at Z = ±foot_screw_z; screws from outside → foot → nut.
     _nut_cr   = m3_nut_af / math.sqrt(3)
-    _fl_y0    = cube_half - flange_depth        # bar inner face (nut trap opening)
-    _bar_z0   = foot_screw_z + boss_pad         # bar half-height in Z
+    _fl_y0    = cube_half - flange_depth                 # bar inner face (nut trap opening)
+    _bar_z0   = foot_screw_z + boss_pad + bar_ext        # bar half-height in Z
     for _spa in [foot_screw_pa, -foot_screw_pa]:
+        _sn      = 1 if _spa > 0 else -1
+        _x_inner = _spa - _sn * boss_pad                 # toward centre      ≈ ±9.2 mm
+        _x_outer = _spa + _sn * (boss_pad + bar_ext)     # toward wall edge   ≈ ±23.8 mm
         _bar = Part.makeBox(
-            2 * boss_pad, flange_depth, 2 * _bar_z0,
-            v(_spa - boss_pad, _fl_y0, -_bar_z0)
+            abs(_x_outer - _x_inner), flange_depth, 2 * _bar_z0,
+            v(min(_x_inner, _x_outer), _fl_y0, -_bar_z0)
         )
         for _sz in [foot_screw_z, -foot_screw_z]:
             # Hex nut trap from inner face (y = _fl_y0), extruded in +Y
@@ -769,8 +786,8 @@ for name, axis in AXES:
         make_output_shaft(axis),
         color=(0.45, 0.75, 0.65))
     add(doc, f"UJ_{name}",
-        make_uj_marker(axis),
-        color=(1.0, 0.90, 0.15))
+        make_uj_body(axis),
+        color=(0.85, 0.65, 0.10))
     add(doc, f"Wall_{name}",
         make_cube_wall(axis),
         color=(0.45, 0.55, 0.75),
