@@ -345,13 +345,17 @@ def make_shaft_bracket(axis):
     pin_z        = z_yz_bot + pin_r + 1.0              # centro pin en neutro (fondo útil ranura)
     slot_z0      = pin_z - pin_r                       # borde inferior del corte = 1 mm sobre base
     sg90_z_shaft = pin_z + sg90_arm_r                  # eje encima del centro del pin neutro
-    slot_z_ctr   = slot_z0 + eng_slot_h / 2           # centro geométrico del rectángulo a cortar
-    eng_yz = eng_yz.cut(Part.makeBox(
-        eng_yz_t + 2,                                  # atraviesa la lámina en X
-        eng_slot_w,                                    # estrecha en Y (Ø muñón + holgura)
-        eng_slot_h,                                    # elongada en Z (recorrido del muñón)
-        v(-eng_yz_t / 2 - 1, y_ctr - eng_slot_w / 2, slot_z0)
-    ))
+    # Ranura con esquina inferior redondeada:
+    #   · Parte recta: desde z=pin_z (centro del semicilindro) hacia arriba
+    #   · Parte curva: semicilindro a lo largo de X, radio=pin_r, centro en pin_z
+    slot_depth   = eng_yz_t + 2                        # profundidad del corte en X
+    slot_x0      = -eng_yz_t / 2 - 1                  # arranque del corte en X
+    slot_rect = Part.makeBox(
+        slot_depth, eng_slot_w, eng_slot_h - pin_r,
+        v(slot_x0, y_ctr - pin_r, pin_z)
+    )
+    slot_round = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, pin_z), v(1, 0, 0))
+    eng_yz = eng_yz.cut(slot_rect.fuse(slot_round))
 
     # XZ blade — chamfer bottom ±X corners
     for sx in [1, -1]:
