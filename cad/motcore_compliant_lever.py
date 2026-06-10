@@ -83,13 +83,13 @@ sg90_arm_r     =  8.0  # mm — radio del brazo del servo (pin en punta del braz
 # Side bars : 2 vertical bars on wall inner face, one at +pa and one at −pa.
 #             Each bar spans Z = [−foot_screw_z−boss_pad … +foot_screw_z+boss_pad]
 #             and carries 2 nut traps (at Z = ±foot_screw_z).
-#             Central gap between bars = 2×(foot_screw_pa−boss_pad) ≈ 18.4 mm,
-#             wide enough for the bracket head (18 mm) to pass during assembly.
+#             Central gap between bars = 2×(foot_screw_pa−boss_pad) ≈ 28.4 mm,
+#             wide enough for the bracket head (25 mm) to pass during assembly.
 m3_nut_af     = 5.7   # mm — M3 hex nut AF with print clearance (5.5 mm + 0.2)
 m3_nut_thick  = 2.6   # mm — nut trap depth (2.4 mm nut + 0.2 mm clearance)
 m3_screw_r    = 1.6   # mm — M3 clearance hole radius (Ø3.2 mm)
-foot_screw_pa = 14.0  # mm — screw centre offset in pa direction (±pa)
-                      #      wide enough so boss blocks clear the bracket head (±9 mm) during assembly
+foot_screw_pa = 19.0  # mm — screw centre offset in pa direction (±pa)
+                      #      wide enough so side bars clear the bracket head (±12.5 mm) during assembly
 foot_screw_z  = 9.0   # mm — screw centre Z offset (±Z, clear of blades at Z≈0 ±0.75)
 foot_fit      = 0.3   # mm — pocket fit clearance per side
 flange_depth  = 5.0   # mm — flange Y depth (protrudes inward from wall inner face)
@@ -133,18 +133,22 @@ disc_h    = 2 * contactZ
 # ── Bracket head and shaft neck geometry ─────────────────────────────────
 head_y0    = wc_dist + WT / 2 + head_gap   # head inner face (just past wheel)
 head_y1    = head_y0 + head_depth          # head outer face / blade root
-blade_gap  = shaft_dia + 1.0               # gap between blades in pa (shaft clears)
+blade_gap  = uj_od + 2.0                   # gap between blades in pa — clears UJ body (Ø11 + 1 mm each side)
 blade_w_g  = 6.0                           # blade width in pa
-bw_half    = blade_gap / 2 + blade_w_g     # bracket half-width in pa = 9 mm
+bw_half    = blade_gap / 2 + blade_w_g     # bracket half-width in pa = 12.5 mm
 # Single compliant neck centred in the free span (kept for reference; shaft now uses UJ)
 neck_start = head_y1 + (cube_half - head_y1 - neck_len) / 2
 neck_end   = neck_start + neck_len
 
 # ── Universal joint position ───────────────────────────────────────────────
-# Cross (pivot) at wall inner face; cylinder straddles the wall ±uj_len/2.
-uj_center  = cube_half               # UJ cross centre (= wall inner face)
-uj_inner_y = uj_center - uj_len / 2  # inner hub end  ≈ 46.8 mm from cube centre
-uj_outer_y = uj_center + uj_len / 2  # outer hub end  ≈ 69.8 mm (7.5 mm past wall face)
+# Outer face of UJ flush with wall INNER face → UJ entirely inside the cube.
+# Bearing sits in the wall (wall_thick = 4 mm); shaft passes through bearing.
+# Cross (actual pivot) at cube_half - uj_len/2 ≈ 46.8 mm.
+# Ideal pivot (uj_dist) was at 54.3 mm → displacement Δ = 7.5 mm inward.
+# Contact-Z error: Δ × sin(2°) = 7.5 × 0.035 = 0.26 mm — still negligible.
+uj_outer_y = cube_half                       # outer face flush with wall inner face
+uj_inner_y = uj_outer_y - uj_len            # inner face ≈ 35.3 mm (inside cube)
+uj_center  = uj_outer_y - uj_len / 2        # actual pivot ≈ 46.8 mm from cube centre
 
 # ── Bracket head half-height in Z (shared with make_lever) ───────────────
 head_z_half = shaft_dia / 2 + 3.5   # = 6.0 mm with defaults
@@ -162,7 +166,7 @@ head_pin_pa  = bw_half + head_trun_len / 2            # head pin midpoint in pa
 _nut_circ_r   = m3_nut_af / math.sqrt(3)             # hex circumradius ≈ 3.29 mm
 boss_pad      = _nut_circ_r + 1.5                     # ≈ 4.8 mm — material around nut
 bar_ext       = 5.0                                    # mm — extra reach in pa (outward) and Z (both ends)
-foot_half_w   = foot_screw_pa + m3_screw_r + 1.5     # = 17.1 mm (wider to clear blades)
+foot_half_w   = foot_screw_pa + m3_screw_r + 1.5     # = 22.1 mm (wider to clear blades)
 foot_z_half   = foot_screw_z  + m3_screw_r + 1.5     # = 12.1 mm
 
 
@@ -236,8 +240,8 @@ def make_output_shaft(axis):
     """
     Output shaft — two solid Ø5 mm segments, split at the UJ.
 
-    Inner shaft : wheel end → UJ inner face (uj_inner_y ≈ 46.8 mm).
-    Outer shaft : UJ outer face (uj_outer_y ≈ 69.8 mm) → lever arm tip.
+    Inner shaft : wheel end → UJ inner face (uj_inner_y ≈ 35.3 mm, inside cube).
+    Outer shaft : UJ outer face (uj_outer_y ≈ 58.3 mm, wall inner face) → lever tip.
     No compliant neck — the UJ (make_uj_body) provides the tilt pivot.
     """
     neg = v(-axis.x, -axis.y, -axis.z)
@@ -367,16 +371,13 @@ def make_shaft_bracket(axis):
     Canonical frame: shaft = +Y, pa (pin axis) = +X.
     """
     blade_t     = 1.5              # blade thickness in Z — matched to neck stiffness
-    blade_w     = 6.0              # blade width in pa (horizontal stiffness)
-    blade_gap   = shaft_dia + 1.0  # gap between blades in pa (shaft clears through)
+    # blade_gap, blade_w_g, bw_half — use globals from DERIVED (clears UJ body Ø11 mm)
     # head_z_half is global (defined in DERIVED)
 
     bore_r = shaft_dia / 2 + 0.25  # bearing bore radius
 
     # head_y0, head_y1 from global DERIVED (shared with make_output_shaft)
     blade_len = cube_half - head_y1
-
-    bw_half = blade_gap / 2 + blade_w  # half total bracket width in pa
 
     # Head block with bearing bore
     head = Part.makeBox(2 * bw_half, head_depth, 2 * head_z_half,
@@ -385,11 +386,11 @@ def make_shaft_bracket(axis):
                         v(0, head_y0 - 1, 0),  v(0, 1, 0)))
 
     # Right blade (+pa side): lies flat at z=0, thin in Z, wide in pa
-    blade_r = Part.makeBox(blade_w, blade_len, blade_t,
-                           v( blade_gap / 2,              head_y1, -blade_t / 2))
+    blade_r = Part.makeBox(blade_w_g, blade_len, blade_t,
+                           v( blade_gap / 2,                head_y1, -blade_t / 2))
     # Left blade (-pa side)
-    blade_l = Part.makeBox(blade_w, blade_len, blade_t,
-                           v(-(blade_gap / 2 + blade_w),  head_y1, -blade_t / 2))
+    blade_l = Part.makeBox(blade_w_g, blade_len, blade_t,
+                           v(-(blade_gap / 2 + blade_w_g),  head_y1, -blade_t / 2))
 
     # Engagement lever blade — two independent sections:
     #
