@@ -421,12 +421,22 @@ def make_shaft_bracket(axis):
     )
     # YZ arm — starts eng_overlap mm above spring bottom, runs to near base plate
     # Centred on the XZ arm mid-plane: y_centre = head_y1 - eng_blade_t/2
-    y_ctr = head_y1 - eng_blade_t / 2                 # Y centre of cross section
-    yz_y0 = y_ctr - eng_blade_w / 2
+    y_ctr  = head_y1 - eng_blade_t / 2                 # Y centre of cross section
+    yz_y0  = y_ctr - eng_blade_w / 2
+    r_cap  = eng_blade_w / 2                            # radio = media anchura en Y
+    # pin_z se calcula justo debajo — cap_z coincide con el centro del fondo de la ranura
+    # → punta exterior concéntrica con la semicircunferencia interior del slot
+    pin_r  = eng_slot_w / 2
+    pin_z  = z_yz_bot + pin_r + 1.0
+    cap_z  = pin_z                                     # mismo centro que el fondo de la ranura
+
+    # Box arranca en cap_z; el cilindro cuelga por debajo añadiendo material
     eng_yz = Part.makeBox(
-        eng_yz_t, eng_blade_w, yz_len,
-        v(-eng_yz_t / 2, yz_y0, z_yz_bot)
+        eng_yz_t, eng_blade_w, z_yz_top - cap_z,
+        v(-eng_yz_t / 2, yz_y0, cap_z)
     )
+    # Cilindro a lo largo de X: punta semicircular en YZ, concéntrica con el slot
+    eng_yz = eng_yz.fuse(cyl(r_cap, eng_yz_t, v(-eng_yz_t / 2, y_ctr, cap_z), v(1, 0, 0)))
 
     # ── Chamfer the transition corners in the overlap zone ────────────────────
     # XZ side: tapers from ±eng_blade_w/2 to ±eng_blade_t/2 in X at z_spring_bot.
