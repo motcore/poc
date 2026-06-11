@@ -187,3 +187,10 @@ Wheel face never contacts motor disc (clearance 0.15–0.2 × dw at 20–25% com
 | `software/driver/` | Arduino firmware — receiver (motor + servo control) |
 
 Web: `motcore.github.io/clutch-geometry.html` — live visualiser.
+
+---
+
+## Claude coding conventions
+
+- **Language**: all code (comments, variable names, docstrings) and all git commit messages must be in **English**.
+- Respond to the user in whatever language they use; only the code and commits must be English.
