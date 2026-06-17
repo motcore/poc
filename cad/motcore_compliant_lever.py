@@ -99,8 +99,23 @@ mhub_bolt_n    =  4    # —    — number of flange bolts
 mhub_pilot_d   =  2.5  # mm — self-tap pilot Ø in the disc (M3 self-taps into PETG)
 mhub_pilot_h   =  6.0  # mm — pilot depth
 
-# ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
+# ── Frame (top + bottom plates + corner columns) ─────────────────────────────
 plate_t       = 4.0   # mm   — plate thickness (top and bottom)
+# Corner columns: each post is SPLIT at mid-height — the lower half prints with
+# the base, the upper half with the top plate (so each print is only ~half the
+# cube tall, far easier to print). The two halves meet at z=0 (optional Lego-style
+# peg for alignment); the structural union is the WALL, which screws to the lower
+# half (bottom) and the upper half (top). Wall edges embed in post grooves so the
+# outer faces stay flush. cube_h + 2·plate_t = 2·cube_out → a perfect 125 mm cube.
+col_w         = 18.0  # mm   — corner post square side (reaches the outer corner)
+col_groove_d  = 7.0   # mm   — depth a wall edge embeds into the post groove
+col_screw_z   = 43.5  # mm   — |Z| of the wall→post screws (one per half-column)
+col_pilot_d   = 2.5   # mm   — self-tap pilot Ø in the posts (M3 from the walls)
+col_pilot_h   = 8.0   # mm   — pilot depth
+col_peg_d     = 6.0   # mm   — alignment peg Ø between the two half-columns (Lego)
+col_peg_h     = 4.0   # mm   — peg height
+rib_d         = 4.0   # mm   — backing rib depth behind the wall (into the cube)
+rib_h         = 8.0   # mm   — backing rib height (up from base / down from top)
 post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
 post_d        =  5.0  # mm   — post depth in axis direction (thin face)
 post_side_gap = 1.5   # mm   — clearance between blade outer edge and post
@@ -181,6 +196,9 @@ uj_dist  = motorY
 cube_half = uj_dist + wall_thick
 cube_size = 2 * cube_half
 cube_h    = cube_size          # cube is cubic: internal height = side length
+cube_out  = cube_half + wall_thick      # outer half-size (wall/plate outer face)
+wall_half = cube_out - col_w + col_groove_d   # wall half-span; ends embed in posts
+w_screw   = wall_half - col_groove_d / 2      # along-wall position of the post screws
 disc_vr   = R + WT / 2            # motor disc visual radius
 
 # ── Output wheel centre ───────────────────────────────────────────────────
@@ -336,9 +354,10 @@ def bolt_circle_points(centre, axis, radius, n, phase_deg):
 def make_motor_disc():
     """One rigid part: top plate + central spool + bottom plate.
     Contact faces at z = ±contactZ; the spool joins them so they stay parallel.
-    Central bore is a close slip fit on the Ø8 shaft (centres the disc — it rotates
-    with the shaft, no relative motion). Torque comes from the motor hub below via
-    a bolt circle into self-tap pilots in the bottom plate.
+    Central bore is a close slip fit on the Ø5 shaft (centres the disc — it rotates
+    with the shaft, no relative motion). Torque comes from a hub on EACH face via
+    a bolt circle into self-tap pilots; two hubs clamp the disc at two points so it
+    stays concentric/perpendicular.
     """
     top   = cyl(disc_vr, WT, v(0, 0, contactZ))                 # face at +contactZ
     bot   = cyl(disc_vr, WT, v(0, 0, -contactZ - WT))           # face at −contactZ
@@ -349,44 +368,46 @@ def make_motor_disc():
     disc = disc.cut(cyl(disc_bore_d / 2 + 0.05, 2 * contactZ + 2 * WT + 2,
                         v(0, 0, -contactZ - WT - 1)))
 
-    # Self-tap pilots on the bottom plate outer face for the hub flange bolts
-    z_face = -contactZ - WT
+    # Self-tap pilots on BOTH plate outer faces (one hub each side)
     rbc = mhub_bolt_cd / 2
-    for k in range(mhub_bolt_n):
-        a = math.radians(360.0 / mhub_bolt_n * k + 45.0)
-        disc = disc.cut(cyl(mhub_pilot_d / 2, mhub_pilot_h + 0.5,
-                            v(rbc * math.cos(a), rbc * math.sin(a), z_face - 0.5),
-                            v(0, 0, 1)))
+    for z_face, zd in ((-contactZ - WT, 1.0), (contactZ + WT, -1.0)):
+        for k in range(mhub_bolt_n):
+            a = math.radians(360.0 / mhub_bolt_n * k + 45.0)
+            disc = disc.cut(cyl(mhub_pilot_d / 2, mhub_pilot_h + 0.5,
+                                v(rbc * math.cos(a), rbc * math.sin(a), z_face - zd * 0.5),
+                                v(0, 0, zd)))
     return disc
 
 
-def make_motor_hub():
-    """Purchased Ø8 flange hub for the motor disc (reference part).
-    Mounts BELOW the disc: flange bolted up to the bottom plate, body + 2 set
-    screws (at 90°) below it where they stay accessible and grip the Ø8 shaft.
+def make_motor_hub(sd):
+    """Ø5 flange hub for the motor disc (reference part). sd = −1 mounts it BELOW
+    the disc, sd = +1 ABOVE. One hub on each face of the spool clamps the disc to
+    the shaft at two points (concentric, perpendicular). Flange bolts into the disc
+    plate; body + 2 set screws (at 90°) sit clear of the disc and grip the shaft.
     """
-    z_top    = -contactZ - WT                       # flange top = disc bottom face
-    z_fl     = z_top - mhub_flange_t                # flange bottom
-    z_body   = z_fl - mhub_body_h                   # body bottom
+    z_face = sd * (contactZ + WT)                       # disc outer face this side
+    fl_lo  = min(z_face, z_face + sd * mhub_flange_t)
+    bd_lo  = min(z_face + sd * mhub_flange_t,
+                 z_face + sd * (mhub_flange_t + mhub_body_h))
 
-    flange = cyl(mhub_flange_od / 2, mhub_flange_t, v(0, 0, z_fl))
-    body   = cyl(mhub_od / 2, mhub_body_h, v(0, 0, z_body))
+    flange = cyl(mhub_flange_od / 2, mhub_flange_t, v(0, 0, fl_lo))
+    body   = cyl(mhub_od / 2, mhub_body_h, v(0, 0, bd_lo))
     hub    = flange.fuse(body)
 
     # Bore for the shaft
     hub = hub.cut(cyl(mhub_bore_d / 2 + 0.05, mhub_flange_t + mhub_body_h + 2,
-                      v(0, 0, z_body - 1)))
+                      v(0, 0, min(fl_lo, bd_lo) - 1)))
 
     # Flange bolt clearance holes
     rbc = mhub_bolt_cd / 2
     for k in range(mhub_bolt_n):
         a = math.radians(360.0 / mhub_bolt_n * k + 45.0)
         hub = hub.cut(cyl(mhub_bolt_d / 2, mhub_flange_t + 2,
-                          v(rbc * math.cos(a), rbc * math.sin(a), z_fl - 1),
+                          v(rbc * math.cos(a), rbc * math.sin(a), fl_lo - 1),
                           v(0, 0, 1)))
 
     # Two radial M3 set-screw holes at 90° through the body
-    z_mid = z_body + mhub_body_h / 2
+    z_mid = bd_lo + mhub_body_h / 2
     for d in (v(1, 0, 0), v(0, 1, 0)):
         hub = hub.cut(cyl(1.5, mhub_od / 2 + 2,
                           v(d.x * (mhub_od / 2 + 1), d.y * (mhub_od / 2 + 1), z_mid),
@@ -523,20 +544,34 @@ def make_cube_wall(axis):
     """
     shaft_hole_r = uj_od / 2 + 0.5       # clearance bore for UJ body (Ø11 + 1 mm)
 
+    # Wall spans 2·wall_half (shorter than the cube) so its edges embed in the
+    # corner-post grooves; outer face flush at cube_out → clean cube face.
     if abs(axis.x) > 0.5:
         x0 = cube_half if axis.x > 0 else -cube_half - wall_thick
-        wall = Part.makeBox(wall_thick, cube_size, cube_h,
-                            v(x0, -cube_half, -cube_h / 2))
+        wall = Part.makeBox(wall_thick, 2 * wall_half, cube_h,
+                            v(x0, -wall_half, -cube_h / 2))
         # Shaft bore along X through the wall at (y=0, z=0)
         hole_base = v(x0 - 1, 0, 0)
         wall = wall.cut(cyl(shaft_hole_r, wall_thick + 2, hole_base, v(1, 0, 0)))
     else:
         y0 = cube_half if axis.y > 0 else -cube_half - wall_thick
-        wall = Part.makeBox(cube_size, wall_thick, cube_h,
-                            v(-cube_half, y0, -cube_h / 2))
+        wall = Part.makeBox(2 * wall_half, wall_thick, cube_h,
+                            v(-wall_half, y0, -cube_h / 2))
         # Shaft bore along Y through the wall at (x=0, z=0)
         hole_base = v(0, y0 - 1, 0)
         wall = wall.cut(cyl(shaft_hole_r, wall_thick + 2, hole_base, v(0, 1, 0)))
+
+    # ── Bolt holes to the corner posts: 2 vertical edges × 2 heights (top into the
+    #    upper half-column, bottom into the lower half-column → the wall ties the
+    #    two column halves together). M3 self-taps into the post pilots.
+    _u, _w = perp_basis(axis)
+    _into = v(-axis.x, -axis.y, -axis.z)
+    for _sw in (1, -1):
+        for _sz in (col_screw_z, -col_screw_z):
+            _woff = _sw * w_screw
+            base = v(axis.x * (cube_out + 1) + _w.x * _woff,
+                     axis.y * (cube_out + 1) + _w.y * _woff, _sz)
+            wall = wall.cut(cyl(m3_screw_r, wall_thick + 2, base, _into))
 
     # ── Pocket for foot (portrait cutout through wall) ────────────────────────
     # Built in canonical frame, rotated to actual axis.
@@ -590,6 +625,67 @@ def make_cube_wall(axis):
         wall = wall.fuse(_bar)
 
     return wall  # bracket is a separate part — shown as Bracket_{name}
+
+
+def make_wall_ribs(z_lo, h):
+    """A backing rib on a plate behind each of the 4 walls, running between the
+    corner posts on the wall's inner face (same idea as the posts, but along the
+    edge). Stiffens the wall against bowing inward and gives it a seat."""
+    span = cube_out - col_w                         # rib half-length (post inner face)
+    ribs = None
+    for ang in (0.0, 90.0, 180.0, 270.0):
+        # Fresh box per face — Shape.rotate() mutates in place, so a shared base
+        # box would get corrupted across iterations.
+        rib = Part.makeBox(2 * span, rib_d, h, v(-span, cube_half - rib_d, z_lo))
+        if ang:
+            rib.rotate(v(0, 0, 0), v(0, 0, 1), ang)
+        ribs = rib if ribs is None else ribs.fuse(rib)
+    return ribs
+
+
+def make_corner_posts(z0, z1, mate):
+    """Four corner HALF-posts spanning z∈[z0, z1] (one half the cube each).
+    Each has two grooves (width = wall_thick, depth = col_groove_d) that receive
+    the adjacent wall edges → flush outer faces. A wall self-tap pilot sits at the
+    screw height that falls in this range. `mate`='peg' adds an alignment peg on
+    the top face (z1); 'socket' cuts a matching socket in the bottom face (z0).
+    Posts reach the outer corners (±cube_out) and clear the disc/wheels (≤34 mm).
+    """
+    h  = z1 - z0
+    sz = col_screw_z if z0 >= 0 else -col_screw_z        # screw height in this half
+    posts = None
+    for sx in (1, -1):
+        for sy in (1, -1):
+            x_lo = min(sx * cube_out, sx * cube_out - sx * col_w)
+            y_lo = min(sy * cube_out, sy * cube_out - sy * col_w)
+            post = Part.makeBox(col_w, col_w, h, v(x_lo, y_lo, z0))
+
+            # Grooves for the two adjacent wall edges
+            gx_lo = min(sx * (cube_out - col_w), sx * wall_half)
+            post = post.cut(Part.makeBox(col_groove_d + 0.2, wall_thick + 0.2, h + 2,
+                                         v(gx_lo - 0.1,
+                                           min(sy * cube_half, sy * cube_out) - 0.1, z0 - 1)))
+            gy_lo = min(sy * (cube_out - col_w), sy * wall_half)
+            post = post.cut(Part.makeBox(wall_thick + 0.2, col_groove_d + 0.2, h + 2,
+                                         v(min(sx * cube_half, sx * cube_out) - 0.1,
+                                           gy_lo - 0.1, z0 - 1)))
+
+            # Wall self-tap pilots (Y-wall from the y-face, X-wall from the x-face)
+            post = post.cut(cyl(col_pilot_d / 2, col_pilot_h,
+                                v(sx * w_screw, sy * cube_half, sz), v(0, -sy, 0)))
+            post = post.cut(cyl(col_pilot_d / 2, col_pilot_h,
+                                v(sx * cube_half, sy * w_screw, sz), v(-sx, 0, 0)))
+
+            # Mating feature at the split (z0 for sockets, z1 for pegs)
+            cx, cy = sx * (cube_out - col_w / 2), sy * (cube_out - col_w / 2)
+            if mate == 'peg':
+                post = post.fuse(cyl(col_peg_d / 2, col_peg_h, v(cx, cy, z1), v(0, 0, 1)))
+            elif mate == 'socket':
+                post = post.cut(cyl(col_peg_d / 2 + 0.2, col_peg_h + 0.5,
+                                    v(cx, cy, z0 - 0.01), v(0, 0, 1)))
+
+            posts = post if posts is None else posts.fuse(post)
+    return posts
 
 
 def make_corner_bevel(sx, sy):
@@ -757,40 +853,47 @@ def make_shaft_bracket(axis):
 
 def make_frame(axes=None):
     """
-    Single-piece frame: bottom plate + servo mount wings for each axis.
+    Frame BASE (one printed part): bottom plate + 4 corner posts + servo mounts.
+    The walls slide into the post grooves on this base; the top plate (separate,
+    make_top_plate) then caps and screws to the post tops.
 
-    axes : list of (name, axis_vector) — mismo formato que AXES en BUILD DOCUMENT.
-           Si se pasa, los mounts de cada eje se fusionan aquí (una sola pieza).
+    Plates are full-outer (2·cube_out) so the cube is closed and flush; with
+    cube_h + 2·plate_t = 2·cube_out the assembled cube is a perfect 125 mm cube.
+
+    axes : list of (name, axis_vector) — same format as AXES in BUILD DOCUMENT;
+           if given, each axis' servo mount is fused into the base.
     """
-    z_bot  = -(cube_h / 2 + plate_t)
-
-    # Both plates carry a central-shaft bearing (MR105ZZ), so the top plate is
-    # now structural — it holds the upper shaft bearing. plate_t (4 mm) = bearing
-    # width, so each seat is flush, like the wall foot.
-    SHOW_TOP = True
-
-    # Bottom plate with lower shaft-bearing seat
-    bot = Part.makeBox(cube_size, cube_size, plate_t,
-                       v(-cube_half, -cube_half, z_bot))
+    z_bot = -(cube_h / 2 + plate_t)
+    bot = Part.makeBox(2 * cube_out, 2 * cube_out, plate_t,
+                       v(-cube_out, -cube_out, z_bot))
     bot = bot.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
-                      v(0, 0, z_bot - 1)))
+                      v(0, 0, z_bot - 1)))            # lower shaft-bearing seat
 
-    frame = bot
+    # Lower half-columns (pegs up) + wall backing ribs print with the base
+    frame = bot.fuse(make_corner_posts(-cube_h / 2, 0, 'peg'))
+    frame = frame.fuse(make_wall_ribs(-cube_h / 2, rib_h))
 
-    if SHOW_TOP:
-        z_top = cube_h / 2
-        top = Part.makeBox(cube_size, cube_size, plate_t,
-                           v(-cube_half, -cube_half, z_top))
-        top = top.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
-                          v(0, 0, z_top - 1)))
-        frame = frame.fuse(top)
-
-    # Servo mount wings — misma pieza que la placa inferior
     if axes:
         for _, axis in axes:
             frame = frame.fuse(make_servo_mount(axis))
 
     return frame
+
+
+def make_top_plate():
+    """Top plate — the SECOND frame part: top plate + the UPPER half-columns
+    (sockets down, mating the base pegs). Holds the upper shaft bearing (MR105ZZ,
+    flush). No vertical screws — the walls tie the two column halves together.
+    """
+    z_top = cube_h / 2
+    top = Part.makeBox(2 * cube_out, 2 * cube_out, plate_t,
+                       v(-cube_out, -cube_out, z_top))
+    top = top.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
+                      v(0, 0, z_top - 1)))            # upper shaft-bearing seat
+    # Upper half-columns (sockets) + wall backing ribs hang below the plate
+    top = top.fuse(make_corner_posts(0, cube_h / 2, 'socket'))
+    top = top.fuse(make_wall_ribs(cube_h / 2 - rib_h, rib_h))
+    return top
 
 
 def make_servo_mount(axis):
@@ -1072,8 +1175,11 @@ add(doc, "MotorShaft_REF",
 add(doc, "MotorDisc",
     make_motor_disc(),
     color=(1.0, 0.60, 0.15))
-add(doc, "MotorHub",
-    make_motor_hub(),
+add(doc, "MotorHubBot",
+    make_motor_hub(-1),
+    color=(0.75, 0.75, 0.78))
+add(doc, "MotorHubTop",
+    make_motor_hub(1),
     color=(0.75, 0.75, 0.78))
 
 # Central-shaft bearings, flush in the bottom and top plates
@@ -1121,10 +1227,18 @@ for name, axis in AXES:
         make_shaft_bracket(axis),
         color=(0.30, 0.65, 0.90))
 
-add(doc, "Frame",
+# Frame is TWO printed parts: base (plate + posts + servo mounts) and top plate.
+add(doc, "FrameBase",
     make_frame(AXES),
     color=(0.70, 0.55, 0.85),
     transparency=40)
+
+SHOW_TOP = True   # set False to hide the lid and see inside the cube
+if SHOW_TOP:
+    add(doc, "TopPlate",
+        make_top_plate(),
+        color=(0.62, 0.48, 0.78),
+        transparency=40)
 
 add(doc, "SG90_REF",
     make_sg90_ref(v(0, 1, 0)),
@@ -1178,7 +1292,7 @@ print(f"  Output bearings:    2× Ø{brg_id:.0f}×{brg_od:.0f}×{brg_w:.0f} (MR1
 print(f"  Wall-side shaft:    free {wc_dist + WT / 2:.1f}→{head_y1:.1f} mm"
       f" for the bearing seat in the head")
 print(f"  Motor disc:         one part (2 plates + Ø{disc_spool_d:.0f} spool),"
-      f" Ø{mhub_bore_d:.0f} hub below, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap")
+      f" Ø{mhub_bore_d:.0f} hub on BOTH faces, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap each")
 print(f"  Central shaft:      Ø{motor_shaft_d:.0f} (unified), 2 MR105 in the plates"
       f"  → all shafts Ø5, one bearing type")
 print(f"  Bearings total:     {4 * 2 + 2} × MR105ZZ (4 axes × 2 + 2 central)")
