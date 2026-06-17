@@ -36,14 +36,18 @@ dw            = 2.5   # mm   — O-ring wire diameter
 
 wall_thick    = 4.0   # mm   — cube wall thickness
 shaft_dia     = 5.0   # mm   — output shaft diameter
-motor_shaft_d = 8.0   # mm   — motor (Z) shaft diameter
+motor_shaft_d = 5.0   # mm   — motor (Z) shaft diameter; unified with the output
+                      #        shafts (Ø5) — self-contained cube, own central shaft
+                      #        on 2 bearings, so one shaft stock + one bearing (MR105)
 # cube_h derived below from cube_size (the cube is cubic: height = side length)
 
 neck_dia      = 2.5   # mm   — neck diameter (torsion strength + stiffness match)
 neck_len      = 13.0  # mm   — neck length (matched to combined blade stiffness)
 head_gap      = 2.0   # mm   — clearance between wheel outer face and bracket head
 head_depth    = 8.0   # mm   — bracket head bearing length
-lever_len     = 25.0  # mm   — fixed shaft stub beyond wall (increased for UJ clearance)
+shaft_stub    =  8.0  # mm   — shaft protrusion beyond the wall/plate; shared by the
+                      #        output shafts and the motor (input) shaft so all
+                      #        stubs stick out equally (aesthetic symmetry)
 
 # ── Universal joint (purchased, metal, Ø11×23 mm, 5 mm bore) ─────────────────
 uj_od         = 11.0  # mm — UJ outer diameter
@@ -81,17 +85,19 @@ brg_wall      = 2.0   # mm — min PETG wall around the bearing seat (sets head 
 # Ø8 metal hub grips the shaft; the spool's close-fit bore centres the disc along
 # the shaft. Hub mounts BELOW the disc so its set screws stay accessible.
 disc_spool_d   = 20.0  # mm — spool joining the two plates into one rigid disc
-disc_bore_d    =  8.0  # mm — central bore, close slip fit on the Ø8 shaft (centring)
-mhub_bore_d    =  8.0  # mm — motor hub bore (= motor shaft)        ┐ purchased Ø8
-mhub_od        = 13.0  # mm — motor hub body OD                     │ flange hub —
-mhub_body_h    = 10.0  # mm — motor hub body height (below disc)    │ match params
-mhub_flange_od = 25.0  # mm — motor hub flange OD                   │ to the real
-mhub_flange_t  =  3.0  # mm — motor hub flange thickness            ┘ part
-mhub_bolt_cd   = 18.0  # mm — motor hub bolt-circle Ø
+disc_bore_d    =  5.0  # mm — central bore, close slip fit on the Ø5 shaft (centring)
+# Motor disc hub = the SAME Ø5 flange hub as the output wheels (buy 5 identical).
+# Carries ~4× a single wheel (≤1063 N·mm) → still ~5× margin on the bolt circle.
+mhub_bore_d    =  5.0  # mm — motor hub bore (= motor shaft)
+mhub_od        = 10.0  # mm — motor hub body OD
+mhub_body_h    =  8.0  # mm — motor hub body height (below disc)
+mhub_flange_od = 22.0  # mm — motor hub flange OD
+mhub_flange_t  =  2.5  # mm — motor hub flange thickness
+mhub_bolt_cd   = 16.0  # mm — motor hub bolt-circle Ø
 mhub_bolt_d    =  3.0  # mm — flange bolt hole Ø (M3)
 mhub_bolt_n    =  4    # —    — number of flange bolts
 mhub_pilot_d   =  2.5  # mm — self-tap pilot Ø in the disc (M3 self-taps into PETG)
-mhub_pilot_h   =  7.0  # mm — pilot depth
+mhub_pilot_h   =  6.0  # mm — pilot depth
 
 # ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
 plate_t       = 4.0   # mm   — plate thickness (top and bottom)
@@ -490,8 +496,8 @@ def make_output_shaft(axis):
     inner_far = wc_dist - WT / 2 - 2.0
     inner = cyl(shaft_dia / 2, inner_into - inner_far, av(axis, inner_into), neg)
 
-    # Outer shaft: from inside the UJ → through the foot bearing → lever tip
-    outer_far = cube_half + wall_thick + lever_len
+    # Outer shaft: from inside the UJ → through the foot bearing → protruding stub
+    outer_far = cube_half + wall_thick + shaft_stub
     outer = cyl(shaft_dia / 2, outer_far - outer_into, av(axis, outer_into), axis)
 
     return inner.fuse(outer)
@@ -758,13 +764,15 @@ def make_frame(axes=None):
     """
     z_bot  = -(cube_h / 2 + plate_t)
 
-    # Top plate omitted for visualisation — set SHOW_TOP = True to restore
-    SHOW_TOP = False
+    # Both plates carry a central-shaft bearing (MR105ZZ), so the top plate is
+    # now structural — it holds the upper shaft bearing. plate_t (4 mm) = bearing
+    # width, so each seat is flush, like the wall foot.
+    SHOW_TOP = True
 
-    # Bottom plate with motor shaft clearance hole
+    # Bottom plate with lower shaft-bearing seat
     bot = Part.makeBox(cube_size, cube_size, plate_t,
                        v(-cube_half, -cube_half, z_bot))
-    bot = bot.cut(cyl(motor_shaft_d / 2 + 1.0, plate_t + 2,
+    bot = bot.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
                       v(0, 0, z_bot - 1)))
 
     frame = bot
@@ -773,7 +781,7 @@ def make_frame(axes=None):
         z_top = cube_h / 2
         top = Part.makeBox(cube_size, cube_size, plate_t,
                            v(-cube_half, -cube_half, z_top))
-        top = top.cut(cyl(motor_shaft_d / 2 + 1.0, plate_t + 2,
+        top = top.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
                           v(0, 0, z_top - 1)))
         frame = frame.fuse(top)
 
@@ -1053,8 +1061,11 @@ if App.listDocuments().get(doc_name):
 doc = App.newDocument(doc_name)
 
 # Motor shaft (reference cylinder)
+# Motor (input) shaft — protrudes shaft_stub beyond each plate, matching the
+# output-shaft stubs for visual symmetry.
+_ms_half = cube_h / 2 + plate_t + shaft_stub
 add(doc, "MotorShaft_REF",
-    cyl(motor_shaft_d / 2, cube_h * 1.2, v(0, 0, -cube_h * 0.6)),
+    cyl(motor_shaft_d / 2, 2 * _ms_half, v(0, 0, -_ms_half)),
     color=(0.6, 0.6, 0.6))
 
 # Motor disc (one rigid part: two plates + spool) + its Ø8 flange hub
@@ -1064,6 +1075,12 @@ add(doc, "MotorDisc",
 add(doc, "MotorHub",
     make_motor_hub(),
     color=(0.75, 0.75, 0.78))
+
+# Central-shaft bearings, flush in the bottom and top plates
+for _zb, _tag in ((cube_h / 2, "top"), (-(cube_h / 2 + plate_t), "bot")):
+    _o = cyl(brg_od / 2, brg_w, v(0, 0, _zb))
+    _i = cyl(brg_id / 2 + 0.05, brg_w + 2, v(0, 0, _zb - 1))
+    add(doc, f"ShaftBearing_{_tag}", _o.cut(_i), color=(0.30, 0.30, 0.32))
 
 # Single axis for clarity — all four are identical rotated 90°
 AXES = [("PosY", v(0, 1, 0))]
@@ -1161,7 +1178,10 @@ print(f"  Output bearings:    2× Ø{brg_id:.0f}×{brg_od:.0f}×{brg_w:.0f} (MR1
 print(f"  Wall-side shaft:    free {wc_dist + WT / 2:.1f}→{head_y1:.1f} mm"
       f" for the bearing seat in the head")
 print(f"  Motor disc:         one part (2 plates + Ø{disc_spool_d:.0f} spool),"
-      f" Ø8 hub below, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap")
+      f" Ø{mhub_bore_d:.0f} hub below, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap")
+print(f"  Central shaft:      Ø{motor_shaft_d:.0f} (unified), 2 MR105 in the plates"
+      f"  → all shafts Ø5, one bearing type")
+print(f"  Bearings total:     {4 * 2 + 2} × MR105ZZ (4 axes × 2 + 2 central)")
 print(f"  Motor disc torque:  ≤ {4 * spr_T_latch:.0f} N·mm (4 axes engaged)"
       f"  → {4 * spr_T_latch / mhub_bolt_n / (mhub_bolt_cd / 2):.0f} N/bolt")
 print("=" * 60)
