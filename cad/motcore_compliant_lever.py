@@ -73,6 +73,24 @@ brg_od        = 10.0  # mm — bearing outer diameter            │ (5×10×4)
 brg_w         = 4.0   # mm — bearing width                     ┘
 brg_wall      = 2.0   # mm — min PETG wall around the bearing seat (sets head height)
 
+# ── Motor disc: one rigid part (2 plates + spool) on a Ø8 flange hub ──────────
+# The disc carries the sum of the engaged axes (~4× a single wheel). Concentricity
+# is critical (disc wobble detunes all four clutch gaps at once), so a machined
+# Ø8 metal hub grips the shaft; the spool's close-fit bore centres the disc along
+# the shaft. Hub mounts BELOW the disc so its set screws stay accessible.
+disc_spool_d   = 20.0  # mm — spool joining the two plates into one rigid disc
+disc_bore_d    =  8.0  # mm — central bore, close slip fit on the Ø8 shaft (centring)
+mhub_bore_d    =  8.0  # mm — motor hub bore (= motor shaft)        ┐ purchased Ø8
+mhub_od        = 13.0  # mm — motor hub body OD                     │ flange hub —
+mhub_body_h    = 10.0  # mm — motor hub body height (below disc)    │ match params
+mhub_flange_od = 25.0  # mm — motor hub flange OD                   │ to the real
+mhub_flange_t  =  3.0  # mm — motor hub flange thickness            ┘ part
+mhub_bolt_cd   = 18.0  # mm — motor hub bolt-circle Ø
+mhub_bolt_d    =  3.0  # mm — flange bolt hole Ø (M3)
+mhub_bolt_n    =  4    # —    — number of flange bolts
+mhub_pilot_d   =  2.5  # mm — self-tap pilot Ø in the disc (M3 self-taps into PETG)
+mhub_pilot_h   =  7.0  # mm — pilot depth
+
 # ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
 plate_t       = 4.0   # mm   — plate thickness (top and bottom)
 post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
@@ -308,14 +326,64 @@ def bolt_circle_points(centre, axis, radius, n, phase_deg):
 
 
 def make_motor_disc():
-    bore_r = motor_shaft_d / 2 + 0.1
-    # Upper disc: contact face at z = +contactZ (bottom of disc), body extends upward
-    top_disc = cyl(disc_vr, WT, v(0, 0, contactZ))
-    top_bore = cyl(bore_r, WT + 2, v(0, 0, contactZ - 1))
-    # Lower disc: contact face at z = -contactZ (top of disc), body extends downward
-    bot_disc = cyl(disc_vr, WT, v(0, 0, -contactZ - WT))
-    bot_bore = cyl(bore_r, WT + 2, v(0, 0, -contactZ - WT - 1))
-    return top_disc.cut(top_bore).fuse(bot_disc.cut(bot_bore))
+    """One rigid part: top plate + central spool + bottom plate.
+    Contact faces at z = ±contactZ; the spool joins them so they stay parallel.
+    Central bore is a close slip fit on the Ø8 shaft (centres the disc — it rotates
+    with the shaft, no relative motion). Torque comes from the motor hub below via
+    a bolt circle into self-tap pilots in the bottom plate.
+    """
+    top   = cyl(disc_vr, WT, v(0, 0, contactZ))                 # face at +contactZ
+    bot   = cyl(disc_vr, WT, v(0, 0, -contactZ - WT))           # face at −contactZ
+    spool = cyl(disc_spool_d / 2, 2 * contactZ, v(0, 0, -contactZ))
+    disc  = top.fuse(spool).fuse(bot)
+
+    # Central centring bore on the shaft, through the whole stack
+    disc = disc.cut(cyl(disc_bore_d / 2 + 0.05, 2 * contactZ + 2 * WT + 2,
+                        v(0, 0, -contactZ - WT - 1)))
+
+    # Self-tap pilots on the bottom plate outer face for the hub flange bolts
+    z_face = -contactZ - WT
+    rbc = mhub_bolt_cd / 2
+    for k in range(mhub_bolt_n):
+        a = math.radians(360.0 / mhub_bolt_n * k + 45.0)
+        disc = disc.cut(cyl(mhub_pilot_d / 2, mhub_pilot_h + 0.5,
+                            v(rbc * math.cos(a), rbc * math.sin(a), z_face - 0.5),
+                            v(0, 0, 1)))
+    return disc
+
+
+def make_motor_hub():
+    """Purchased Ø8 flange hub for the motor disc (reference part).
+    Mounts BELOW the disc: flange bolted up to the bottom plate, body + 2 set
+    screws (at 90°) below it where they stay accessible and grip the Ø8 shaft.
+    """
+    z_top    = -contactZ - WT                       # flange top = disc bottom face
+    z_fl     = z_top - mhub_flange_t                # flange bottom
+    z_body   = z_fl - mhub_body_h                   # body bottom
+
+    flange = cyl(mhub_flange_od / 2, mhub_flange_t, v(0, 0, z_fl))
+    body   = cyl(mhub_od / 2, mhub_body_h, v(0, 0, z_body))
+    hub    = flange.fuse(body)
+
+    # Bore for the shaft
+    hub = hub.cut(cyl(mhub_bore_d / 2 + 0.05, mhub_flange_t + mhub_body_h + 2,
+                      v(0, 0, z_body - 1)))
+
+    # Flange bolt clearance holes
+    rbc = mhub_bolt_cd / 2
+    for k in range(mhub_bolt_n):
+        a = math.radians(360.0 / mhub_bolt_n * k + 45.0)
+        hub = hub.cut(cyl(mhub_bolt_d / 2, mhub_flange_t + 2,
+                          v(rbc * math.cos(a), rbc * math.sin(a), z_fl - 1),
+                          v(0, 0, 1)))
+
+    # Two radial M3 set-screw holes at 90° through the body
+    z_mid = z_body + mhub_body_h / 2
+    for d in (v(1, 0, 0), v(0, 1, 0)):
+        hub = hub.cut(cyl(1.5, mhub_od / 2 + 2,
+                          v(d.x * (mhub_od / 2 + 1), d.y * (mhub_od / 2 + 1), z_mid),
+                          v(-d.x, -d.y, 0)))
+    return hub
 
 
 def make_output_wheel(axis):
@@ -657,6 +725,14 @@ def make_shaft_bracket(axis):
             foot = foot.cut(cyl(m3_screw_r, wall_thick + 2,
                                 v(_spa, cube_half - 1, _spz), v(0, 1, 0)))
 
+    # ── Output-shaft bearing seat ("pie de la pared") ─────────────────────────
+    # The outer (output) shaft turns on an MR105ZZ here, just outboard of the UJ.
+    # Boss on the foot outer face; the bearing inserts from outside and seats
+    # against the foot (the Ø-shaft hole is the shoulder). Same bearing as the head.
+    foot_out = cube_half + wall_thick
+    foot = foot.fuse(cyl(brg_od / 2 + 3.0, brg_w, v(0, foot_out, 0), v(0, 1, 0)))
+    foot = foot.cut(cyl(brg_od / 2 + 0.05, brg_w + 0.5, v(0, foot_out, 0), v(0, 1, 0)))
+
     shape = head.fuse(blade_r).fuse(blade_l).fuse(eng_blade).fuse(foot)
 
     # Rotate canonical (+Y) to actual axis
@@ -976,10 +1052,13 @@ add(doc, "MotorShaft_REF",
     cyl(motor_shaft_d / 2, cube_h * 1.2, v(0, 0, -cube_h * 0.6)),
     color=(0.6, 0.6, 0.6))
 
-# Motor disc
+# Motor disc (one rigid part: two plates + spool) + its Ø8 flange hub
 add(doc, "MotorDisc",
     make_motor_disc(),
     color=(1.0, 0.60, 0.15))
+add(doc, "MotorHub",
+    make_motor_hub(),
+    color=(0.75, 0.75, 0.78))
 
 # Single axis for clarity — all four are identical rotated 90°
 AXES = [("PosY", v(0, 1, 0))]
@@ -994,8 +1073,14 @@ for name, axis in AXES:
     # Ball bearing reference: ring seated at the head shoulder
     _brg_outer = cyl(brg_od / 2, brg_w, av(axis, head_y1 - brg_w), axis)
     _brg_inner = cyl(brg_id / 2 + 0.05, brg_w + 2, av(axis, head_y1 - brg_w - 1), axis)
-    add(doc, f"Bearing_{name}",
+    add(doc, f"HeadBearing_{name}",
         _brg_outer.cut(_brg_inner),
+        color=(0.30, 0.30, 0.32))
+    # Output-shaft bearing at the wall foot
+    _wb_o = cyl(brg_od / 2, brg_w, av(axis, cube_half + wall_thick), axis)
+    _wb_i = cyl(brg_id / 2 + 0.05, brg_w + 2, av(axis, cube_half + wall_thick - 1), axis)
+    add(doc, f"WallBearing_{name}",
+        _wb_o.cut(_wb_i),
         color=(0.30, 0.30, 0.32))
     add(doc, f"Oring_{name}",
         make_oring(axis),
@@ -1066,8 +1151,12 @@ print(f"                      {hub_bolt_n}× M{hub_bolt_d:.0f} on Ø{hub_bolt_cd
       f" M3 self-tap into PETG, 2× M3 set screws on a shaft flat")
 print(f"  Flange↔disc gap:    {_flange_disc_clr:.1f} mm"
       f"  ({'OK' if _flange_disc_clr > 0 else 'COLLISION'})")
-print(f"  Head bearing:       Ø{brg_id:.0f}×{brg_od:.0f}×{brg_w:.0f} (MR105ZZ),"
-      f" head half-height {head_z_half:.1f} mm")
+print(f"  Output bearings:    2× Ø{brg_id:.0f}×{brg_od:.0f}×{brg_w:.0f} (MR105ZZ) per axis —"
+      f" head (half-height {head_z_half:.1f} mm) + wall foot")
 print(f"  Wall-side shaft:    free {wc_dist + WT / 2:.1f}→{head_y1:.1f} mm"
       f" for the bearing seat in the head")
+print(f"  Motor disc:         one part (2 plates + Ø{disc_spool_d:.0f} spool),"
+      f" Ø8 hub below, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap")
+print(f"  Motor disc torque:  ≤ {4 * spr_T_latch:.0f} N·mm (4 axes engaged)"
+      f"  → {4 * spr_T_latch / mhub_bolt_n / (mhub_bolt_cd / 2):.0f} N/bolt")
 print("=" * 60)
