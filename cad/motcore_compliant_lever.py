@@ -27,7 +27,9 @@ except ImportError:
 # PARAMETERS  ← edit here, then re-run
 # ═══════════════════════════════════════════════════════════════════
 
-A_deg         = 2.0   # deg  — engagement angle (shaft tilt from horizontal)
+A_deg         = 1.5   # deg  — engagement angle (shaft tilt from horizontal);
+                      #        kept small so the neutral gap does not eat the
+                      #        short servo-arm stroke (see SPRING SIZING)
 B             = 35.0  # mm   — UJ pivot → output wheel centre (along shaft)
 R             = 20.0  # mm   — contact radius (O-ring outer edge = motor disc rim)
 dw            = 2.5   # mm   — O-ring wire diameter
@@ -58,14 +60,25 @@ head_trun_r   =  1.5  # mm   — head trunnion pin radius
 head_trun_len =  5.0  # mm   — head trunnion pin length (sticks out from head side)
 
 # ── Engagement lever blade (integral with bracket head, extends downward) ─────
-eng_blade_l  = 30.0  # mm — spring section length in −Z (XZ arm, free to flex)
-eng_blade_w  = 10.0  # mm — width in pa direction (centred at pa = 0)
-eng_blade_t  =  1.5  # mm — XZ arm thickness in Y (spring direction — keep thin)
+eng_blade_l  = 36.0  # mm — spring section length in −Z (XZ arm, free to flex);
+                     #      junction block spans z −42 … −34, fully above the
+                     #      servo body top (z ≈ −43.2)
+eng_blade_w  = 14.0  # mm — XZ spring width in pa direction (centred at pa = 0);
+                     #      narrowed from 20 with t 4.0→4.5 (w·t³ preserved →
+                     #      same latch force, sigma 12.8→14.4 MPa, creep-safe)
+eng_yz_w     = 10.0  # mm — YZ arm width in Y direction (structural, not spring)
+eng_blade_t  =  4.5  # mm — XZ arm thickness in Y (spring direction; sized so the
+                     #      sustained latch stress stays ≤ ~15 MPa — see
+                     #      ENGAGEMENT SPRING SIZING in DERIVED)
 eng_yz_t     =  4.0  # mm — YZ arm thickness in X (contact arm — no need to flex)
 eng_overlap  =  8.0  # mm — how far YZ arm overlaps upward into the XZ spring section
+eng_blk_w    =  9.0  # mm — junction (overlap) block width in pa; narrowed so the
+                     #      lowered block clears the servo body (front face at x ≈ 6.5)
 eng_tip_clr  =  3.0  # mm — clearance above bottom plate for YZ contact arm
 eng_slot_w   =  2.5  # mm — ranura: ancho en pa (diámetro muñón + holgura)
-eng_slot_h   =  6.0  # mm — ranura: longitud en Z (Ø pin 2.5 + subida Z a ±45° 2.3 + holgura 0.5)
+latch_deg    = 95.0  # deg — arm angle at the slot-top hard stop, just past the
+                     #       90° dead point → passive over-centre latch
+                     #       (eng_slot_h is now DERIVED from this)
 
 # ── MG90D servo (Tower Pro — digital, metal gears, ~0.1° resolution) ─────────
 sg90_l        = 28.5  # mm — body length along shaft axis (pa direction)          [C=28.5]
@@ -76,7 +89,9 @@ sg90_sl       =  4.0  # mm — shaft protrusion beyond body face              [A
 sg90_tol      =  0.3  # mm — mounting clearance per side
 sg90_wall     =  2.0  # mm — bracket wall thickness (legacy, kept for reference)
 sg90_shaft_off =  6.0  # mm — shaft centre from front body face (by0), estimated
-sg90_arm_r     =  8.0  # mm — servo arm radius (pin at arm tip)
+sg90_arm_r     =  4.0  # mm — servo arm radius (pin at arm tip); short arm →
+                       #      over-centre latch within a short slot and low
+                       #      sustained spring stress (creep-safe)
 sg90_arm_t     =  4.0  # mm — arm thickness in X (was 2.0)
 sg90_ear_y     =  4.45 # mm — ear tab protrusion beyond body face (±Y)  [(E-B)/2=(31.5-22.6)/2]
 sg90_ear_t     =  2.0  # mm — ear tab thickness in X (bolt direction)
@@ -162,6 +177,53 @@ head_z_half = shaft_dia / 2 + 3.5   # = 6.0 mm with defaults
 post_pa_off  = bw_half + post_side_gap + post_w / 2  # post centre offset in pa
 head_trun_y  = head_y0 + 2.0                          # head trunnion Y (2 mm from inner face)
 head_pin_pa  = bw_half + head_trun_len / 2            # head pin midpoint in pa
+
+# ── Slot height (derived): the pin rises r·(1−cos α) during the arm sweep;
+#    the slot top is a hard stop at latch_deg, just past the 90° dead point →
+#    passive over-centre latch: the spring presses the pin against the stop,
+#    the clutch self-holds at max force and the servo is unloaded (works even
+#    unpowered).  Stadium-slot vertical play = eng_slot_h − eng_slot_w.
+eng_slot_h = eng_slot_w + sg90_arm_r * (1 - math.cos(math.radians(latch_deg)))
+
+# ── ENGAGEMENT SPRING SIZING (XZ flexure + over-centre latch) ────────────────
+# The servo pin (arm radius sg90_arm_r) pushes the YZ arm with force F (±Y);
+# pin Y-travel x = r·sin α.  Moment balance about the UJ tilt axis:
+#     N = F · (pin_arm / contact_arm)        T_slip = mu · N · R_out
+# Max bending stress at the spring root (head bottom face):
+#     sigma = 6 · F · a / (w · t²)           a = root → pin distance
+# The latch stress is sustained → kept ≤ ~15 MPa so PETG stress relaxation
+# stays negligible.  Servo demand peaks mid-sweep and is transient only.
+E_PETG      = 2000.0   # MPa  — printed PETG flexural modulus
+MU_ORING    = 0.6      # —    — silicone O-ring on PETG disc, conservative
+SRV_T_CONT  = 125.0    # N·mm — MG90D continuous torque (~45 % of 6 V stall)
+
+spr_pin_z    = -(cube_half - eng_tip_clr) + eng_slot_w / 2 + 1.0  # pin centre, neutral
+spr_root_z   = -head_z_half                 # spring fixed end (head bottom face)
+spr_a        = spr_root_z - spr_pin_z       # root → pin lever arm (≈ 47 mm)
+spr_L        = eng_blade_l - eng_overlap    # free flexible length (overlap block is rigid)
+spr_pin_arm  = -spr_pin_z                   # pin force arm about UJ tilt axis
+spr_cont_arm = uj_center - wc_dist          # normal force arm about UJ tilt axis
+spr_leverage = spr_pin_arm / spr_cont_arm
+
+spr_I     = eng_blade_w * eng_blade_t ** 3 / 12
+# Pin compliance: cantilever (free length spr_L) + rigid extension to the pin
+_th_unit  = (spr_a * spr_L - spr_L ** 2 / 2) / (E_PETG * spr_I)
+_dl_unit  = (spr_a * spr_L ** 2 / 2 - spr_L ** 3 / 6) / (E_PETG * spr_I)
+spr_k     = 1.0 / (_dl_unit + _th_unit * (spr_a - spr_L))  # N/mm at the pin
+
+spr_free      = (contactZ - R_out) / spr_cont_arm * spr_pin_arm  # pin free travel
+spr_a_contact = math.degrees(math.asin(min(spr_free / sg90_arm_r, 1.0)))
+spr_F_latch   = spr_k * (sg90_arm_r * math.sin(math.radians(latch_deg)) - spr_free)
+spr_N_latch   = spr_F_latch * spr_leverage
+spr_T_latch   = MU_ORING * spr_N_latch * R_out
+spr_sig_latch = 6 * spr_F_latch * spr_a / (eng_blade_w * eng_blade_t ** 2)
+# Peak transient servo torque on the way to the latch (proportional range)
+spr_peak_dem  = max(
+    spr_k * max(sg90_arm_r * math.sin(math.radians(_d)) - spr_free, 0.0)
+          * sg90_arm_r * math.cos(math.radians(_d))
+    for _d in range(0, 91))
+# Latch force lost per 0.1 mm of extra neutral gap (O-ring wear, print tolerance)
+spr_dF_wear   = spr_k * 0.1 * spr_pin_arm / spr_cont_arm
 
 # ── Modular foot + side-bar dimensions ────────────────────────────────────────
 # Screws at (±foot_screw_pa, ±foot_screw_z) — clear of all blades (Z≈0 ±0.75 mm).
@@ -414,16 +476,18 @@ def make_shaft_bracket(axis):
     z_yz_bot     = -(cube_half - eng_tip_clr)        # YZ bottom, eng_tip_clr above base plate
     yz_len       = abs(z_yz_bot - z_yz_top)
 
-    # XZ arm — full spring section
+    # XZ arm — wide spring section spans head bottom → junction block top only.
+    # Below z_yz_top just the narrow block + YZ arm continue, so the wide part
+    # stays clear of the servo body (front face x ≈ 6.5, top z ≈ −43).
     eng_xz = Part.makeBox(
-        eng_blade_w, eng_blade_t, eng_blade_l,
-        v(-eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot)
+        eng_blade_w, eng_blade_t, eng_blade_l - eng_overlap,
+        v(-eng_blade_w / 2, head_y1 - eng_blade_t, z_yz_top)
     )
     # YZ arm — starts eng_overlap mm above spring bottom, runs to near base plate
     # Centred on the XZ arm mid-plane: y_centre = head_y1 - eng_blade_t/2
     y_ctr  = head_y1 - eng_blade_t / 2                 # Y centre of cross section
-    yz_y0  = y_ctr - eng_blade_w / 2
-    r_cap  = eng_blade_w / 2                            # radio = media anchura en Y
+    yz_y0  = y_ctr - eng_yz_w / 2
+    r_cap  = eng_yz_w / 2                              # radio = media anchura en Y
     # pin_z se calcula justo debajo — cap_z coincide con el centro del fondo de la ranura
     # → punta exterior concéntrica con la semicircunferencia interior del slot
     pin_r  = eng_slot_w / 2
@@ -432,17 +496,11 @@ def make_shaft_bracket(axis):
 
     # Box arranca en cap_z; el cilindro cuelga por debajo añadiendo material
     eng_yz = Part.makeBox(
-        eng_yz_t, eng_blade_w, z_yz_top - cap_z,
+        eng_yz_t, eng_yz_w, z_yz_top - cap_z,
         v(-eng_yz_t / 2, yz_y0, cap_z)
     )
     # Cilindro a lo largo de X: punta semicircular en YZ, concéntrica con el slot
     eng_yz = eng_yz.fuse(cyl(r_cap, eng_yz_t, v(-eng_yz_t / 2, y_ctr, cap_z), v(1, 0, 0)))
-
-    # ── Chamfer the transition corners in the overlap zone ────────────────────
-    # XZ side: tapers from ±eng_blade_w/2 to ±eng_blade_t/2 in X at z_spring_bot.
-    chamfer_h_xz = (eng_blade_w - eng_blade_t) / 2
-    # YZ side: tapers from ±eng_blade_w/2 to ±eng_yz_t/2 in Y at z_yz_top.
-    chamfer_h_yz = (eng_blade_w - eng_yz_t) / 2
 
     # Ranura en la lámina YZ: elongada en Z, estrecha en Y.
     # El brazo cuelga en −Z en neutro → el pin está en el FONDO de la ranura.
@@ -454,8 +512,8 @@ def make_shaft_bracket(axis):
     # Ranura con esquina inferior redondeada:
     #   · Parte recta: desde z=pin_z (centro del semicilindro) hacia arriba
     #   · Parte curva: semicilindro a lo largo de X, radio=pin_r, centro en pin_z
-    slot_depth   = eng_yz_t + 2                        # profundidad del corte en X
-    slot_x0      = -eng_yz_t / 2 - 1                  # arranque del corte en X
+    slot_depth   = eng_blk_w + 3                       # cut spans the full block width
+    slot_x0      = -(eng_blk_w / 2 + 1.5)              # clears the pin shank at −X too
     # Ranura en forma de estadio (oblong): dos semicilindros + rectángulo central.
     # Altura total = eng_slot_h, sin cambiar la posición del slot.
     slot_top_ctr = slot_z0 + eng_slot_h - pin_r      # centro semicilindro superior
@@ -465,29 +523,19 @@ def make_shaft_bracket(axis):
     )
     slot_round_bot = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, pin_z),        v(1, 0, 0))
     slot_round_top = cyl(pin_r, slot_depth, v(slot_x0, y_ctr, slot_top_ctr), v(1, 0, 0))
-    eng_yz = eng_yz.cut(slot_rect.fuse(slot_round_bot).fuse(slot_round_top))
+    slot_cut = slot_rect.fuse(slot_round_bot).fuse(slot_round_top)
 
-    # XZ blade — chamfer bottom ±X corners
-    for sx in [1, -1]:
-        pts = [v(sx * eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot),
-               v(sx * eng_blade_t / 2, head_y1 - eng_blade_t, z_spring_bot),
-               v(sx * eng_blade_w / 2, head_y1 - eng_blade_t, z_spring_bot + chamfer_h_xz)]
-        wire = Part.Wire([Part.makeLine(pts[0], pts[1]),
-                          Part.makeLine(pts[1], pts[2]),
-                          Part.makeLine(pts[2], pts[0])])
-        eng_xz = eng_xz.cut(Part.Face(wire).extrude(v(0, eng_blade_t, 0)))
+    # ── Overlap zone: solid block bridging the XZ spring and YZ arm ──────────
+    # Narrow (eng_blk_w) so the lowered block clears the servo body in +X.
+    overlap_block = Part.makeBox(
+        eng_blk_w, eng_yz_w, eng_overlap,
+        v(-eng_blk_w / 2, yz_y0, z_spring_bot)
+    )
 
-    # YZ blade — chamfer top ±Y corners (tapers to eng_yz_t in Y)
-    for sy in [1, -1]:
-        pts = [v(-eng_yz_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top),
-               v(-eng_yz_t / 2, y_ctr + sy * eng_yz_t / 2,   z_yz_top),
-               v(-eng_yz_t / 2, y_ctr + sy * eng_blade_w / 2, z_yz_top - chamfer_h_yz)]
-        wire = Part.Wire([Part.makeLine(pts[0], pts[1]),
-                          Part.makeLine(pts[1], pts[2]),
-                          Part.makeLine(pts[2], pts[0])])
-        eng_yz = eng_yz.cut(Part.Face(wire).extrude(v(eng_yz_t, 0, 0)))
-
-    eng_blade = eng_xz.fuse(eng_yz)
+    # Fuse first, then cut the slot through everything: with the junction block
+    # lowered the slot top reaches ~0.4 mm into the block bottom — the latch
+    # stop must be the slot end, not the block face.
+    eng_blade = eng_xz.fuse(eng_yz).fuse(overlap_block).cut(slot_cut)
 
     # ── Modular attachment foot (plate in wall pocket) ───────────────────────────
     # At y = [cube_half, cube_half + wall_thick] — slides into pocket in the wall.
@@ -886,4 +934,17 @@ print(f"  contactZ:           {contactZ:.2f} mm  → disc height = {disc_h:.1f} 
 print(f"  Motor disc vr:      {disc_vr:.1f} mm  (R + WT/2)")
 print(f"  UJ distance:        {uj_dist:.1f} mm from centre")
 print(f"  Cube size:          {cube_size:.0f} × {cube_size:.0f} mm")
+print("-" * 60)
+print(f"  Engagement spring:  {eng_blade_w:.0f} × {eng_blade_t:.1f} mm, free length {spr_L:.0f} mm,"
+      f"  k = {spr_k:.1f} N/mm at pin")
+print(f"  Servo arm:          r = {sg90_arm_r:.0f} mm, latch stop at {latch_deg:.0f}°"
+      f"  → slot height {eng_slot_h:.1f} mm (derived)")
+print(f"  Free travel:        {spr_free:.2f} mm → contact at {spr_a_contact:.0f}° of arm sweep")
+print(f"  Latched (self-held): F = {spr_F_latch:.1f} N → N = {spr_N_latch:.1f} N"
+      f" → T_slip = {spr_T_latch:.0f} N·mm = {spr_T_latch / SRV_T_CONT:.1f}× servo cont.")
+print(f"  Latch root stress:  {spr_sig_latch:.1f} MPa sustained  (creep target ≤ ~15 MPa)")
+print(f"  Servo demand:       {spr_peak_dem:.0f} N·mm peak, transient"
+      f"  (MG90D continuous {SRV_T_CONT:.0f} N·mm)")
+print(f"  Wear sensitivity:   −{spr_dF_wear:.1f} N per 0.1 mm gap growth"
+      f"  ({100 * spr_dF_wear / spr_F_latch:.0f}% of latch force)")
 print("=" * 60)
