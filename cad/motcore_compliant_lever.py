@@ -48,6 +48,8 @@ lever_len     = 25.0  # mm   — fixed shaft stub beyond wall (increased for UJ 
 # ── Universal joint (purchased, metal, Ø11×23 mm, 5 mm bore) ─────────────────
 uj_od         = 11.0  # mm — UJ outer diameter
 uj_len        = 23.0  # mm — UJ total length (both hubs + cross)
+uj_cross_w    =  8.0  # mm — central cross/yoke region (no bore); each hub bore is
+                      #      (uj_len − uj_cross_w)/2 deep and receives a shaft end
 
 # ── Flange shaft hub (purchased aluminium, Ø5 bore) — wheel ↔ shaft coupling ──
 # Torque path is metal-on-metal (set screws on the shaft) → no PETG creep on the
@@ -479,25 +481,34 @@ def make_output_shaft(axis):
     """
     neg = v(-axis.x, -axis.y, -axis.z)
 
-    # Inner shaft: from just past wheel bore inward end to UJ inner face
-    inner_len   = uj_inner_y - (wc_dist - WT / 2 - 2.0)
-    inner_start = av(axis, uj_inner_y)
-    inner = cyl(shaft_dia / 2, inner_len, inner_start, neg)
+    # Both segments plug INTO the UJ hub bores, stopping at the cross region —
+    # faithful to the purchased UJ (5 mm bore each side, set-screwed).
+    inner_into = uj_center - uj_cross_w / 2     # inner shaft end inside the UJ
+    outer_into = uj_center + uj_cross_w / 2     # outer shaft end inside the UJ
 
-    # Outer shaft: from UJ outer face to lever arm tip
-    outer_len   = cube_half + wall_thick + lever_len - uj_outer_y
-    outer_start = av(axis, uj_outer_y)
-    outer = cyl(shaft_dia / 2, outer_len, outer_start, axis)
+    # Inner shaft: motor-side end (through wheel/hub + head bearing) → into the UJ
+    inner_far = wc_dist - WT / 2 - 2.0
+    inner = cyl(shaft_dia / 2, inner_into - inner_far, av(axis, inner_into), neg)
+
+    # Outer shaft: from inside the UJ → through the foot bearing → lever tip
+    outer_far = cube_half + wall_thick + lever_len
+    outer = cyl(shaft_dia / 2, outer_far - outer_into, av(axis, outer_into), axis)
 
     return inner.fuse(outer)
 
 
 def make_uj_body(axis):
-    """Universal joint — reference cylinder Ø{uj_od} × {uj_len} mm.
-    Cross (pivot) at cube_half (wall inner face); straddles the wall.
-    Represents the purchased metal UJ (5 mm bore each side).
+    """Universal joint — reference Ø{uj_od} × {uj_len} mm, hubs bored Ø5 each side
+    so the shaft ends plug in; the central uj_cross_w region (the cross/yoke) is
+    left solid. Represents the purchased metal UJ.
     """
-    return cyl(uj_od / 2, uj_len, av(axis, uj_inner_y), axis)
+    neg  = v(-axis.x, -axis.y, -axis.z)
+    body = cyl(uj_od / 2, uj_len, av(axis, uj_inner_y), axis)
+    bore_r = shaft_dia / 2 + 0.2
+    depth  = (uj_len - uj_cross_w) / 2
+    body = body.cut(cyl(bore_r, depth + 0.01, av(axis, uj_inner_y - 0.01), axis))
+    body = body.cut(cyl(bore_r, depth + 0.01, av(axis, uj_outer_y + 0.01), neg))
+    return body
 
 
 def make_cube_wall(axis):
@@ -716,22 +727,16 @@ def make_shaft_bracket(axis):
         2 * foot_half_w, wall_thick, 2 * foot_z_half,
         v(-foot_half_w, cube_half, -foot_z_half)
     )
-    # Output shaft clearance hole through foot (same bore as wall shaft hole)
-    foot = foot.cut(cyl(shaft_dia / 2 + 0.4, wall_thick + 2,
+    # Output-shaft bearing seat ("pie de la pared"): MR105ZZ pressed into the
+    # foot, flush with the wall faces. Foot thickness (wall_thick = 4 mm) = the
+    # bearing width, so it sits fully inside the foot — no protruding boss.
+    foot = foot.cut(cyl(brg_od / 2 + 0.05, wall_thick + 2,
                         v(0, cube_half - 1, 0), v(0, 1, 0)))
     # 4× M3 screw clearance holes at corner positions (±pa, ±Z)
     for _spa in [foot_screw_pa, -foot_screw_pa]:
         for _spz in [foot_screw_z, -foot_screw_z]:
             foot = foot.cut(cyl(m3_screw_r, wall_thick + 2,
                                 v(_spa, cube_half - 1, _spz), v(0, 1, 0)))
-
-    # ── Output-shaft bearing seat ("pie de la pared") ─────────────────────────
-    # The outer (output) shaft turns on an MR105ZZ here, just outboard of the UJ.
-    # Boss on the foot outer face; the bearing inserts from outside and seats
-    # against the foot (the Ø-shaft hole is the shoulder). Same bearing as the head.
-    foot_out = cube_half + wall_thick
-    foot = foot.fuse(cyl(brg_od / 2 + 3.0, brg_w, v(0, foot_out, 0), v(0, 1, 0)))
-    foot = foot.cut(cyl(brg_od / 2 + 0.05, brg_w + 0.5, v(0, foot_out, 0), v(0, 1, 0)))
 
     shape = head.fuse(blade_r).fuse(blade_l).fuse(eng_blade).fuse(foot)
 
@@ -1076,9 +1081,9 @@ for name, axis in AXES:
     add(doc, f"HeadBearing_{name}",
         _brg_outer.cut(_brg_inner),
         color=(0.30, 0.30, 0.32))
-    # Output-shaft bearing at the wall foot
-    _wb_o = cyl(brg_od / 2, brg_w, av(axis, cube_half + wall_thick), axis)
-    _wb_i = cyl(brg_id / 2 + 0.05, brg_w + 2, av(axis, cube_half + wall_thick - 1), axis)
+    # Output-shaft bearing, flush inside the wall foot (58.5 → 62.5)
+    _wb_o = cyl(brg_od / 2, brg_w, av(axis, cube_half + wall_thick - brg_w), axis)
+    _wb_i = cyl(brg_id / 2 + 0.05, brg_w + 2, av(axis, cube_half - 1), axis)
     add(doc, f"WallBearing_{name}",
         _wb_o.cut(_wb_i),
         color=(0.30, 0.30, 0.32))
