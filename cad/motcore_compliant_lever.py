@@ -49,6 +49,30 @@ lever_len     = 25.0  # mm   — fixed shaft stub beyond wall (increased for UJ 
 uj_od         = 11.0  # mm — UJ outer diameter
 uj_len        = 23.0  # mm — UJ total length (both hubs + cross)
 
+# ── Flange shaft hub (purchased aluminium, Ø5 bore) — wheel ↔ shaft coupling ──
+# Torque path is metal-on-metal (set screws on the shaft) → no PETG creep on the
+# load path; the printed wheel only sees the bolt circle (hugely over-margined).
+hub_bore_d    = 5.0   # mm — hub bore (matches the metal output shaft)
+hub_od        = 10.0  # mm — hub body outer diameter
+hub_body_h    = 8.0   # mm — hub body height (above flange)
+hub_flange_od = 22.0  # mm — flange outer diameter
+hub_flange_t  = 2.5   # mm — flange thickness
+hub_bolt_cd   = 16.0  # mm — flange bolt-circle diameter
+hub_bolt_d    = 3.0   # mm — flange bolt hole diameter (M3)
+hub_bolt_n    = 4     # —    — number of flange bolts (evenly spaced, 90°)
+hub_bolt_ph   = 45.0  # deg  — bolt-circle phase offset
+hub_pilot_d   = 2.5   # mm — pilot hole Ø in the wheel; the M3 flange bolt self-taps
+                      #      straight into the PETG (no insert — ~8 N/bolt load)
+hub_pilot_h   = 6.0   # mm — pilot hole depth
+# Hub mounts from the MOTOR side: flange on the wheel's motor-side face, neck
+# passing through the wheel. This keeps the wall-side shaft clear for a bearing.
+
+# ── Output shaft bearing (in the bracket head) ───────────────────────────────
+brg_id        = 5.0   # mm — bearing bore (= shaft)            ┐ MR105ZZ
+brg_od        = 10.0  # mm — bearing outer diameter            │ (5×10×4)
+brg_w         = 4.0   # mm — bearing width                     ┘
+brg_wall      = 2.0   # mm — min PETG wall around the bearing seat (sets head height)
+
 # ── Frame (top + bottom plates + lever pivot posts) ───────────────────────────
 plate_t       = 4.0   # mm   — plate thickness (top and bottom)
 post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
@@ -171,7 +195,7 @@ uj_inner_y = uj_outer_y - uj_len            # inner face ≈ 35.3 mm (inside cub
 uj_center  = uj_outer_y - uj_len / 2        # actual pivot ≈ 46.8 mm from cube centre
 
 # ── Bracket head half-height in Z (shared with make_lever) ───────────────
-head_z_half = shaft_dia / 2 + 3.5   # = 6.0 mm with defaults
+head_z_half = max(shaft_dia / 2 + 3.5, brg_od / 2 + brg_wall)  # sized for bearing seat
 
 # ── Lever pivot post geometry (shared with make_frame and make_lever) ─────
 post_pa_off  = bw_half + post_side_gap + post_w / 2  # post centre offset in pa
@@ -263,6 +287,26 @@ def av(axis, dist):
     return v(axis.x * dist, axis.y * dist, axis.z * dist)
 
 
+def perp_basis(axis):
+    """Two unit vectors spanning the plane perpendicular to a horizontal axis:
+    u = vertical (Z), w = the other horizontal direction (axis × Z)."""
+    return v(0, 0, 1), v(axis.y, -axis.x, 0)
+
+
+def bolt_circle_points(centre, axis, radius, n, phase_deg):
+    """n points on a circle of given radius, centred at `centre`, lying in the
+    plane perpendicular to `axis` (used for flange bolt patterns)."""
+    u, w = perp_basis(axis)
+    pts = []
+    for k in range(n):
+        a = math.radians(360.0 / n * k + phase_deg)
+        c, s = math.cos(a), math.sin(a)
+        pts.append(v(centre.x + radius * (c * w.x + s * u.x),
+                     centre.y + radius * (c * w.y + s * u.y),
+                     centre.z + radius * (c * w.z + s * u.z)))
+    return pts
+
+
 def make_motor_disc():
     bore_r = motor_shaft_d / 2 + 0.1
     # Upper disc: contact face at z = +contactZ (bottom of disc), body extends upward
@@ -278,13 +322,20 @@ def make_output_wheel(axis):
     """
     Disc perpendicular to axis, centred at wc_dist from origin.
     Structural radius Rw, thickness WT. O-ring groove on rim.
+    Motor-side face (−axis end) carries the flange-hub mounting: a flat seat +
+    hub_bolt_n pilot holes on a hub_bolt_cd circle (M3 bolts self-tap into the
+    PETG). The central bore is Ø(hub_od) so the hub neck passes through; torque
+    comes through the bolts.
+    Mounting the hub from the motor side keeps the wall-side shaft clear for the
+    head bearing.
     In neutral position (shaft horizontal, no tilt).
     """
     wc   = av(axis, wc_dist)            # wheel centre
     base = wc - av(axis, WT / 2)        # disc start along axis
 
     disc  = cyl(Rw, WT, base, axis)
-    bore  = cyl(shaft_dia / 2 + 0.1, WT + 2, base - axis, axis)
+    # Through bore for the hub neck (clearance over Ø hub_od)
+    bore  = cyl(hub_od / 2 + 0.1, WT + 2, base - axis, axis)
 
     # O-ring groove: width = 1.2·dw, depth = 0.6·dw, centred on wheel face
     gw    = dw * 1.2
@@ -294,7 +345,54 @@ def make_output_wheel(axis):
     g_in  = cyl(Rw - gd,  gw + 2, gb - axis, axis)
     groove = g_out.cut(g_in)
 
-    return disc.cut(bore).cut(groove)
+    wheel = disc.cut(bore).cut(groove)
+
+    # Self-tap pilot holes, drilled inward (+axis) from the MOTOR-side face
+    motor_face = av(axis, wc_dist - WT / 2)
+    for p in bolt_circle_points(motor_face, axis, hub_bolt_cd / 2,
+                                hub_bolt_n, hub_bolt_ph):
+        mouth = v(p.x - axis.x * 0.5, p.y - axis.y * 0.5, p.z - axis.z * 0.5)
+        wheel = wheel.cut(cyl(hub_pilot_d / 2, hub_pilot_h + 0.5, mouth, axis))
+
+    return wheel
+
+
+def make_flange_hub(axis):
+    """
+    Purchased aluminium flange shaft hub (reference part), mounted from the MOTOR
+    side. The flange seats on the wheel's motor-side face; the neck passes through
+    the wheel toward the wall. Two M3 set screws at 90° grip the Ø5 shaft; the
+    hub_bolt_n flange bolts drive the printed wheel.
+    """
+    neg = v(-axis.x, -axis.y, -axis.z)
+    motor_face  = av(axis, wc_dist - WT / 2)                    # wheel motor-side face
+    flange_base = av(axis, wc_dist - WT / 2 - hub_flange_t)     # flange outer face
+
+    flange = cyl(hub_flange_od / 2, hub_flange_t, flange_base, axis)
+    # Neck runs from the flange through the wheel (toward the wall)
+    neck   = cyl(hub_od / 2, hub_flange_t + hub_body_h, flange_base, axis)
+    hub    = flange.fuse(neck)
+
+    # Central bore for the shaft
+    hub = hub.cut(cyl(hub_bore_d / 2 + 0.05, hub_flange_t + hub_body_h + 2,
+                      v(flange_base.x - axis.x, flange_base.y - axis.y,
+                        flange_base.z - axis.z), axis))
+
+    # Flange through-holes on the bolt circle (from the flange outer face inward)
+    for p in bolt_circle_points(flange_base, axis, hub_bolt_cd / 2,
+                                hub_bolt_n, hub_bolt_ph):
+        start = v(p.x - axis.x, p.y - axis.y, p.z - axis.z)
+        hub = hub.cut(cyl(hub_bolt_d / 2, hub_flange_t + 2, start, axis))
+
+    # Two radial M3 set-screw holes at 90°, in the neck where it passes the shaft
+    neck_mid = av(axis, wc_dist - WT / 2 + hub_body_h / 2)
+    u, w = perp_basis(axis)
+    for d in (w, u):
+        start = v(neck_mid.x + d.x * (hub_od / 2 + 1),
+                  neck_mid.y + d.y * (hub_od / 2 + 1),
+                  neck_mid.z + d.z * (hub_od / 2 + 1))
+        hub = hub.cut(cyl(1.5, hub_od / 2 + 2, start, v(-d.x, -d.y, -d.z)))
+    return hub
 
 
 def make_oring(axis):
@@ -441,16 +539,20 @@ def make_shaft_bracket(axis):
     # blade_gap, blade_w_g, bw_half — use globals from DERIVED (clears UJ body Ø11 mm)
     # head_z_half is global (defined in DERIVED)
 
-    bore_r = shaft_dia / 2 + 0.25  # bearing bore radius
-
     # head_y0, head_y1 from global DERIVED (shared with make_output_shaft)
     blade_len = cube_half - head_y1
 
-    # Head block with bearing bore
+    # Head block with a ball-bearing seat.
+    # Bearing slides in from the wall side (head_y1) and seats against a shoulder;
+    # the shaft passes through the Ø(shaft+clr) front lip toward the wheel.
     head = Part.makeBox(2 * bw_half, head_depth, 2 * head_z_half,
                         v(-bw_half, head_y0, -head_z_half))
-    head = head.cut(cyl(bore_r, head_depth + 2,
-                        v(0, head_y0 - 1, 0),  v(0, 1, 0)))
+    # shaft clearance through the whole head
+    head = head.cut(cyl(shaft_dia / 2 + 0.4, head_depth + 2,
+                        v(0, head_y0 - 1, 0), v(0, 1, 0)))
+    # bearing pocket from the wall-side face inward (press/slip fit)
+    head = head.cut(cyl(brg_od / 2 + 0.05, brg_w + 0.3,
+                        v(0, head_y1 - brg_w, 0), v(0, 1, 0)))
 
     # Right blade (+pa side): lies flat at z=0, thin in Z, wide in pa
     blade_r = Part.makeBox(blade_w_g, blade_len, blade_t,
@@ -886,6 +988,15 @@ for name, axis in AXES:
     add(doc, f"OutputWheel_{name}",
         make_output_wheel(axis),
         color=(0.20, 0.80, 0.60))
+    add(doc, f"FlangeHub_{name}",
+        make_flange_hub(axis),
+        color=(0.75, 0.75, 0.78))
+    # Ball bearing reference: ring seated at the head shoulder
+    _brg_outer = cyl(brg_od / 2, brg_w, av(axis, head_y1 - brg_w), axis)
+    _brg_inner = cyl(brg_id / 2 + 0.05, brg_w + 2, av(axis, head_y1 - brg_w - 1), axis)
+    add(doc, f"Bearing_{name}",
+        _brg_outer.cut(_brg_inner),
+        color=(0.30, 0.30, 0.32))
     add(doc, f"Oring_{name}",
         make_oring(axis),
         color=(0.90, 0.20, 0.50))
@@ -947,4 +1058,16 @@ print(f"  Servo demand:       {spr_peak_dem:.0f} N·mm peak, transient"
       f"  (MG90D continuous {SRV_T_CONT:.0f} N·mm)")
 print(f"  Wear sensitivity:   −{spr_dF_wear:.1f} N per 0.1 mm gap growth"
       f"  ({100 * spr_dF_wear / spr_F_latch:.0f}% of latch force)")
+print("-" * 60)
+_flange_disc_clr = contactZ - hub_flange_od / 2
+_free_shaft      = head_y1 - (wc_dist + WT / 2)
+print(f"  Wheel↔shaft hub:    flange Ø{hub_flange_od:.0f} on MOTOR side, neck through wheel,")
+print(f"                      {hub_bolt_n}× M{hub_bolt_d:.0f} on Ø{hub_bolt_cd:.0f} circle,"
+      f" M3 self-tap into PETG, 2× M3 set screws on a shaft flat")
+print(f"  Flange↔disc gap:    {_flange_disc_clr:.1f} mm"
+      f"  ({'OK' if _flange_disc_clr > 0 else 'COLLISION'})")
+print(f"  Head bearing:       Ø{brg_id:.0f}×{brg_od:.0f}×{brg_w:.0f} (MR105ZZ),"
+      f" head half-height {head_z_half:.1f} mm")
+print(f"  Wall-side shaft:    free {wc_dist + WT / 2:.1f}→{head_y1:.1f} mm"
+      f" for the bearing seat in the head")
 print("=" * 60)
