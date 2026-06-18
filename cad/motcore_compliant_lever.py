@@ -933,23 +933,27 @@ def make_servo_mount(axis):
     ear_x0e = ear_xc - sg90_ear_t / 2  # ear inner X face
     ear_x1e = ear_xc + sg90_ear_t / 2  # ear outer X face
 
-    brk_wall = 2.5                           # bracket wall thickness (X and outer-Y)
-    z_base   = -(cube_h / 2 + plate_t)      # fondo de la placa inferior del frame
+    brk_wall = 3.5                            # bracket wall thickness (thicker = sturdier)
+    z_base   = -(cube_h / 2 + plate_t)        # bottom of the frame base plate
 
-    # ── X span: wraps the ear ─────────────────────────────────────────────────
-    bx0    = ear_x0e - brk_wall              # −X face of bracket wing
-    bx1    = ear_x1e + brk_wall              # +X face of bracket wing
+    # ── Cradle X span = the FULL servo body length (broad bracket, not a thin
+    #    slice at the ears → far stiffer). Open toward −X for the arm/blade sweep.
+    bx0    = body_x0
+    bx1    = body_x0 + sg90_l + brk_wall
     bx_len = bx1 - bx0
 
-    # ── Alas verticales: desde el fondo de la placa hasta la cima del cuerpo ──
-    # Se fusionan con la placa inferior de make_frame (geometría coincidente).
+    # ── Side wings hug the body ±Y faces (front wraps the ear, back reaches the
+    #    wall), from the base plate up to the body top.
     wing_f = Part.makeBox(bx_len, sg90_ear_y + brk_wall, bz1 - z_base,
                           v(bx0, by0 - sg90_ear_y - brk_wall, z_base))
-
-    # Ala trasera: llega hasta la cara interior de la pared (cube_half)
-    # → columna de unión entre el suelo del frame y la pared
     wing_b = Part.makeBox(bx_len, cube_half - by1, bz1 - z_base,
                           v(bx0, by1, z_base))
+
+    # ── Floor under the servo body tying the two wings together along their full
+    #    length (stops them splaying) and seating the body from below.
+    y_front = by0 - sg90_ear_y - brk_wall
+    floor = Part.makeBox(bx_len, cube_half - y_front, (bz0 - sg90_tol) - z_base,
+                         v(bx0, y_front, z_base))
 
     # ── Ranuras para orejas — abiertas por +X (el servo entra deslizando) ─────
     # Longitud del corte: desde cara interior de la oreja hasta cara +X del ala
@@ -968,7 +972,7 @@ def make_servo_mount(axis):
                           v(slot_x0, by1, slot_z0))
     wing_b = wing_b.cut(slot_b)
 
-    blk = wing_f.fuse(wing_b)
+    blk = wing_f.fuse(wing_b).fuse(floor)
 
     # ── M2 through-holes in X direction (at Z = z_shaft, Y = ear centre) ─────
     m2_f = cyl(sg90_m2_r + sg90_tol, bx_len + 2,
@@ -1164,11 +1168,16 @@ if App.listDocuments().get(doc_name):
 doc = App.newDocument(doc_name)
 
 # Motor shaft (reference cylinder)
-# Motor (input) shaft — protrudes shaft_stub beyond each plate, matching the
-# output-shaft stubs for visual symmetry.
-_ms_half = cube_h / 2 + plate_t + shaft_stub
-add(doc, "MotorShaft_REF",
-    cyl(motor_shaft_d / 2, 2 * _ms_half, v(0, 0, -_ms_half)),
+# Motor (input) shaft — TWO pieces split at centre, joined by the disc + its two
+# hubs (like the UJ joins the output shaft). Lower piece = drive (motor below);
+# upper piece = support stub (no torque). Each half ships with its frame half.
+_ms_end = cube_h / 2 + plate_t + shaft_stub     # outer tip (protrudes shaft_stub)
+_ms_gap = 0.5                                    # small gap at the split (z = 0)
+add(doc, "MotorShaftLower",
+    cyl(motor_shaft_d / 2, _ms_end - _ms_gap / 2, v(0, 0, -_ms_end)),
+    color=(0.6, 0.6, 0.6))
+add(doc, "MotorShaftUpper",
+    cyl(motor_shaft_d / 2, _ms_end - _ms_gap / 2, v(0, 0, _ms_gap / 2)),
     color=(0.6, 0.6, 0.6))
 
 # Motor disc (one rigid part: two plates + spool) + its Ø8 flange hub
@@ -1293,8 +1302,8 @@ print(f"  Wall-side shaft:    free {wc_dist + WT / 2:.1f}→{head_y1:.1f} mm"
       f" for the bearing seat in the head")
 print(f"  Motor disc:         one part (2 plates + Ø{disc_spool_d:.0f} spool),"
       f" Ø{mhub_bore_d:.0f} hub on BOTH faces, {mhub_bolt_n}× M{mhub_bolt_d:.0f} self-tap each")
-print(f"  Central shaft:      Ø{motor_shaft_d:.0f} (unified), 2 MR105 in the plates"
-      f"  → all shafts Ø5, one bearing type")
+print(f"  Central shaft:      Ø{motor_shaft_d:.0f}, split in 2 (joined by the disc +"
+      f" its 2 hubs), 2 MR105 in the plates → all shafts Ø5, one bearing type")
 print(f"  Bearings total:     {4 * 2 + 2} × MR105ZZ (4 axes × 2 + 2 central)")
 print(f"  Motor disc torque:  ≤ {4 * spr_T_latch:.0f} N·mm (4 axes engaged)"
       f"  → {4 * spr_T_latch / mhub_bolt_n / (mhub_bolt_cd / 2):.0f} N/bolt")
