@@ -78,6 +78,18 @@ brg_id        = 5.0   # mm — bearing bore (= shaft)            ┐ MR105ZZ
 brg_od        = 10.0  # mm — bearing outer diameter            │ (5×10×4)
 brg_w         = 4.0   # mm — bearing width                     ┘
 brg_wall      = 2.0   # mm — min PETG wall around the bearing seat (sets head height)
+# Axial retention: set-screw collars bear against the bearing inner races so the
+# shaft can't slide through (a press fit alone is not a reliable axial stop).
+collar_od     = 10.0  # mm — set-screw collar outer Ø (Ø5 bore)
+collar_w      = 5.0   # mm — collar width
+collar_contact_d = 7.0 # mm — relief boss Ø that touches ONLY the bearing inner
+                       #       race (> inner-race OD, < outer-race ID ≈ 8.5) so the
+                       #       rotating collar never rubs the stationary outer race
+# Central-shaft bearings sit in a boss on each plate's INNER face (a proper seat
+# with the plate as the shoulder) instead of flush in the thin plate; the plate
+# then carries only the shaft clearance hole.
+brg_boss_d    = 14.0  # mm — bearing-boss outer Ø (around the seat)
+brg_boss_h    = brg_w # mm — boss depth into the cube (= bearing width)
 
 # ── Motor disc: one rigid part (2 plates + spool) on a Ø8 flange hub ──────────
 # The disc carries the sum of the engaged axes (~4× a single wheel). Concentricity
@@ -524,6 +536,38 @@ def make_output_shaft(axis):
     return inner.fuse(outer)
 
 
+def make_plate_bearing_boss(z_inner, sd, fit):
+    """Bearing seat as a boss on a plate's inner face (the plate keeps only the
+    shaft hole and acts as the bearing shoulder). z_inner = plate inner-face z;
+    sd = +1 boss grows +Z (bottom plate), −1 grows −Z (top plate); fit = radial
+    seat offset (0 → press/located, 0.05 → slip/floating)."""
+    z0 = min(z_inner, z_inner + sd * brg_boss_h)
+    boss = cyl(brg_boss_d / 2, brg_boss_h, v(0, 0, z0))
+    boss = boss.cut(cyl(brg_od / 2 + fit, brg_boss_h + 1, v(0, 0, z0 - 0.5)))
+    return boss
+
+
+def make_shaft_collar(z_lo, shaft_d, face_z):
+    """Set-screw collar (reference) on a Z-shaft, bottom face at z_lo. Bears
+    against a bearing inner race (the face at `face_z`) to locate the shaft
+    axially. The bearing-facing side has a relief: only a Ø(collar_contact_d) boss
+    protrudes, so the rotating collar touches just the inner race, never the
+    stationary outer race. Ø(shaft_d) bore + a radial M3 set screw.
+    """
+    rec_d = 1.0
+    if face_z > z_lo + collar_w / 2:        # bearing face is the +Z (top) side
+        body = cyl(collar_od / 2, collar_w - rec_d, v(0, 0, z_lo))
+        boss = cyl(collar_contact_d / 2, rec_d, v(0, 0, z_lo + collar_w - rec_d))
+    else:                                   # bearing face is the −Z (bottom) side
+        body = cyl(collar_od / 2, collar_w - rec_d, v(0, 0, z_lo + rec_d))
+        boss = cyl(collar_contact_d / 2, rec_d, v(0, 0, z_lo))
+    c = body.fuse(boss)
+    c = c.cut(cyl(shaft_d / 2 + 0.1, collar_w + 2, v(0, 0, z_lo - 1)))
+    c = c.cut(cyl(1.5, collar_od / 2 + 2,
+                  v(collar_od / 2 + 1, 0, z_lo + collar_w / 2), v(-1, 0, 0)))
+    return c
+
+
 def make_uj_body(axis):
     """Universal joint — reference Ø{uj_od} × {uj_len} mm, hubs bored Ø5 each side
     so the shaft ends plug in; the central uj_cross_w region (the cross/yoke) is
@@ -866,8 +910,10 @@ def make_frame(axes=None):
     z_bot = -(cube_h / 2 + plate_t)
     bot = Part.makeBox(2 * cube_out, 2 * cube_out, plate_t,
                        v(-cube_out, -cube_out, z_bot))
-    bot = bot.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
-                      v(0, 0, z_bot - 1)))            # lower shaft-bearing seat
+    # Plate carries only a shaft clearance hole; the bearing seats in a boss on
+    # the inner face (the plate is the shoulder). LOCATED bearing → press fit.
+    bot = bot.cut(cyl(motor_shaft_d / 2 + 0.4, plate_t + 2, v(0, 0, z_bot - 1)))
+    bot = bot.fuse(make_plate_bearing_boss(-cube_h / 2, 1, 0.0))
 
     # Lower half-columns (pegs up) + wall backing ribs print with the base
     frame = bot.fuse(make_corner_posts(-cube_h / 2, 0, 'peg'))
@@ -888,8 +934,10 @@ def make_top_plate():
     z_top = cube_h / 2
     top = Part.makeBox(2 * cube_out, 2 * cube_out, plate_t,
                        v(-cube_out, -cube_out, z_top))
-    top = top.cut(cyl(brg_od / 2 + 0.05, plate_t + 2,
-                      v(0, 0, z_top - 1)))            # upper shaft-bearing seat
+    # Plate carries only a shaft hole; bearing in a boss on the inner face.
+    # FLOATING bearing → slip fit (free to slide axially, absorbs misalignment).
+    top = top.cut(cyl(motor_shaft_d / 2 + 0.4, plate_t + 2, v(0, 0, z_top - 1)))
+    top = top.fuse(make_plate_bearing_boss(cube_h / 2, -1, 0.05))
     # Upper half-columns (sockets) + wall backing ribs hang below the plate
     top = top.fuse(make_corner_posts(0, cube_h / 2, 'socket'))
     top = top.fuse(make_wall_ribs(cube_h / 2 - rib_h, rib_h))
@@ -1180,6 +1228,16 @@ add(doc, "MotorShaftUpper",
     cyl(motor_shaft_d / 2, _ms_end - _ms_gap / 2, v(0, 0, _ms_gap / 2)),
     color=(0.6, 0.6, 0.6))
 
+# Axial-retention collars: INSIDE the cube, on the inner face of each plate
+# bearing (between bearing and disc), pinning the whole central assembly (2 shafts
+# + disc + 2 hubs) against the inner races. Inside keeps the cube exterior clean
+# and clear of the motor coupling; set screws are reached during staged assembly.
+_bf = cube_h / 2 - brg_w                           # bearing inner-race face |z| (in the boss)
+add(doc, "ShaftCollarBot",
+    make_shaft_collar(-_bf, motor_shaft_d, -_bf), color=(0.5, 0.5, 0.5))
+add(doc, "ShaftCollarTop",
+    make_shaft_collar(_bf - collar_w, motor_shaft_d, _bf), color=(0.5, 0.5, 0.5))
+
 # Motor disc (one rigid part: two plates + spool) + its Ø8 flange hub
 add(doc, "MotorDisc",
     make_motor_disc(),
@@ -1191,8 +1249,8 @@ add(doc, "MotorHubTop",
     make_motor_hub(1),
     color=(0.75, 0.75, 0.78))
 
-# Central-shaft bearings, flush in the bottom and top plates
-for _zb, _tag in ((cube_h / 2, "top"), (-(cube_h / 2 + plate_t), "bot")):
+# Central-shaft bearings, seated in the plate inner-face bosses
+for _zb, _tag in ((cube_h / 2 - brg_w, "top"), (-cube_h / 2, "bot")):
     _o = cyl(brg_od / 2, brg_w, v(0, 0, _zb))
     _i = cyl(brg_id / 2 + 0.05, brg_w + 2, v(0, 0, _zb - 1))
     add(doc, f"ShaftBearing_{_tag}", _o.cut(_i), color=(0.30, 0.30, 0.32))
@@ -1305,6 +1363,8 @@ print(f"  Motor disc:         one part (2 plates + Ø{disc_spool_d:.0f} spool),"
 print(f"  Central shaft:      Ø{motor_shaft_d:.0f}, split in 2 (joined by the disc +"
       f" its 2 hubs), 2 MR105 in the plates → all shafts Ø5, one bearing type")
 print(f"  Bearings total:     {4 * 2 + 2} × MR105ZZ (4 axes × 2 + 2 central)")
+print(f"  Axial retention:    central shaft pinned by 2 set-screw collars vs the"
+      f" plate bearings; output shafts held by hubs/UJ (axial load < 1 N)")
 print(f"  Motor disc torque:  ≤ {4 * spr_T_latch:.0f} N·mm (4 axes engaged)"
       f"  → {4 * spr_T_latch / mhub_bolt_n / (mhub_bolt_cd / 2):.0f} N/bolt")
 print("=" * 60)
