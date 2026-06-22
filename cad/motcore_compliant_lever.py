@@ -1255,7 +1255,10 @@ for _zb, _tag in ((cube_h / 2 - brg_w, "top"), (-cube_h / 2, "bot")):
     _i = cyl(brg_id / 2 + 0.05, brg_w + 2, v(0, 0, _zb - 1))
     add(doc, f"ShaftBearing_{_tag}", _o.cut(_i), color=(0.30, 0.30, 0.32))
 
-# Single axis for clarity — all four are identical rotated 90°
+# Single axis for a clear per-module view. ALL_AXES is the full set (used for the
+# one-piece frame and for STL export). Swap AXES = ALL_AXES to see the full cube.
+ALL_AXES = [("PosX", v(1, 0, 0)), ("NegX", v(-1, 0, 0)),
+            ("PosY", v(0, 1, 0)), ("NegY", v(0, -1, 0))]
 AXES = [("PosY", v(0, 1, 0))]
 
 for name, axis in AXES:
@@ -1293,6 +1296,10 @@ for name, axis in AXES:
     add(doc, f"Bracket_{name}",
         make_shaft_bracket(axis),
         color=(0.30, 0.65, 0.90))
+    add(doc, f"SG90_{name}",
+        make_sg90_ref(axis),
+        color=(0.20, 0.55, 1.00),
+        transparency=40)
 
 # Frame is TWO printed parts: base (plate + posts + servo mounts) and top plate.
 add(doc, "FrameBase",
@@ -1306,11 +1313,6 @@ if SHOW_TOP:
         make_top_plate(),
         color=(0.62, 0.48, 0.78),
         transparency=40)
-
-add(doc, "SG90_REF",
-    make_sg90_ref(v(0, 1, 0)),
-    color=(0.20, 0.55, 1.00),
-    transparency=40)
 
 doc.recompute()
 
@@ -1368,3 +1370,53 @@ print(f"  Axial retention:    central shaft pinned by 2 set-screw collars vs the
 print(f"  Motor disc torque:  ≤ {4 * spr_T_latch:.0f} N·mm (4 axes engaged)"
       f"  → {4 * spr_T_latch / mhub_bolt_n / (mhub_bolt_cd / 2):.0f} N/bolt")
 print("=" * 60)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# STL EXPORT  — printed (PETG) parts only; purchased parts are reference
+# ═══════════════════════════════════════════════════════════════════
+EXPORT_STL = True          # set False to skip writing STL files
+
+if EXPORT_STL:
+    import os
+
+    try:
+        _here = os.path.dirname(os.path.abspath(__file__))
+    except NameError:                       # __file__ undefined when run as a macro
+        _here = App.getUserMacroDir(True)
+    OUT_DIR = os.path.join(_here, "stl")
+    if not os.path.isdir(OUT_DIR):
+        os.makedirs(OUT_DIR)
+
+    def export_stl(shape, fname):
+        """Write one printable part as STL (fine tessellation for curved bores)."""
+        path = os.path.join(OUT_DIR, fname + ".stl")
+        try:
+            import MeshPart
+            mesh = MeshPart.meshFromShape(Shape=shape,
+                                          LinearDeflection=0.1, AngularDeflection=0.5)
+            mesh.write(path)
+        except Exception:
+            shape.exportStl(path)           # fallback: default tessellation
+        return path
+
+    _yax = v(0, 1, 0)
+    printed_parts = [
+        # filename                 shape                       qty  notes
+        ("motcore_wall",         make_cube_wall(_yax),        4, "lay the outer face flat on the bed"),
+        ("motcore_bracket",      make_shaft_bracket(_yax),    4, "lay flat so the engagement blade flexes ALONG layers"),
+        ("motcore_output_wheel", make_output_wheel(_yax),     4, "flat, O-ring groove up"),
+        ("motcore_frame_base",   make_frame(ALL_AXES),        1, "plate on the bed, posts up"),
+        ("motcore_top_plate",    make_top_plate(),            1, "plate on the bed, half-posts up"),
+        ("motcore_motor_disc",   make_motor_disc(),           1, "a plate face on the bed"),
+    ]
+
+    print("-" * 60)
+    print(f"  STL export → {OUT_DIR}")
+    for _fn, _shp, _qty, _note in printed_parts:
+        export_stl(_shp, _fn)
+        print(f"    {_fn + '.stl':28s} ×{_qty}  — {_note}")
+    print("  Parts are exported in model orientation; orient each in the slicer.")
+    print("  NOT printed (purchased): Ø5 metal shafts, UJ, MR105ZZ bearings,")
+    print("  Ø5 flange hubs, set-screw collars, MG90-class servo, silicone O-rings.")
+    print("=" * 60)
