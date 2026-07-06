@@ -212,6 +212,7 @@ cd poc
 | [Wiring Diagram](docs/wiring.md) | Electrical connections and pinout |
 | [Firmware Guide](docs/firmware.md) | Code architecture and customization |
 | [3D Models](docs/3d-models.md) | FreeCAD parametric design (v0.2) |
+| [Build Log](docs/build-log.md) | Prototype journal — BOM, prints, calibrations, tests |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 
 ### 🛠️ Design Tools

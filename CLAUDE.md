@@ -224,6 +224,8 @@ Wheel face never contacts motor disc (clearance 0.15–0.2 × dw at 20–25% com
 | `cad/clutch_geometry_v3.html` | Interactive 2D visualiser (Y-Z cross-section) |
 | `cad/motcore_plates.py` | FreeCAD macro — bevel cone design (superseded) |
 | `cad/motcore_animate.py` | FreeCAD macro — bevel cone animation (superseded) |
+| `cad/calibration.py` | FreeCAD macro — FDM/PLA tolerance calibration coupon |
+| `docs/build-log.md` | Prototype build log — purchases, prints, calibrations, tests |
 | `software/controller/` | Arduino firmware — master (touchscreen UI) |
 | `software/driver/` | Arduino firmware — receiver (motor + servo control) |
 
