@@ -33,12 +33,17 @@ Status: ✅ have · 🛒 ordered · ⬜ to buy
 
 ## Printer calibration
 
-| Printer | Material | Bearing (Ø10 press) | Shaft (Ø5 slip) | M3 pilot | Date |
-|---------|----------|---------------------|-----------------|----------|------|
-| Creality Hi | PLA | _pending_ | _pending_ | _pending_ | — |
+| Printer | Material | Bearing (Ø10) | Shaft (Ø5 slip) | M3 pilot | Date |
+|---------|----------|---------------|-----------------|----------|------|
+| Creality Hi | PLA | **10.3** press / 10.4 float | _pending_ | _pending_ | 2026-06-17 |
 
 Coupon: `cad/calibration.py` → `cad/stl/motcore_calibration.stl`. Once measured,
 these offsets get set in `cad/motcore_compliant_lever.py`.
+
+- **Bearing**: a hole modelled at 10.3 gives a good press for the Ø10 MR105 (holds
+  when flipped, out with a firm tap); 10.2 was too brutal for brittle PLA. → the
+  printer runs **~0.2–0.3 mm undersize**, so all bearing seats (were 10.0–10.05 for
+  SLS) must go up to ~10.3. Shaft + pilot pending (parts not arrived yet).
 
 ---
 
@@ -61,6 +66,9 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 ## Journal
 
 ### 2026-06-17
+- Printed the calibration coupon (PLA) and measured the **bearing row**: 10.3 is a
+  good press seat (printer ~0.2–0.3 mm undersize). Shaft/pilot pending (rod + M3
+  screws not arrived). Macro fits NOT changed yet — waiting for all three.
 - Bought Creality Hi + Space Pi dryer + Hyper PETG 1 kg (white). Coupon printing.
 - Decided: PLA for fit-check iteration, PETG for functional test, SLS PA12 for the
   final bracket if needed.
