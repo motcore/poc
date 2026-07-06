@@ -32,7 +32,10 @@ A_deg         = 1.5   # deg  — engagement angle (shaft tilt from horizontal);
                       #        short servo-arm stroke (see SPRING SIZING)
 B             = 35.0  # mm   — UJ pivot → output wheel centre (along shaft)
 R             = 20.0  # mm   — contact radius (O-ring outer edge = motor disc rim)
-dw            = 2.5   # mm   — O-ring wire diameter
+dw            = 2.5   # mm   — O-ring wire diameter (cross-section CS)
+oring_id      = 25.0  # mm   — O-ring inner diameter (ID) of the part you buy
+oring_stretch = 0.01  # —    — seat stretch on the groove so the O-ring grips and
+                      #        doesn't slip circumferentially under drive shear
 
 wall_thick    = 4.0   # mm   — cube wall thickness
 shaft_dia     = 5.0   # mm   — output shaft diameter
@@ -223,6 +226,8 @@ wc_dist = uj_dist - B             # wheel centre distance from cube centre
 wheel_gap = 0.5                   # mm clearance at corners between adjacent wheels
 R_out = wc_dist - WT / 2 - wheel_gap   # output wheel contact radius (< R, breaks 1:1)
 Rw    = R_out - 0.4 * dw          # structural wheel radius
+# Groove bottom sized to the real O-ring ID (+stretch) so it seats and grips.
+groove_bottom_r = oring_id / 2 * (1 + oring_stretch)
 
 # ── Contact geometry uses R_out ───────────────────────────────────────────
 # Motor disc faces are where the O-ring actually contacts them.
@@ -448,10 +453,9 @@ def make_output_wheel(axis):
 
     # O-ring groove: width = 1.2·dw, depth = 0.6·dw, centred on wheel face
     gw    = dw * 1.2
-    gd    = dw * 0.6
     gb    = wc - av(axis, gw / 2)       # groove start
     g_out = cyl(Rw + 0.1, gw, gb, axis)
-    g_in  = cyl(Rw - gd,  gw + 2, gb - axis, axis)
+    g_in  = cyl(groove_bottom_r, gw + 2, gb - axis, axis)   # bottom = O-ring seat
     groove = g_out.cut(g_in)
 
     wheel = disc.cut(bore).cut(groove)
@@ -505,7 +509,7 @@ def make_flange_hub(axis):
 
 
 def make_oring(axis):
-    Ror = R_out - 0.5 * dw   # O-ring centre radius (0.1·dw inside rim, protrudes 0.4·dw)
+    Ror = groove_bottom_r + dw / 2   # O-ring centreline = groove bottom + half CS
     wc  = av(axis, wc_dist)
     return Part.makeTorus(Ror, dw / 2, wc, axis)
 
@@ -563,7 +567,8 @@ def make_shaft_collar(z_lo, shaft_d, face_z):
         boss = cyl(collar_contact_d / 2, rec_d, v(0, 0, z_lo))
     c = body.fuse(boss)
     c = c.cut(cyl(shaft_d / 2 + 0.1, collar_w + 2, v(0, 0, z_lo - 1)))
-    c = c.cut(cyl(1.5, collar_od / 2 + 2,
+    # Radial M3 grub-screw pilot (Ø2.5) — self-taps into the printed collar
+    c = c.cut(cyl(col_pilot_d / 2, collar_od / 2 + 2,
                   v(collar_od / 2 + 1, 0, z_lo + collar_w / 2), v(-1, 0, 0)))
     return c
 
@@ -1409,6 +1414,8 @@ if EXPORT_STL:
         ("motcore_frame_base",   make_frame(ALL_AXES),        1, "plate on the bed, posts up"),
         ("motcore_top_plate",    make_top_plate(),            1, "plate on the bed, half-posts up"),
         ("motcore_motor_disc",   make_motor_disc(),           1, "a plate face on the bed"),
+        ("motcore_shaft_collar", make_shaft_collar(0, motor_shaft_d, collar_w),
+                                                              2, "relieved face toward the bearing; M3 grub screw"),
     ]
 
     print("-" * 60)
