@@ -20,9 +20,11 @@ except ImportError:
 # ── What we calibrate (target sizes used in the design) ──────────────────────
 # For each row, print the coupon, try the REAL part in each hole, and note the
 # modelled size of the hole that fits best.
-BEARING_STEPS = [9.8, 9.9, 10.0, 10.1, 10.2, 10.3]  # MR105ZZ OD press fit (blind)
-SHAFT_STEPS   = [5.0, 5.1, 5.2, 5.3, 5.4, 5.5]       # Ø5 shaft slip fit (through)
-PILOT_STEPS   = [2.3, 2.4, 2.5, 2.6, 2.7]            # M3 self-tap pilot (blind)
+# v2 ranges — shifted up after v1 showed this printer runs small holes ~0.5 mm
+# undersize (v1: bearing best at 10.3; shaft/pilot maxed out still too tight).
+BEARING_STEPS = [10.2, 10.3, 10.4, 10.5, 10.6]       # MR105ZZ OD: press → slip (blind)
+SHAFT_STEPS   = [5.6, 5.8, 6.0, 6.2, 6.4]            # Ø5 shaft free slip (through)
+PILOT_STEPS   = [2.8, 2.9, 3.0, 3.1, 3.2]            # M3 self-tap pilot (blind)
 
 # ── Coupon geometry ──────────────────────────────────────────────────────────
 plate_t   = 6.0     # mm — coupon thickness
@@ -102,8 +104,7 @@ except Exception:
 print("=" * 64)
 print("Motcore — FDM/PLA calibration coupon")
 print(f"  STL: {_path}")
-print("  The notch marks hole #1 of each row (smallest). Holes go +0.1 mm each")
-print("  step away from the notch.")
+print("  The notch marks hole #1 of each row (smallest). Sizes per row listed below.")
 print("-" * 64)
 print("  Row 1 (near notch side, blind)  BEARING — push a real MR105ZZ in:")
 print(f"    {BEARING_STEPS}  → firm press, stays put, no crack = your value")

@@ -70,7 +70,8 @@ hub_bolt_cd   = 16.0  # mm — flange bolt-circle diameter
 hub_bolt_d    = 3.0   # mm — flange bolt hole diameter (M3)
 hub_bolt_n    = 4     # —    — number of flange bolts (evenly spaced, 90°)
 hub_bolt_ph   = 45.0  # deg  — bolt-circle phase offset
-hub_pilot_d   = 2.5   # mm — pilot hole Ø in the wheel; the M3 flange bolt self-taps
+hub_pilot_d   = 3.1   # mm — pilot hole Ø in the wheel; the M3 flange bolt self-taps
+                      #      (FDM-calibrated: prints ~2.5, good M3 self-tap in PLA)
                       #      straight into the PETG (no insert — ~8 N/bolt load)
 hub_pilot_h   = 6.0   # mm — pilot hole depth
 # Hub mounts from the MOTOR side: flange on the wheel's motor-side face, neck
@@ -100,7 +101,8 @@ brg_boss_h    = brg_w # mm — boss depth into the cube (= bearing width)
 # Ø8 metal hub grips the shaft; the spool's close-fit bore centres the disc along
 # the shaft. Hub mounts BELOW the disc so its set screws stay accessible.
 disc_spool_d   = 20.0  # mm — spool joining the two plates into one rigid disc
-disc_bore_d    =  5.0  # mm — central bore, close slip fit on the Ø5 shaft (centring)
+disc_bore_d    =  5.6  # mm — central bore, close fit on the Ø5 shaft (FDM: prints
+                       #      ~5.1; the shaft rotates with the disc, so snug is fine)
 # Motor disc hub = the SAME Ø5 flange hub as the output wheels (buy 5 identical).
 # Carries ~4× a single wheel (≤1063 N·mm) → still ~5× margin on the bolt circle.
 mhub_bore_d    =  5.0  # mm — motor hub bore (= motor shaft)
@@ -111,7 +113,7 @@ mhub_flange_t  =  2.5  # mm — motor hub flange thickness
 mhub_bolt_cd   = 16.0  # mm — motor hub bolt-circle Ø
 mhub_bolt_d    =  3.0  # mm — flange bolt hole Ø (M3)
 mhub_bolt_n    =  4    # —    — number of flange bolts
-mhub_pilot_d   =  2.5  # mm — self-tap pilot Ø in the disc (M3 self-taps into PETG)
+mhub_pilot_d   =  3.1  # mm — self-tap pilot Ø in the disc (M3; FDM-calibrated)
 mhub_pilot_h   =  6.0  # mm — pilot depth
 
 # ── Frame (top + bottom plates + corner columns) ─────────────────────────────
@@ -125,12 +127,20 @@ plate_t       = 4.0   # mm   — plate thickness (top and bottom)
 col_w         = 18.0  # mm   — corner post square side (reaches the outer corner)
 col_groove_d  = 7.0   # mm   — depth a wall edge embeds into the post groove
 col_screw_z   = 43.5  # mm   — |Z| of the wall→post screws (one per half-column)
-col_pilot_d   = 2.5   # mm   — self-tap pilot Ø in the posts (M3 from the walls)
+col_pilot_d   = 3.1   # mm   — self-tap pilot Ø in the posts (M3; FDM-calibrated)
 col_pilot_h   = 8.0   # mm   — pilot depth
 col_peg_d     = 6.0   # mm   — alignment peg Ø between the two half-columns (Lego)
 col_peg_h     = 4.0   # mm   — peg height
 rib_d         = 4.0   # mm   — backing rib depth behind the wall (into the cube)
 rib_h         = 8.0   # mm   — backing rib height (up from base / down from top)
+
+# ── FDM print calibration (Creality Hi / PLA) — see docs/build-log.md ─────────
+# Measured: small holes print ~0.5 mm undersize; positive features ~0.15 over.
+# (For SLS/other printers, reset these toward 0 and re-calibrate.)
+brg_fit_press = 0.15  # mm — radial add to a bearing seat for a PRESS fit (→ Ø10.3)
+brg_fit_slip  = 0.20  # mm — radial add for a SLIP / floating seat (→ Ø10.4)
+fdm_slot_clr  = 0.8   # mm — width clearance for a printed edge in a printed slot
+fdm_peg_clr   = 0.5   # mm — radial clearance for a printed peg in a printed socket
 post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
 post_d        =  5.0  # mm   — post depth in axis direction (thin face)
 post_side_gap = 1.5   # mm   — clearance between blade outer edge and post
@@ -711,11 +721,11 @@ def make_corner_posts(z0, z1, mate):
 
             # Grooves for the two adjacent wall edges
             gx_lo = min(sx * (cube_out - col_w), sx * wall_half)
-            post = post.cut(Part.makeBox(col_groove_d + 0.2, wall_thick + 0.2, h + 2,
+            post = post.cut(Part.makeBox(col_groove_d + 0.2, wall_thick + fdm_slot_clr, h + 2,
                                          v(gx_lo - 0.1,
                                            min(sy * cube_half, sy * cube_out) - 0.1, z0 - 1)))
             gy_lo = min(sy * (cube_out - col_w), sy * wall_half)
-            post = post.cut(Part.makeBox(wall_thick + 0.2, col_groove_d + 0.2, h + 2,
+            post = post.cut(Part.makeBox(wall_thick + fdm_slot_clr, col_groove_d + 0.2, h + 2,
                                          v(min(sx * cube_half, sx * cube_out) - 0.1,
                                            gy_lo - 0.1, z0 - 1)))
 
@@ -730,7 +740,7 @@ def make_corner_posts(z0, z1, mate):
             if mate == 'peg':
                 post = post.fuse(cyl(col_peg_d / 2, col_peg_h, v(cx, cy, z1), v(0, 0, 1)))
             elif mate == 'socket':
-                post = post.cut(cyl(col_peg_d / 2 + 0.2, col_peg_h + 0.5,
+                post = post.cut(cyl(col_peg_d / 2 + fdm_peg_clr, col_peg_h + 0.5,
                                     v(cx, cy, z0 - 0.01), v(0, 0, 1)))
 
             posts = post if posts is None else posts.fuse(post)
@@ -781,7 +791,7 @@ def make_shaft_bracket(axis):
     head = head.cut(cyl(shaft_dia / 2 + 0.4, head_depth + 2,
                         v(0, head_y0 - 1, 0), v(0, 1, 0)))
     # bearing pocket from the wall-side face inward (press/slip fit)
-    head = head.cut(cyl(brg_od / 2 + 0.05, brg_w + 0.3,
+    head = head.cut(cyl(brg_od / 2 + brg_fit_slip, brg_w + 0.3,
                         v(0, head_y1 - brg_w, 0), v(0, 1, 0)))
 
     # Right blade (+pa side): lies flat at z=0, thin in Z, wide in pa
@@ -881,7 +891,7 @@ def make_shaft_bracket(axis):
     # Output-shaft bearing seat ("pie de la pared"): MR105ZZ pressed into the
     # foot, flush with the wall faces. Foot thickness (wall_thick = 4 mm) = the
     # bearing width, so it sits fully inside the foot — no protruding boss.
-    foot = foot.cut(cyl(brg_od / 2 + 0.05, wall_thick + 2,
+    foot = foot.cut(cyl(brg_od / 2 + brg_fit_press, wall_thick + 2,
                         v(0, cube_half - 1, 0), v(0, 1, 0)))
     # 4× M3 screw clearance holes at corner positions (±pa, ±Z)
     for _spa in [foot_screw_pa, -foot_screw_pa]:
@@ -918,7 +928,7 @@ def make_frame(axes=None):
     # Plate carries only a shaft clearance hole; the bearing seats in a boss on
     # the inner face (the plate is the shoulder). LOCATED bearing → press fit.
     bot = bot.cut(cyl(motor_shaft_d / 2 + 0.4, plate_t + 2, v(0, 0, z_bot - 1)))
-    bot = bot.fuse(make_plate_bearing_boss(-cube_h / 2, 1, 0.0))
+    bot = bot.fuse(make_plate_bearing_boss(-cube_h / 2, 1, brg_fit_press))
 
     # Lower half-columns (pegs up) + wall backing ribs print with the base
     frame = bot.fuse(make_corner_posts(-cube_h / 2, 0, 'peg'))
@@ -942,7 +952,7 @@ def make_top_plate():
     # Plate carries only a shaft hole; bearing in a boss on the inner face.
     # FLOATING bearing → slip fit (free to slide axially, absorbs misalignment).
     top = top.cut(cyl(motor_shaft_d / 2 + 0.4, plate_t + 2, v(0, 0, z_top - 1)))
-    top = top.fuse(make_plate_bearing_boss(cube_h / 2, -1, 0.05))
+    top = top.fuse(make_plate_bearing_boss(cube_h / 2, -1, brg_fit_slip))
     # Upper half-columns (sockets) + wall backing ribs hang below the plate
     top = top.fuse(make_corner_posts(0, cube_h / 2, 'socket'))
     top = top.fuse(make_wall_ribs(cube_h / 2 - rib_h, rib_h))

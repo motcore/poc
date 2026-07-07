@@ -35,15 +35,27 @@ Status: ✅ have · 🛒 ordered · ⬜ to buy
 
 | Printer | Material | Bearing (Ø10) | Shaft (Ø5 slip) | M3 pilot | Date |
 |---------|----------|---------------|-----------------|----------|------|
-| Creality Hi | PLA | **10.3** press / 10.4 float | _pending_ | _pending_ | 2026-06-17 |
+| Creality Hi | PLA | **10.3** press / 10.4 slip | **5.8** (disc bore 5.6) | **3.1** | 2026-07-07 |
+
+Applied to `motcore_compliant_lever.py` (FDM block): pilots 3.1, disc bore 5.6,
+bearing seats press +0.15 (Ø10.3) / slip +0.20 (Ø10.4). Shaft pass-through holes
+were already Ø5.8 → left as-is. **Estimated (not directly measured, verify on first
+assembly)**: wall-in-groove width 4.8 and peg/socket Ø7.0 (printed male-in-female
+fits — forgiving; sand if tight, shim if loose).
 
 Coupon: `cad/calibration.py` → `cad/stl/motcore_calibration.stl`. Once measured,
 these offsets get set in `cad/motcore_compliant_lever.py`.
 
 - **Bearing**: a hole modelled at 10.3 gives a good press for the Ø10 MR105 (holds
-  when flipped, out with a firm tap); 10.2 was too brutal for brittle PLA. → the
-  printer runs **~0.2–0.3 mm undersize**, so all bearing seats (were 10.0–10.05 for
-  SLS) must go up to ~10.3. Shaft + pilot pending (parts not arrived yet).
+  when flipped, out with a firm tap); 10.2 was too brutal for brittle PLA. → press
+  seat ≈ **10.3**, float ≈ 10.4 (to confirm on v2 coupon).
+- **Shaft (v1)**: Ø5 rod only entered the biggest hole (5.5) and even that was zero
+  clearance + squeak → **small holes run ~0.5 mm undersize**. Free slip is > 5.5.
+- **Pilot (v1)**: M3 didn't self-tap in any (2.3–2.7 → printed ~1.8–2.2, too small).
+- → **coupon v2** with shifted ranges (bearing 10.2–10.6, shaft 5.6–6.4, pilot
+  2.8–3.2) to nail shaft slip + M3 pilot + bearing float. Reprint & measure.
+- Note the disc centring bore (5.0 in the macro) would print ~4.5 → the rod won't
+  fit; all shaft holes need bumping up in the FDM tolerance pass.
 
 ---
 
@@ -64,6 +76,13 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 ---
 
 ## Journal
+
+### 2026-07-07
+- Coupon v2 measured: shaft free slip ≈ 5.8, M3 pilot 3.1, bearing press 10.3.
+  Confirmed the printer runs small holes ~0.5 mm undersize.
+- Applied the **FDM tolerance pass** to the macro (pilots 3.1, disc bore 5.6,
+  bearing seats 10.3/10.4). Peg/socket + wall-groove clearances estimated — to
+  verify on the first assembly print. Ready to export the real parts.
 
 ### 2026-06-17
 - Printed the calibration coupon (PLA) and measured the **bearing row**: 10.3 is a
