@@ -197,7 +197,9 @@ sg90_m2_r      =  1.1  # mm — M2 hole radius in ear (clearance for M2 bolt)
 #             wide enough for the bracket head (25 mm) to pass during assembly.
 m3_nut_af     = 5.7   # mm — M3 hex nut AF with print clearance (5.5 mm + 0.2)
 m3_nut_thick  = 2.6   # mm — nut trap depth (2.4 mm nut + 0.2 mm clearance)
-m3_screw_r    = 1.6   # mm — M3 clearance hole radius (Ø3.2 mm)
+m3_screw_r    = 1.9   # mm — M3 clearance hole radius; FDM-bumped to Ø3.8 so it
+                      #      prints ~Ø3.3 (screw passes FREELY — taps only the post,
+                      #      not the wall/foot/plate it passes through)
 foot_screw_pa = 19.0  # mm — screw centre offset in pa direction (±pa)
                       #      wide enough so side bars clear the bracket head (±12.5 mm) during assembly
 foot_screw_z  = 9.0   # mm — screw centre Z offset (±Z, clear of blades at Z≈0 ±0.75)

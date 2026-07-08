@@ -78,6 +78,10 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 ## Journal
 
 ### 2026-07-07
+- Printed the wall (PLA) — spotted that the M3 **clearance** holes were missed in
+  the FDM pass: modelled Ø3.2 → printed ~2.7 → the screw taps the wall instead of
+  passing through. Bumped `m3_screw_r` 1.6 → 1.9 (Ø3.8 → ~3.3 free). Already-printed
+  wall: drill out to ~3.3 or use as-is. Fix applies to wall/foot/top-plate M3 holes.
 - Coupon v2 measured: shaft free slip ≈ 5.8, M3 pilot 3.1, bearing press 10.3.
   Confirmed the printer runs small holes ~0.5 mm undersize.
 - Applied the **FDM tolerance pass** to the macro (pilots 3.1, disc bore 5.6,
