@@ -721,15 +721,18 @@ def make_corner_posts(z0, z1, mate):
             y_lo = min(sy * cube_out, sy * cube_out - sy * col_w)
             post = Part.makeBox(col_w, col_w, h, v(x_lo, y_lo, z0))
 
-            # Grooves for the two adjacent wall edges
+            # Grooves for the two adjacent wall edges. The groove's INNER wall sits
+            # exactly at cube_half so it lines up with the base/top backing rib
+            # (make_wall_ribs) — no step where they meet — and the fit clearance
+            # goes on the OUTER side. Symmetric for ±sx/±sy.
             gx_lo = min(sx * (cube_out - col_w), sx * wall_half)
+            gy0   = min(sy * cube_half, sy * (cube_out + fdm_slot_clr))
             post = post.cut(Part.makeBox(col_groove_d + 0.2, wall_thick + fdm_slot_clr, h + 2,
-                                         v(gx_lo - 0.1,
-                                           min(sy * cube_half, sy * cube_out) - 0.1, z0 - 1)))
+                                         v(gx_lo - 0.1, gy0, z0 - 1)))
             gy_lo = min(sy * (cube_out - col_w), sy * wall_half)
+            gx0   = min(sx * cube_half, sx * (cube_out + fdm_slot_clr))
             post = post.cut(Part.makeBox(wall_thick + fdm_slot_clr, col_groove_d + 0.2, h + 2,
-                                         v(min(sx * cube_half, sx * cube_out) - 0.1,
-                                           gy_lo - 0.1, z0 - 1)))
+                                         v(gx0, gy_lo - 0.1, z0 - 1)))
 
             # Wall self-tap pilots (Y-wall from the y-face, X-wall from the x-face)
             post = post.cut(cyl(col_pilot_d / 2, col_pilot_h,

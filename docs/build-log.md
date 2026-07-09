@@ -78,6 +78,13 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 ## Journal
 
 ### 2026-07-07
+- Printed frame base + top: spotted a **step** where the wall rests — the column
+  groove's inner wall didn't line up with the base/top backing rib, and it varied
+  per face. Root cause: the groove was positioned asymmetrically for ±sx/±sy
+  (0.1 mm on +, ~0.7 mm on −). Fixed: groove inner wall now sits exactly at
+  cube_half (= rib plane) on all four faces, clearance moved to the outer side.
+  Already-printed frame has the step — usable for the test; reprint later for a
+  clean assembly.
 - Printed the wall (PLA) — spotted that the M3 **clearance** holes were missed in
   the FDM pass: modelled Ø3.2 → printed ~2.7 → the screw taps the wall instead of
   passing through. Bumped `m3_screw_r` 1.6 → 1.9 (Ø3.8 → ~3.3 free). Already-printed
