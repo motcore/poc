@@ -1418,6 +1418,16 @@ if EXPORT_STL:
         return path
 
     _yax = v(0, 1, 0)
+
+    # Motor disc split at its mid-plane (z=0) → two halves that each print plate
+    # DOWN, spool up, with NO overhang/supports (so the contact faces stay smooth).
+    # Rejoined on the shaft: the two hubs clamp each half to it (glue the spool
+    # joint for extra rigidity). Both halves are oriented plate-down here.
+    _disc = make_motor_disc()
+    _disc_bot = _disc.cut(Part.makeBox(300, 300, 300, v(-150, -150, 0)))       # keep z<0
+    _disc_top = _disc.cut(Part.makeBox(300, 300, 300, v(-150, -150, -300)))    # keep z>0
+    _disc_top.rotate(v(0, 0, 0), v(1, 0, 0), 180)                             # flip → plate down
+
     printed_parts = [
         # filename                 shape                       qty  notes
         ("motcore_wall",         make_cube_wall(_yax),        4, "lay the outer face flat on the bed"),
@@ -1425,7 +1435,8 @@ if EXPORT_STL:
         ("motcore_output_wheel", make_output_wheel(_yax),     4, "flat, O-ring groove up"),
         ("motcore_frame_base",   make_frame(ALL_AXES),        1, "plate on the bed, posts up"),
         ("motcore_top_plate",    make_top_plate(),            1, "plate on the bed, half-posts up"),
-        ("motcore_motor_disc",   make_motor_disc(),           1, "a plate face on the bed"),
+        ("motcore_motor_disc_bot", _disc_bot,                 1, "plate DOWN, spool up — no supports"),
+        ("motcore_motor_disc_top", _disc_top,                 1, "plate DOWN, spool up — no supports"),
         ("motcore_shaft_collar", make_shaft_collar(0, motor_shaft_d, collar_w),
                                                               2, "relieved face toward the bearing; M3 grub screw"),
     ]
