@@ -81,7 +81,7 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 |---|-------|------|------|
 | 1 | O-ring loose in the wheel groove (wobbles) | model | ✅ stretch 1%→3% + dovetail groove |
 | 2 | O-ring slips (rotates) in its groove — needs grip | model | ✅ **dovetail groove** (revolved trapezoid, bottom 3.25 > opening 2.62) keys the O-ring; verify the revolve + ~16° undercut print in FreeCAD; glue for the current printed wheel |
-| 3 | Flexure blade roots need progressive material (fillets) on both sides | model | ✅ tilt blades: 45° gussets both ends + both faces. Engagement-spring root fillet still pending (highest-stress flexure) |
+| 3 | Flexure blade roots need progressive material (fillets) on both sides | model | ✅ tilt blades (45° gussets both ends + both faces) + engagement-spring head root (45° gusset both Y faces, r=2.5 — small vs 28 mm free length to stay within the creep budget) |
 | 3b | Head bearing easier to install from the wheel side | model | ✅ head bearing seat now opens toward the wheel (head_y0) instead of the wall side |
 | 4 | Bracket supports clogged the holes | print | tree supports / support blockers on holes / reorient; drill out for now |
 | 5 | Ø5 aluminium rod won't enter the bearing | hardware | file/sand to fit; consider **mild steel SMOOTH** rod (NOT threaded — a threaded rod rides on its thread tips in a bearing) |

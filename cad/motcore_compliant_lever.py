@@ -859,6 +859,26 @@ def make_shaft_bracket(axis):
         eng_blade_w, eng_blade_t, eng_blade_l - eng_overlap,
         v(-eng_blade_w / 2, head_y1 - eng_blade_t, z_yz_top)
     )
+    # Root fillets — the engagement spring carries the SUSTAINED latch load, so its
+    # head junction (top, max bending moment) is the highest-stress flexure anchor.
+    # A 45° gusset on BOTH Y faces (the spring bends ±Y, so both go into tension):
+    #   · back face  (y_back): fills the re-entrant notch under the head
+    #   · front face (y_front): blends the thin blade into the flush head face
+    # Kept small (2.5 mm on a 28 mm free length) so it relieves the stress
+    # concentration without materially stiffening the spring (creep budget).
+    eng_fr = 2.5
+    y_front = head_y1
+    y_back  = head_y1 - eng_blade_t
+    z_root  = -head_z_half
+    def _eng_gusset(y_root, y_dir):
+        a = v(-eng_blade_w / 2, y_root,               z_root)
+        b = v(-eng_blade_w / 2, y_root,               z_root - eng_fr)
+        c = v(-eng_blade_w / 2, y_root + y_dir * eng_fr, z_root)
+        return Part.Face(Part.Wire([Part.makeLine(a, b),
+                                    Part.makeLine(b, c),
+                                    Part.makeLine(c, a)])).extrude(v(eng_blade_w, 0, 0))
+    eng_xz = eng_xz.fuse(_eng_gusset(y_back,  -1.0))   # back — fills the notch
+    eng_xz = eng_xz.fuse(_eng_gusset(y_front, +1.0))   # front — smooths the step
     # YZ arm — starts eng_overlap mm above spring bottom, runs to near base plate
     # Centred on the XZ arm mid-plane: y_centre = head_y1 - eng_blade_t/2
     y_ctr  = head_y1 - eng_blade_t / 2                 # Y centre of cross section
