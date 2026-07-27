@@ -141,6 +141,8 @@ brg_fit_press = 0.15  # mm — radial add to a bearing seat for a PRESS fit (→
 brg_fit_slip  = 0.20  # mm — radial add for a SLIP / floating seat (→ Ø10.4)
 fdm_slot_clr  = 0.8   # mm — width clearance for a printed edge in a printed slot
 fdm_peg_clr   = 0.5   # mm — radial clearance for a printed peg in a printed socket
+servo_spline_d = 5.2  # mm — press-fit bore for the MG90 output spline (CALIBRATE:
+                      #      must be a firm press onto the spline; FDM prints small)
 post_w        = 10.0  # mm   — post width  in pa direction (along trunnion hole)
 post_d        =  5.0  # mm   — post depth in axis direction (thin face)
 post_side_gap = 1.5   # mm   — clearance between blade outer edge and post
@@ -788,16 +790,17 @@ def make_shaft_bracket(axis):
     blade_len = cube_half - head_y1
 
     # Head block with a ball-bearing seat.
-    # Bearing slides in from the wall side (head_y1) and seats against a shoulder;
-    # the shaft passes through the Ø(shaft+clr) front lip toward the wheel.
+    # Bearing slides in from the WHEEL side (head_y0) — the accessible outer face —
+    # and seats against a shoulder; the shaft passes through the Ø(shaft+clr) lip
+    # toward the wall/UJ. (Easier to install than seating from the wall side.)
     head = Part.makeBox(2 * bw_half, head_depth, 2 * head_z_half,
                         v(-bw_half, head_y0, -head_z_half))
     # shaft clearance through the whole head
     head = head.cut(cyl(shaft_dia / 2 + 0.4, head_depth + 2,
                         v(0, head_y0 - 1, 0), v(0, 1, 0)))
-    # bearing pocket from the wall-side face inward (press/slip fit)
+    # bearing pocket from the WHEEL-side face inward (press/slip fit)
     head = head.cut(cyl(brg_od / 2 + brg_fit_slip, brg_w + 0.3,
-                        v(0, head_y1 - brg_w, 0), v(0, 1, 0)))
+                        v(0, head_y0 - 0.3, 0), v(0, 1, 0)))
 
     # Right blade (+pa side): lies flat at z=0, thin in Z, wide in pa
     blade_r = Part.makeBox(blade_w_g, blade_len, blade_t,
@@ -805,6 +808,22 @@ def make_shaft_bracket(axis):
     # Left blade (-pa side)
     blade_l = Part.makeBox(blade_w_g, blade_len, blade_t,
                            v(-(blade_gap / 2 + blade_w_g),  head_y1, -blade_t / 2))
+
+    # Root fillets: a 45° gusset at BOTH ends (head + foot) and BOTH faces (top +
+    # bottom) of each tilt blade → progressive material at the anchors so the peak
+    # bending stress isn't a sharp step (fatigue/crack relief).
+    fillet_r = 2.5
+    def _gusset(x0, y_root, y_dir, z_face, z_sign):
+        p1 = v(x0, y_root, z_face)
+        p2 = v(x0, y_root + y_dir * fillet_r, z_face)
+        p3 = v(x0, y_root, z_face + z_sign * fillet_r)
+        return Part.Face(Part.Wire([Part.makeLine(p1, p2),
+                                    Part.makeLine(p2, p3),
+                                    Part.makeLine(p3, p1)])).extrude(v(blade_w_g, 0, 0))
+    for _x0 in (blade_gap / 2, -(blade_gap / 2 + blade_w_g)):
+        for _zf, _zs in ((blade_t / 2, 1), (-blade_t / 2, -1)):
+            blade_r = blade_r.fuse(_gusset(_x0, head_y1,   +1.0, _zf, _zs))   # head end
+            blade_r = blade_r.fuse(_gusset(_x0, cube_half, -1.0, _zf, _zs))   # foot end
 
     # Engagement lever blade — two independent sections:
     #
@@ -1226,6 +1245,31 @@ def make_sg90_ref(axis):
     return shape
 
 
+def make_servo_arm():
+    """Printable servo-horn adapter (prints flat, hub face on the bed).
+    Presses onto the MG90 output spline (servo_spline_d — calibrate to a firm
+    press) and carries the drive pin at radius sg90_arm_r. The pin is an M2 screw
+    (self-taps into the Ø2.2 hole) whose shank rides in the engagement-blade slot
+    — metal, because the pin sees ~14 N. Central hole for the servo's own retaining
+    screw.
+    """
+    hub_od = 9.0
+    hub_t  = 5.0                      # spline engagement depth
+    arm_w  = 5.0
+    arm_t  = 3.5                      # arm thickness (pin length available)
+
+    hub = cyl(hub_od / 2, hub_t, v(0, 0, 0))
+    hub = hub.cut(cyl(servo_spline_d / 2, hub_t - 1.0, v(0, 0, -0.01)))  # blind spline bore
+    hub = hub.cut(cyl(1.2, hub_t + 2, v(0, 0, -1)))                      # M2 centre screw through
+
+    arm = Part.makeBox(sg90_arm_r + arm_w / 2, arm_w, arm_t, v(0, -arm_w / 2, 0))
+    part = hub.fuse(arm)
+
+    # Drive-pin hole (M2 self-tap) at r = sg90_arm_r, through the arm
+    part = part.cut(cyl(1.1, arm_t + 2, v(sg90_arm_r, 0, -1)))
+    return part
+
+
 # ═══════════════════════════════════════════════════════════════════
 # BUILD DOCUMENT
 # ═══════════════════════════════════════════════════════════════════
@@ -1442,6 +1486,7 @@ if EXPORT_STL:
         ("motcore_motor_disc_top", _disc_top,                 1, "plate DOWN, spool up — no supports"),
         ("motcore_shaft_collar", make_shaft_collar(0, motor_shaft_d, collar_w),
                                                               2, "relieved face toward the bearing; M3 grub screw"),
+        ("motcore_servo_arm",    make_servo_arm(),            4, "hub on bed; press on servo spline, M2 drive pin"),
     ]
 
     print("-" * 60)

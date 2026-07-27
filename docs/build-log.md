@@ -75,6 +75,19 @@ these offsets get set in `cad/motcore_compliant_lever.py`.
 
 ---
 
+## Backlog — issues found on the first PLA build (2026-07-07)
+
+| # | Issue | Type | Plan |
+|---|-------|------|------|
+| 1 | O-ring loose in the wheel groove (wobbles) | model | more seat stretch / tighter groove |
+| 2 | O-ring slips against the plastic — needs much more grip | model | **dovetail groove** to trap+grip the O-ring (+ glue); if it's disc μ, grippier surface (silicone O-ring / textured disc) — clarify |
+| 3 | Flexure blade roots need progressive material (fillets) on both sides | model | ✅ tilt blades: 45° gussets both ends + both faces. Engagement-spring root fillet still pending (highest-stress flexure) |
+| 3b | Head bearing easier to install from the wheel side | model | ✅ head bearing seat now opens toward the wheel (head_y0) instead of the wall side |
+| 4 | Bracket supports clogged the holes | print | tree supports / support blockers on holes / reorient; drill out for now |
+| 5 | Ø5 aluminium rod won't enter the bearing | hardware | file/sand to fit; consider **mild steel SMOOTH** rod (NOT threaded — a threaded rod rides on its thread tips in a bearing) |
+| 6 | Bearing too loose in the frame-base boss | model | the tall boss prints looser than the flat coupon → tighten the plate-boss bearing fit (per-feature) |
+| 7 | Wall internal overhangs (foot pocket / bracket seating faces) rough — printed without support | print/model | support there, or chamfer those overhangs < 45° so they print clean |
+
 ## Journal
 
 ### 2026-07-07
