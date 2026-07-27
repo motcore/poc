@@ -34,8 +34,8 @@ B             = 35.0  # mm   — UJ pivot → output wheel centre (along shaft)
 R             = 20.0  # mm   — contact radius (O-ring outer edge = motor disc rim)
 dw            = 2.5   # mm   — O-ring wire diameter (cross-section CS)
 oring_id      = 25.0  # mm   — O-ring inner diameter (ID) of the part you buy
-oring_stretch = 0.01  # —    — seat stretch on the groove so the O-ring grips and
-                      #        doesn't slip circumferentially under drive shear
+oring_stretch = 0.03  # —    — seat stretch on the groove (raised: more radial grip
+                      #        so the O-ring doesn't slip in its groove under drive)
 
 wall_thick    = 4.0   # mm   — cube wall thickness
 shaft_dia     = 5.0   # mm   — output shaft diameter
@@ -465,12 +465,22 @@ def make_output_wheel(axis):
     # Through bore for the hub neck (clearance over Ø hub_od)
     bore  = cyl(hub_od / 2 + 0.1, WT + 2, base - axis, axis)
 
-    # O-ring groove: width = 1.2·dw, depth = 0.6·dw, centred on wheel face
-    gw    = dw * 1.2
-    gb    = wc - av(axis, gw / 2)       # groove start
-    g_out = cyl(Rw + 0.1, gw, gb, axis)
-    g_in  = cyl(groove_bottom_r, gw + 2, gb - axis, axis)   # bottom = O-ring seat
-    groove = g_out.cut(g_in)
+    # O-ring groove — DOVETAIL (wider at the bottom than at the rim opening) so the
+    # O-ring is mechanically keyed and can't roll/slip in the groove under drive
+    # shear. Built as a revolved trapezoid about the wheel axis.
+    gw_bottom = dw * 1.30              # axial width at the groove bottom (wide)
+    gw_open   = dw * 1.05              # axial width at the rim opening (narrow = key)
+    uz = v(0, 0, 1)                    # radial reference (⊥ to the horizontal axis)
+
+    def _gp(r, s):                     # profile point: r radial (along Z), s axial
+        return v(wc.x + r * uz.x + s * axis.x,
+                 wc.y + r * uz.y + s * axis.y,
+                 wc.z + r * uz.z + s * axis.z)
+
+    _pts = [_gp(groove_bottom_r, -gw_bottom / 2), _gp(groove_bottom_r, gw_bottom / 2),
+            _gp(Rw + 0.3, gw_open / 2), _gp(Rw + 0.3, -gw_open / 2)]
+    _wire = Part.Wire([Part.makeLine(_pts[i], _pts[(i + 1) % 4]) for i in range(4)])
+    groove = Part.Face(_wire).revolve(wc, axis, 360)
 
     wheel = disc.cut(bore).cut(groove)
 
