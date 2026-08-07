@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motcore v5 — Vertical Cone Clutch Cross-Section</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Arial, sans-serif; padding: 16px; }
+  h1 { font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 14px; letter-spacing: 0.04em; }
+  #wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  canvas { background: #111827; border-radius: 8px; flex-shrink: 0; }
+  #panel { display: flex; flex-direction: column; gap: 8px; min-width: 250px; max-width: 280px; }
+  .sp { background: #1f2937; border-radius: 6px; padding: 8px 11px; }
+  .sp label { display: block; color: #9ca3af; font-size: 11px; margin-bottom: 3px; }
+  .sp .lbl-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .sp .param-name { font-size: 13px; font-weight: 700; }
+  .sp .param-val  { font-size: 13px; font-weight: 700; }
+  input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #60a5fa; }
+  input[type=range].pos-range { accent-color: #a78bfa; }
+  #derived { background: #1f2937; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #9ca3af; line-height: 1.85; }
+  #derived b { color: #e5e7eb; }
+  #derived .hd { color: #64748b; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin: 6px 0 2px; }
+  #alerts { display: flex; flex-direction: column; gap: 4px; }
+  .alert-line { font-size: 11px; font-weight: 700; line-height: 1.5; }
+  .ok  { color: #34d399; }
+  .bad { color: #f87171; }
+  .warn{ color: #fbbf24; }
+  #controls { background: #1f2937; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  #controls label { font-size: 11px; color: #9ca3af; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  button { background: #2d3748; border: 1px solid #4a5568; color: #e2e8f0; border-radius: 5px;
+           padding: 7px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #3d4f68; }
+  button.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+  .posbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .posbtns button { padding: 6px 4px; font-size: 11px; }
+  footer { margin-top: 12px; font-size: 10px; color: #4b5563; line-height: 1.7; max-width: 900px; }
+</style>
+</head>
+<body>
+<h1>Motcore v5 — Vertical Cone Clutch (Y-Z cross-section)</h1>
+<div id="wrap">
+  <canvas id="cvs" width="660" height="560"></canvas>
+
+  <div id="panel">
+    <div id="controls">
+      <div class="posbtns">
+        <button id="b0">1 · Free</button>
+        <button id="b1">2 · Mesh</button>
+        <button id="b2">3 · Contact</button>
+        <button id="b3">4 · Preload</button>
+      </div>
+      <input type="range" class="pos-range" id="slPos" min="0" max="1" step="0.002" value="0">
+      <label><input type="checkbox" id="ckRings" checked> show rubber rings</label>
+      <label><input type="checkbox" id="ckApex" checked> show apex / generatrix</label>
+      <button id="btnAnim">Animate stroke</button>
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#facc15">&alpha;</span>
+        <span class="param-val" style="color:#facc15" id="vAl">55&deg;</span></div>
+      <label>motor cone half-angle (output = 90&minus;&alpha;)</label>
+      <input type="range" id="slAl" min="35" max="70" step="0.5" value="55">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#34d399">s&#8320;</span>
+        <span class="param-val" style="color:#34d399" id="vS0">10 mm</span></div>
+      <label>apex &rarr; start of contact line</label>
+      <input type="range" id="slS0" min="4" max="30" step="0.5" value="10">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#34d399">L</span>
+        <span class="param-val" style="color:#34d399" id="vL">18 mm</span></div>
+      <label>contact line length</label>
+      <input type="range" id="slL" min="6" max="40" step="0.5" value="18">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#f472b6">d</span>
+        <span class="param-val" style="color:#f472b6" id="vDw">2.5 mm</span></div>
+      <label>O-ring wire diameter</label>
+      <input type="range" id="slDw" min="1" max="5" step="0.25" value="2.5">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#f472b6">n</span>
+        <span class="param-val" style="color:#f472b6" id="vN">5</span></div>
+      <label>rings on motor cone (output carries n&minus;1)</label>
+      <input type="range" id="slN" min="2" max="8" step="1" value="5">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#60a5fa">m</span>
+        <span class="param-val" style="color:#60a5fa" id="vM">1.0</span></div>
+      <label>gear module</label>
+      <input type="range" id="slM" min="0.6" max="1.6" step="0.1" value="1">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#60a5fa">Z<sub>p</sub> / Z<sub>c</sub></span>
+        <span class="param-val" style="color:#60a5fa" id="vZ">14 / 28</span></div>
+      <label>pinion teeth (carriage)</label>
+      <input type="range" id="slZp" min="8" max="22" step="1" value="14">
+      <label style="margin-top:5px">corona teeth (output shaft)</label>
+      <input type="range" id="slZc" min="18" max="46" step="1" value="28">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#fb923c">g</span>
+        <span class="param-val" style="color:#fb923c" id="vG">0.20 mm</span></div>
+      <label>margin: full mesh &rarr; rubber contact</label>
+      <input type="range" id="slG" min="0" max="0.6" step="0.05" value="0.2">
+    </div>
+
+    <div class="sp">
+      <div class="lbl-row"><span class="param-name" style="color:#fb923c">&delta;</span>
+        <span class="param-val" style="color:#fb923c" id="vD">0.25 mm</span></div>
+      <label>preload travel past contact</label>
+      <input type="range" id="slD" min="0.05" max="0.8" step="0.05" value="0.25">
+    </div>
+
+    <div id="derived"></div>
+    <div id="alerts"></div>
+  </div>
+</div>
+
+<footer>
+Cross-section in the vertical plane containing the motor axis (Z) and the output shaft axis (Y).
+The output cone rides a carriage that translates vertically; the pinion is rigid to the cone and lives
+permanently inside the corona, so it is captive and cannot fall out. Free = pinion concentric with the
+corona (centre distance 0, output shaft carries nothing). Descending the carriage drives the pinion
+toward the corona teeth, then brings the interleaved rubber rings into flank-to-flank contact, then
+preloads them. Preload travel is absorbed by the gear's own root clearance (0.25&middot;m) &mdash; no slot,
+no floating ring.
+</footer>
+
+<script>
+const cvs = document.getElementById('cvs');
+const ctx = cvs.getContext('2d');
+
+const S = { al:55, s0:10, L:18, dw:2.5, n:5, m:1, Zp:14, Zc:28, g:0.2, d:0.25, pos:0 };
+let showRings = true, showApex = true, anim = false, animT = 0, animDir = 1;
+
+const D2R = Math.PI/180;
+
+// ---- geometry -------------------------------------------------------------
+function geom() {
+  const al = S.al * D2R;              // motor cone half-angle from vertical axis
+  const ao = Math.PI/2 - al;          // output cone half-angle from its own (horizontal) axis
+  const sa = Math.sin(al), ca = Math.cos(al);
+
+  // friction ratio is independent of position along the contact line
+  const ratioFric = Math.sin(al) / Math.sin(ao);
+  const ratioGear = S.Zp / S.Zc;                  // internal mesh: shaft slower than cone
+  const ratioTot  = ratioFric * ratioGear;
+
+  const e  = S.m * (S.Zc - S.Zp) / 2;             // mesh centre distance
+  const cl = 0.25 * S.m;                          // standard root clearance
+  const rPitchP = S.m * S.Zp / 2,  rTipP  = rPitchP + S.m;
+  const rPitchC = S.m * S.Zc / 2,  rTipC  = rPitchC - S.m;
+  const freeRadial = rTipC - rTipP;               // = e - 2m : float before first tooth touch
+  const meshTravel = 2 * S.m;                     // first touch -> correct centre distance
+
+  // ring layout along the contact line
+  const nM = S.n, nO = S.n - 1, N = nM + nO;
+  const q  = N > 1 ? S.L / (N - 1) : S.L;         // along-line spacing between alternating rings
+  const canTouch = q < S.dw;
+  const h = canTouch ? Math.sqrt(S.dw*S.dw - q*q) : 0;   // normal offset between generatrices at contact
+  const apexSep = h / sa;                          // vertical separation of the two apexes
+  const slip = apexSep / S.L;
+
+  // cone radii at the outer end of the contact line
+  const Rm = (S.s0 + S.L) * Math.sin(al);
+  const Ro = (S.s0 + S.L) * Math.sin(ao);
+
+  // vertical ladder (Z of the output-cone axis; contact = 0, down is negative)
+  const zFree = S.g + e, zMesh = S.g, zContact = 0, zPreload = -S.d;
+  const zShaft = S.g + e;                          // fixed output shaft axis (concentric at free)
+  const stroke = zFree - zPreload;
+
+  return { al, ao, sa, ca, ratioFric, ratioGear, ratioTot, e, cl, rPitchP, rTipP,
+           rPitchC, rTipC, freeRadial, meshTravel, nM, nO, q, canTouch, h, apexSep,
+           slip, Rm, Ro, zFree, zMesh, zContact, zPreload, zShaft, stroke };
+}
+
+// current output-cone axis height, interpolated across the 4 stops
+function coneZ(g) {
+  const stops = [g.zFree, g.zMesh, g.zContact, g.zPreload];
+  const t = S.pos * 3, i = Math.min(2, Math.floor(t)), f = t - i;
+  return stops[i] + (stops[i+1] - stops[i]) * f;
+}
+
+// ---- drawing --------------------------------------------------------------
+const OX = 210, OY = 250;
+function sc(g) { return Math.min(7.5, 260 / Math.max(18, S.s0 + S.L)); }
+function X(g, y) { return OX + y * sc(g); }
+function Y(g, z) { return OY - z * sc(g); }
+
+function line(x1,y1,x2,y2,col,w,dash) {
+  ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=w||1;
+  if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+}
+function txt(s,x,y,col,size,align) {
+  ctx.save(); ctx.fillStyle=col; ctx.font=(size||11)+'px Segoe UI, Arial';
+  ctx.textAlign=align||'left'; ctx.fillText(s,x,y); ctx.restore();
+}
+
+function draw() {
+  const g = geom(), k = sc(g), cz = coneZ(g);
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  ctx.fillStyle = '#111827'; ctx.fillRect(0,0,cvs.width,cvs.height);
+
+  const uOut = (S.s0 + S.L) * g.sa;   // axial extent of cone along Y
+
+  // wall on the right
+  const wallY = uOut + Math.max(g.rPitchC, g.Ro) + 6;
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(X(g, wallY), 20, 26, cvs.height - 60);
+  txt('wall', X(g, wallY) + 4, 36, '#475569', 10);
+
+  // motor axis
+  line(X(g,0), 20, X(g,0), cvs.height-40, '#334155', 1, [4,4]);
+  txt('motor axis (Z)', X(g,0)+4, cvs.height-26, '#475569', 10);
+
+  // ---- motor cone (fixed). Apex sits apexSep below the contact reference.
+  const zApexM = -g.apexSep;
+  const mp = s => ({ y: s*g.sa, z: zApexM - s*g.ca });
+  const a1 = mp(S.s0), a2 = mp(S.s0 + S.L);
+  ctx.save();
+  ctx.fillStyle = 'rgba(96,165,250,0.13)'; ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(X(g,-a1.y), Y(g,a1.z)); ctx.lineTo(X(g,a1.y), Y(g,a1.z));
+  ctx.lineTo(X(g,a2.y), Y(g,a2.z));  ctx.lineTo(X(g,-a2.y), Y(g,a2.z));
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // motor shaft stub
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(X(g,-2.5), Y(g,a2.z), 5*k, cvs.height - 40 - Y(g,a2.z));
+
+  // ---- output cone (moves with carriage)
+  const op = u => ({ y: u, z: cz - u * Math.tan(g.ao) });
+  const u0 = S.s0*g.sa, u1 = (S.s0+S.L)*g.sa;
+  const b1 = op(u0), b2 = op(u1);
+  ctx.save();
+  ctx.fillStyle = 'rgba(52,211,153,0.13)'; ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(X(g,b1.y), Y(g,b1.z));
+  ctx.lineTo(X(g,b2.y), Y(g,b2.z));
+  ctx.lineTo(X(g,b2.y), Y(g, cz + u1*Math.tan(g.ao)));
+  ctx.lineTo(X(g,b1.y), Y(g, cz + u0*Math.tan(g.ao)));
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  line(X(g,0), Y(g,cz), X(g,wallY-2), Y(g,cz), '#34d399', 1, [3,3]);
+  txt('output cone axis', X(g,u1)+6, Y(g,cz)-4, '#34d399', 10);
+
+  // ---- rubber rings
+  if (showRings) {
+    for (let i = 0; i < g.nM; i++) {
+      const s = S.s0 + i * 2 * g.q, p = mp(s);
+      ctx.save(); ctx.fillStyle = 'rgba(244,114,182,0.55)'; ctx.strokeStyle='#f472b6';
+      [-1,1].forEach(sg => {
+        ctx.beginPath(); ctx.arc(X(g, sg*p.y), Y(g,p.z), S.dw/2*k, 0, 7); ctx.fill(); ctx.stroke();
+      });
+      ctx.restore();
+    }
+    for (let i = 0; i < g.nO; i++) {
+      const s = S.s0 + (2*i+1) * g.q, u = s*g.sa;
+      const p = op(u);
+      ctx.save(); ctx.fillStyle = 'rgba(251,146,60,0.55)'; ctx.strokeStyle='#fb923c';
+      ctx.beginPath(); ctx.arc(X(g,p.y), Y(g,p.z), S.dw/2*k, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---- apex / generatrix reference
+  if (showApex) {
+    line(X(g,0), Y(g,zApexM), X(g,(S.s0+S.L)*g.sa*1.05), Y(g, zApexM-(S.s0+S.L)*g.ca*1.05),
+         '#fbbf24', 1, [5,4]);
+    ctx.save(); ctx.fillStyle='#fbbf24';
+    ctx.beginPath(); ctx.arc(X(g,0), Y(g,zApexM), 3, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(g,0), Y(g,cz), 3, 0, 7); ctx.fill(); ctx.restore();
+    txt('apex sep ' + g.apexSep.toFixed(2) + ' mm', X(g,0)+8, Y(g,zApexM)+14, '#fbbf24', 10);
+  }
+
+  // ---- guide rods + carriage
+  const rodY = uOut + 4;
+  line(X(g,rodY), 30, X(g,rodY), cvs.height-50, '#64748b', 3);
+  line(X(g,rodY+5), 30, X(g,rodY+5), cvs.height-50, '#64748b', 3);
+  ctx.save(); ctx.fillStyle='rgba(148,163,184,0.25)'; ctx.strokeStyle='#94a3b8';
+  ctx.fillRect(X(g,rodY-2), Y(g,cz)-9, 9*k*0.9, 18); ctx.strokeRect(X(g,rodY-2), Y(g,cz)-9, 9*k*0.9, 18);
+  ctx.restore();
+  txt('carriage', X(g,rodY-2), Y(g,cz)-14, '#94a3b8', 10);
+
+  // ---- fixed output shaft
+  line(X(g,u1*0.2), Y(g,g.zShaft), X(g,wallY), Y(g,g.zShaft), '#a78bfa', 3);
+  txt('output shaft (fixed)', X(g,u1*0.2)+4, Y(g,g.zShaft)-6, '#a78bfa', 10);
+
+  // ---- vertical ladder of the four stops
+  const lx = 40;
+  const stops = [['1 Free',g.zFree,'#94a3b8'],['2 Mesh',g.zMesh,'#60a5fa'],
+                 ['3 Contact',g.zContact,'#f472b6'],['4 Preload',g.zPreload,'#fb923c']];
+  line(lx, Y(g,g.zFree)-14, lx, Y(g,g.zPreload)+14, '#334155', 1);
+  stops.forEach(([lab,z,col]) => {
+    line(lx-6, Y(g,z), lx+6, Y(g,z), col, 2);
+    txt(lab, lx+10, Y(g,z)+4, col, 10);
+  });
+  ctx.save(); ctx.fillStyle='#e2e8f0';
+  ctx.beginPath(); ctx.arc(lx, Y(g,cz), 4, 0, 7); ctx.fill(); ctx.restore();
+  txt('stroke ' + g.stroke.toFixed(2) + ' mm', lx-14, Y(g,g.zPreload)+30, '#64748b', 10);
+
+  // ---- inset: pinion inside corona (X-Z view, seen along the output axis)
+  const ix = cvs.width - 150, iy = 110, ik = Math.min(3.4, 80 / g.rPitchC);
+  ctx.save();
+  ctx.fillStyle='#0b1220'; ctx.strokeStyle='#1f2937';
+  ctx.fillRect(ix-95, iy-92, 190, 200); ctx.strokeRect(ix-95, iy-92, 190, 200);
+  ctx.strokeStyle='#a78bfa'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(ix, iy, g.rPitchC*ik, 0, 7); ctx.stroke();
+  ctx.strokeStyle='rgba(167,139,250,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(ix, iy, g.rTipC*ik, 0, 7); ctx.stroke();
+  const dNow = g.zShaft - cz;                       // centre distance right now
+  ctx.strokeStyle='#34d399'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(ix, iy + dNow*ik, g.rPitchP*ik, 0, 7); ctx.stroke();
+  ctx.strokeStyle='rgba(52,211,153,0.4)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(ix, iy + dNow*ik, g.rTipP*ik, 0, 7); ctx.stroke();
+  ctx.restore();
+  txt('pinion in corona', ix, iy-76, '#64748b', 10, 'center');
+  txt('centre dist ' + dNow.toFixed(2) + ' / mesh ' + g.e.toFixed(2) + ' mm',
+      ix, iy+98, dNow > g.e + g.cl ? '#f87171' : '#64748b', 10, 'center');
+
+  updatePanel(g, dNow);
+}
+
+// ---- panel ----------------------------------------------------------------
+function updatePanel(g, dNow) {
+  document.getElementById('derived').innerHTML =
+    '<span class="hd">transmission</span>' +
+    'friction (cone): <b>' + g.ratioFric.toFixed(3) + '&times;</b><br>' +
+    'gear (pinion&rarr;corona): <b>' + g.ratioGear.toFixed(3) + '&times;</b><br>' +
+    '<b>total &omega;<sub>out</sub>/&omega;<sub>motor</sub>: ' + g.ratioTot.toFixed(3) + '&times;</b><br>' +
+    'torque multiplier: <b>' + (1/g.ratioTot).toFixed(2) + '&times;</b>' +
+    '<span class="hd">vertical stroke</span>' +
+    'free float (no tooth touch): <b>' + g.freeRadial.toFixed(2) + ' mm</b><br>' +
+    'progressive mesh: <b>' + g.meshTravel.toFixed(2) + ' mm</b><br>' +
+    'margin &rarr; contact: <b>' + S.g.toFixed(2) + ' mm</b><br>' +
+    'preload: <b>' + S.d.toFixed(2) + ' mm</b><br>' +
+    'total: <b>' + g.stroke.toFixed(2) + ' mm</b>' +
+    '<span class="hd">rings &amp; cones</span>' +
+    'ring spacing q: <b>' + g.q.toFixed(2) + ' mm</b> (need &lt; d)<br>' +
+    'apex separation: <b>' + g.apexSep.toFixed(2) + ' mm</b><br>' +
+    'micro-slip &asymp; <b>' + (g.slip*100).toFixed(1) + '%</b><br>' +
+    'R motor / R output: <b>' + g.Rm.toFixed(1) + ' / ' + g.Ro.toFixed(1) + ' mm</b><br>' +
+    'root clearance: <b>' + g.cl.toFixed(2) + ' mm</b>';
+
+  const A = [];
+  if (S.g + S.d > g.cl)
+    A.push(['bad', 'margin + preload (' + (S.g+S.d).toFixed(2) + ') exceeds root clearance ('
+            + g.cl.toFixed(2) + ') — pinion jams into corona']);
+  else A.push(['ok', 'preload absorbed by root clearance']);
+
+  if (!g.canTouch)
+    A.push(['bad', 'ring spacing q=' + g.q.toFixed(2) + ' ≥ d=' + S.dw.toFixed(2)
+            + ' — flanks can never touch; add rings or shorten L']);
+  else A.push(['ok', 'ring flanks interdigitate']);
+
+  if (S.Zc - S.Zp < 8)
+    A.push(['bad', 'Zc − Zp = ' + (S.Zc-S.Zp) + ' < 8 — internal mesh interference']);
+  if (g.freeRadial < 1)
+    A.push(['warn', 'free float only ' + g.freeRadial.toFixed(2) + ' mm — teeth may graze when free']);
+  if (g.ratioTot > 1)
+    A.push(['warn', 'ratio > 1: multiplying speed, losing torque']);
+  else A.push(['ok', 'reduction — torque regenerated at each level']);
+  if (g.slip > 0.03)
+    A.push(['warn', 'micro-slip ' + (g.slip*100).toFixed(1) + '% — rubber wear']);
+
+  document.getElementById('alerts').innerHTML =
+    A.map(([c,t]) => '<div class="alert-line ' + c + '">' + (c==='ok'?'✓ ':'⚠ ') + t + '</div>').join('');
+}
+
+// ---- animation / wiring ---------------------------------------------------
+function bind(id, key, fmt, el) {
+  const s = document.getElementById(id);
+  s.addEventListener('input', () => {
+    S[key] = parseFloat(s.value);
+    if (el) document.getElementById(el).textContent = fmt(S[key]);
+    if (key === 'Zp' || key === 'Zc') document.getElementById('vZ').textContent = S.Zp + ' / ' + S.Zc;
+    draw();
+  });
+}
+bind('slAl','al',v=>v+'\u00B0','vAl');
+bind('slS0','s0',v=>v+' mm','vS0');
+bind('slL','L',v=>v+' mm','vL');
+bind('slDw','dw',v=>v.toFixed(2)+' mm','vDw');
+bind('slN','n',v=>v,'vN');
+bind('slM','m',v=>v.toFixed(1),'vM');
+bind('slZp','Zp',v=>v,null);
+bind('slZc','Zc',v=>v,null);
+bind('slG','g',v=>v.toFixed(2)+' mm','vG');
+bind('slD','d',v=>v.toFixed(2)+' mm','vD');
+
+document.getElementById('slPos').addEventListener('input', e => {
+  S.pos = parseFloat(e.target.value); anim = false;
+  document.getElementById('btnAnim').classList.remove('active'); draw();
+});
+[0,1,2,3].forEach(i => {
+  document.getElementById('b'+i).addEventListener('click', () => {
+    S.pos = i/3; document.getElementById('slPos').value = S.pos;
+    anim = false; document.getElementById('btnAnim').classList.remove('active'); draw();
+  });
+});
+document.getElementById('ckRings').addEventListener('change', e => { showRings = e.target.checked; draw(); });
+document.getElementById('ckApex').addEventListener('change', e => { showApex = e.target.checked; draw(); });
+document.getElementById('btnAnim').addEventListener('click', e => {
+  anim = !anim; e.target.classList.toggle('active', anim); if (anim) loop();
+});
+function loop() {
+  if (!anim) return;
+  animT += 0.006 * animDir;
+  if (animT > 1) { animT = 1; animDir = -1; }
+  if (animT < 0) { animT = 0; animDir = 1; }
+  S.pos = animT; document.getElementById('slPos').value = S.pos;
+  draw(); requestAnimationFrame(loop);
+}
+draw();
+</script>
+</body>
+</html>

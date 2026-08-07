@@ -1,185 +1,312 @@
-# Motcore Bevel Clutch — Geometry & Equations
+# Motcore v5 Clutch — Geometry & Equations
 
-The interactive visualizer is at `cad/clutch_geometry.html`. This document
+The interactive visualiser is at `cad/clutch_geometry_v5.html`. This document
 derives the equations implemented there.
+
+For the four superseded generations that led here, see
+[design-evolution.md](design-evolution.md). The v2 bevel derivation is archived
+at [archive/clutch-geometry-bevel.md](archive/clutch-geometry-bevel.md).
 
 ---
 
 ## 1. Design intent
 
-A single Z-axis motor must drive output shafts along ±X and ±Y. Each output
-shaft has a **bevel cone friction clutch**: a truncated cone mounted on the
-output shaft that, when the shaft is tilted by a servo, makes surface contact
-with the motor cone on the Z shaft and transmits torque by friction.
+A single vertical motor shaft must drive several output shafts, each of which
+feeds the **next hub of an actuator tree**. Three requirements, in order of how
+hard they were to satisfy:
 
-The design goal is **generator-line contact** — both cones share a common apex
-and are tangent along a common generator line.
+1. **Real free rotation.** A disengaged axis must carry *nothing* — not a small
+   residual friction, nothing. An arm has to be able to fall under its own
+   weight. This is what killed every previous generation.
+2. **Reduction at every level.** Torque is consumed going down the tree and has
+   to be regenerated at each stage. Speed is the surplus resource.
+3. **Torque limiting per axis**, settable in software.
+
+v5 answers (1) with geometry rather than friction, (2) with an internal gear
+stage, and (3) with the friction stage it already needed.
 
 ---
 
-## 2. The four free parameters
+## 2. Architecture
 
-```
-A  — engagement angle (degrees): how much the servo tilts the output shaft
-B  — arm length (mm): distance along the output shaft from UJ pivot to the
-     large face of the clutch cone
-C  — clutch cone large-face radius (mm)
-D  — motor cone large-face radius (mm)
-```
-
-All other dimensions are derived from these four.
+- **Motor cone** — on the central vertical shaft (Z), fixed height, rotating
+  continuously.
+- **Output cone** — on a **carriage that translates vertically** on two 3 mm
+  guide rods. No tilt, no pivot, no universal joint. One degree of freedom.
+- **Output shaft** — horizontal, fixed, perpendicular to the motor axis, with
+  the two cone apexes nominally common.
+- **Friction contact** — interleaved rubber O-rings on both cones, meeting
+  flank to flank.
+- **Gear stage** — a pinion rigid to the output cone, permanently inside an
+  internal corona (ring gear) fixed to the output shaft.
 
 ---
 
 ## 3. Coordinate system
 
-The geometry is described in the Y-Z cross-section:
+The geometry is described in the Y-Z cross-section: the vertical plane
+containing both the motor axis and the output shaft axis.
 
 ```
 Z (up)
-│                     ╔═══════╗
-│             apex ●──╢ motor ╟── input shaft at y = L
-│            ╱    └───╚═══════╝
-│           ╱  ← contact edge (red)
-│          ╱ ← clutch cone (tilted A° from horizontal)
-│─────────●──────────────────── Y (horizontal)
-│        UJ pivot (origin)
+│         ┌───┐  ← output cone on the carriage
+│        ╱     ╲    (translates vertically ↕)
+│       │  ○ ○  │ ── output shaft (fixed) + internal corona
+│     ╱ ╲╲     ╱╱
+│    ╱ ○ ┴╲───╱  ← O-rings interleaved, flank to flank
+│   ╱──────╲
+│    motor cone
+└──────────────────────────── Y (horizontal, toward the wall)
+     motor axis at Y = 0
 ```
 
-- **UJ pivot** = world origin (y=0, z=0)
-- **Y** = horizontal, pointing toward the input shaft
-- **Z** = vertical, pointing up (input shaft direction)
-- **Input shaft** sits at a horizontal distance L from the UJ (derived)
+- **Z** = motor shaft, vertical, upward. Motor axis at Y = 0.
+- **Y** = horizontal, from the motor axis toward the wall / output shaft.
+- Carriage height reference: **contact = 0**, downward negative.
+- The output shaft axis is fixed at `z = g + e`, so the pinion is concentric
+  with the corona in position 1.
 
 ---
 
-## 4. Deriving L — the key constraint
-
-When the output shaft is tilted by angle A, the clutch cone large face is at:
+## 4. Free parameters
 
 ```
-lfc_y = B·cos(A)
-lfc_z = B·sin(A)
+α   — motor cone half-angle from the vertical axis (default 55°)
+m   — gear module (default 1.0)
+Zp  — pinion teeth, on the output cone / carriage (default 14)
+Zc  — corona teeth, on the output shaft (default 28)
+L   — contact line length along the generatrix (default 18 mm)
+s₀  — apex → start of the contact line (default 10 mm)
+d   — O-ring wire diameter (default 2.5 mm)
+n   — rings on the motor cone; the output cone carries n − 1 (default 5)
+g   — margin from full mesh to rubber contact (default 0.20 mm)
+δ   — preload travel past contact (default 0.25 mm)
 ```
 
-The perpendicular to the shaft axis (pointing toward the motor) is (−sin A, cos A).
-The contact edge endpoint (where the clutch cone large face meets the motor cone) is:
-
-```
-contact_y = B·cos(A) − C·sin(A)
-contact_z = B·sin(A) + C·cos(A)
-```
-
-For this point to lie on the motor cone large face, which has radius D centred
-on the input shaft at y = L, we need:
-
-```
-contact_y = L − D
-```
-
-Therefore:
-
-```
-L = D + B·cos(A) − C·sin(A)          [Key derived dimension]
-```
-
-L is not a free parameter — it is fully determined by A, B, C, D.
+Everything else is derived.
 
 ---
 
-## 5. Shared apex position
+## 5. Cone angles
 
-The output shaft axis, tilted by A from horizontal, passes through the UJ origin
-with slope tan(A). It meets the input shaft (vertical line at y = L) at:
+The two shaft axes are perpendicular and the apexes are common, so:
 
 ```
-apex_y = L
-apex_z = L · tan(A)                   [Shared apex]
+α_out = 90° − α_motor
 ```
 
-Both cones have their apex at this point.
+At α = 55° the output cone half-angle is 35°.
 
 ---
 
-## 6. Motor cone geometry
+## 6. Transmission ratio
 
-The motor cone's large face is horizontal at height contact_z, centred on the
-input shaft. Its height (from apex to large face) is:
+The friction stage ratio follows from the two cone radii at any point on the
+shared generatrix. Because both radii scale linearly with distance from the
+common apex, the ratio is **independent of position along the contact line** —
+which is exactly why the common apex matters:
 
 ```
-h_motor = contact_z − apex_z
-        = B·sin(A) + C·cos(A) − L·tan(A)
+ratio_fric = sin(α_m) / sin(α_o)
 ```
+
+The gear stage is an internal mesh, pinion driving corona, so it reduces:
+
+```
+ratio_gear = Zp / Zc
+```
+
+```
+ratio_total = ratio_fric · ratio_gear
+```
+
+At defaults: 1.428 × 0.500 = **0.714**, i.e. ω_out = 0.714 · ω_motor and
+**1.40× torque**. `ratio_total > 1` means the design is multiplying speed and
+losing torque — the visualiser flags it.
 
 ---
 
-## 7. Cone half-angles
+## 7. The gear stage and the vertical ladder
+
+The pinion never leaves the corona; only the **centre distance** changes as the
+carriage descends. At mesh:
 
 ```
-dist_apex_lfc = √[(lfc_y − apex_y)² + (lfc_z − apex_z)²]
-
-α_clutch = arctan( C / dist_apex_lfc )
-α_motor  = arctan( D / h_motor )
+e = m · (Zc − Zp) / 2
 ```
+
+Tip radii are `r_tip,p = m·(Zp/2 + 1)` for the pinion and
+`r_tip,c = m·(Zc/2 − 1)` for the corona, so the gap before the first tooth can
+touch anything is:
+
+```
+free float  = r_tip,c − r_tip,p = e − 2m
+mesh travel = 2m
+```
+
+That gives four stops, descending:
+
+| # | Position | z of the output cone axis | State |
+|---|----------|---------------------------|-------|
+| 1 | **Free** | `g + e` | pinion concentric, rings separated, output shaft drives nothing |
+| 2 | **Mesh** | `g` | centre distance `e` reached, rings **still separated**, relative velocity zero → teeth engage without shock |
+| 3 | **Contact** | `0` | rubber flanks touch, normal force zero |
+| 4 | **Preload** | `−δ` | flanks compressed, torque transmitted |
+
+```
+stroke = e + g + δ
+```
+
+At defaults: e = 7.00, free float 5.00, mesh travel 2.00, **stroke 7.45 mm**.
+
+The order of stops 2 and 3 is not negotiable. Teeth must be fully meshed
+*before* the rubber starts turning the output cone, or they clash at speed.
 
 ---
 
-## 8. Bevel condition
+## 8. Preload and root clearance
 
-For generator-line contact, the sum of the two half-angles must equal the angle
-between the shaft axes:
+Past position 3 the carriage keeps descending by δ to compress the rubber
+flanks. The pinion therefore sits δ + g deeper than nominal centre distance,
+and that overshoot has to fit in the gear's own **root clearance**:
 
 ```
-α_clutch + α_motor = 90° − A          [Bevel condition]
+c = 0.25 · m
+
+g + δ ≤ c            [constraint]
 ```
 
-**This is automatically satisfied** by the shared-apex construction — you do not
-need to check or enforce it. Choosing any A, B, C, D and computing L as above
-guarantees the bevel condition holds.
+This is why there is no slot, no floating ring and no compliant blade — the
+gear already has the compliance the preload needs.
+
+> **Open:** at defaults `g + δ = 0.45 mm` against `c = 0.25 mm`. The constraint
+> is currently violated and the visualiser reports it in red. Unresolved.
 
 ---
 
-## 9. Self-locking condition
+## 9. Ring interleaving
 
-With a conical surface, friction has a component along the cone axis. Self-locking
-occurs when the servo cannot disengage the clutch:
+`n` rings sit on the motor generatrix and `n − 1` on the output generatrix,
+offset by half a pitch. Counting both sets, N = 2n − 1 rings share the contact
+line, so the **alternating** spacing is:
 
 ```
-μ ≥ tan(α_clutch)    ← self-locked, cannot disengage
-
-μ < tan(α_clutch)    ← safe, servo can disengage
+q = L / (2n − 2)
 ```
 
-At small A (e.g. 8°), α_clutch is large (~49°), so tan(α_clutch) ≈ 1.1 — well
-above any practical friction coefficient. Self-locking is not a concern at small
-engagement angles.
+For two adjacent rings of wire diameter `d` to touch flank to flank, their
+centres must be closer than `d` measured along the line:
+
+```
+q < d                [constraint]
+```
+
+If `q ≥ d` the flanks never reach each other and no torque passes at all.
+
+When they do touch, the two generatrices are pushed apart by the normal offset:
+
+```
+h = √(d² − q²)
+```
+
+which separates the two apexes along the motor axis by:
+
+```
+apex separation = h / sin(α_m)
+```
+
+and that separation is what breaks the common-apex condition, producing
+**micro-slip** along the contact line:
+
+```
+micro-slip ≈ apex separation / L
+```
+
+At defaults: q = 2.25 mm < d = 2.5 mm ✓, apex separation 1.33 mm,
+micro-slip ≈ 7.4 %.
+
+> **Open — narrow window.** More rings interdigitate better but push the cones
+> further apart:
+>
+> | n | q | flanks touch? | micro-slip |
+> |---|---|---------------|------------|
+> | 3 | 4.50 mm | ✗ (q > d) | — |
+> | 5 | 2.25 mm | ✓ | 7.4 % |
+> | 7 | 1.50 mm | ✓ | 13.6 % |
+>
+> Needs a sweep over `L` and `d`. Catalogue O-rings fix the available `d`, and
+> the resulting pitches then have to land on the generatrix.
 
 ---
 
-## 10. Summary table
+## 10. Internal mesh interference
 
-| Quantity | Formula |
-|----------|---------|
-| L (UJ to input shaft) | D + B·cos(A) − C·sin(A) |
-| Apex position | (L, L·tan(A)) in (y, z) |
-| Contact point | (L−D, B·sin(A)+C·cos(A)) |
-| Motor cone height | B·sin(A) + C·cos(A) − L·tan(A) |
-| α_clutch | arctan(C / dist(apex, lfc)) |
-| α_motor | arctan(D / h_motor) |
-| Bevel condition | α_clutch + α_motor = 90° − A (auto) |
-| Self-locking limit | μ < tan(α_clutch) |
+An internal pinion/ring pair with too small a tooth-count difference fouls on
+assembly and during rotation:
+
+```
+Zc − Zp ≥ 8          [constraint]
+```
+
+At defaults 28 − 14 = 14 ✓.
 
 ---
 
-## 11. Default parameter values
+## 11. Transmitted torque
 
-| Parameter | Value |
-|-----------|-------|
-| A | 8° |
-| B | 35 mm |
-| C | 9 mm |
-| D | 9 mm |
-| L (derived) | ≈ 42.4 mm |
-| apex_z (derived) | ≈ 6.0 mm |
-| h_motor (derived) | ≈ 7.8 mm |
-| α_clutch ≈ α_motor | ≈ 49° |
+Torque is set by the **radial preload between rubber flanks**, with μ ≈ 1.2–1.5
+for rubber on rubber — against 0.6–0.9 for the rubber-on-plastic contact of the
+earlier generations. Because preload is radial and not axial, it is decoupled
+from apex displacement: pushing harder does not require the cones to move into
+each other.
+
+The friction stage is also a **per-axis torque limiter**. It slips above the
+preload-set threshold, the preload is set by carriage position, and carriage
+position is software — so each axis can cap its own slip torque.
+
+---
+
+## 12. Summary of constraints
+
+| # | Constraint | At defaults |
+|---|------------|-------------|
+| 1 | `ratio_total < 1` — reduction, never 1:1 | 0.714 ✓ |
+| 2 | Mesh before rubber contact (`z_mesh > z_contact`) | 0.20 mm ✓ |
+| 3 | `g + δ ≤ 0.25 · m` — root clearance | 0.45 vs 0.25 ✗ **open** |
+| 4 | `q < d` — flanks can touch | 2.25 < 2.5 ✓ |
+| 5 | `Zc − Zp ≥ 8` — internal mesh interference | 14 ✓ |
+| 6 | AS5600 on every output shaft (structural, not optional) | — |
+| 7 | Rubber on rubber only, never rubber on plastic | — |
+
+---
+
+## 13. Default parameter values
+
+| Parameter | Value | | Derived | Value |
+|-----------|-------|-|---------|-------|
+| α | 55° | | friction ratio | 1.428 |
+| m | 1.0 | | gear ratio | 0.500 |
+| Zp / Zc | 14 / 28 | | **total ratio** | **0.714** (1.4× torque) |
+| L | 18 mm | | centre distance `e` | 7.00 mm |
+| s₀ | 10 mm | | free float | 5.00 mm |
+| d | 2.5 mm | | mesh travel | 2.00 mm |
+| n | 5 | | **total stroke** | **7.45 mm** |
+| g | 0.20 mm | | ring pitch `q` | 2.25 mm |
+| δ | 0.25 mm | | apex separation | 1.33 mm |
+| | | | micro-slip | ≈ 7.4 % |
+
+---
+
+## 14. Position feedback is structural
+
+Friction slip accumulates non-repeatably in series along a tree. Commanded
+position is therefore not knowable by dead reckoning — it has to be **measured**
+at every output shaft. An **AS5600** magnetic encoder on each output shaft is
+part of the mechanism, not an optional extra.
+
+Its I2C address is fixed at **0x36**, so multiple encoders require multiplexing:
+analog output, PWM, or a TCA9548A.
+
+Firmware also needs the encoder *before* engaging: re-meshing while the output
+shaft is still turning (an arm falling, say) clashes teeth. A velocity check via
+the AS5600 has to gate the transition into position 2.

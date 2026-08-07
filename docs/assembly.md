@@ -69,8 +69,8 @@ Refer to [Wiring Diagram](wiring.md) for full pinout details.
 
 ## Step 3 — Firmware Upload
 
-1. Upload `software/controller/` to the **master Arduino** (touchscreen + servo control)
-2. Upload `software/driver/` to the **receiver Arduino** (stepper motor control)
+1. Upload `src/controller/` to the **master Arduino** (touchscreen + servo control)
+2. Upload `src/driver/` to the **receiver Arduino** (stepper motor control)
 
 See [Firmware Guide](firmware.md) for details.
 

@@ -26,6 +26,6 @@ SOFTWARE.
 
 This licence covers all software and firmware files in this repository, including:
 
-- Arduino firmware (`software/`)
+- Arduino firmware (`src/`)
 - Scripts and utilities
 - Any other source code files

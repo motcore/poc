@@ -4,6 +4,11 @@ Running journal for a **specific physical build**: purchases, prints, calibratio
 tests and hands-on decisions. Major geometry changes live in git; this is the
 day-to-day record that git doesn't capture. **Newest entries at the top.**
 
+> **Scope note.** Entries below Aug 2026 record the **v4 compliant-lever** build
+> (metal universal joint, engagement blade, over-centre latch), which is
+> superseded — see [design-evolution.md](design-evolution.md). The FDM tolerance
+> and bearing calibrations still apply; the v4 mechanical parts do not.
+
 ---
 
 ## Bill of materials (this prototype)
@@ -27,7 +32,7 @@ Status: ✅ have · 🛒 ordered · ⬜ to buy
 | Threadlocker | Loctite 243 (blue) | 1 | ⬜ | on all set screws |
 | Allen keys | hex key set | 1 | ⬜ | for socket screws |
 | Drive motor | external, spins the central shaft | 1 | ⬜ | drill or DC motor for the test |
-| Servo control | servo tester or Arduino + 5–6 V | 1 | ⬜ | firmware in software/ |
+| Servo control | servo tester or Arduino + 5–6 V | 1 | ⬜ | firmware in src/ |
 
 ---
 

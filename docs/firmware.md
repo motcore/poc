@@ -21,7 +21,7 @@ The control system uses two Arduino Uno boards communicating over serial:
 ## Repository Structure
 
 ```
-software/
+src/
 ├── controller/          # Master Arduino firmware
 │   ├── controller.ino   # Main file
 │   └── ...
@@ -64,11 +64,11 @@ Install the following libraries via Library Manager:
 
 ```bash
 # PlatformIO
-cd software/controller
+cd src/controller
 pio run --target upload
 
 # Arduino IDE
-# Open software/controller/controller.ino
+# Open src/controller/controller.ino
 # Select board: Arduino Uno
 # Select port: COM port of master Arduino
 # Click Upload
@@ -78,11 +78,11 @@ pio run --target upload
 
 ```bash
 # PlatformIO
-cd software/driver
+cd src/driver
 pio run --target upload
 
 # Arduino IDE
-# Open software/driver/driver.ino
+# Open src/driver/driver.ino
 # Select board: Arduino Uno
 # Select port: COM port of receiver Arduino
 # Click Upload

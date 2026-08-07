@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motcore — Design Evolution</title>
+<meta name="description" content="Five generations of the Motcore multi-axis actuator: what each mechanism was, what killed it, and what survived into the next.">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --panel: #1f2937; --panel2: #111827; --ink: #e2e8f0;
+    --dim: #94a3b8; --dim2: #64748b; --line: #334155;
+    --blue: #60a5fa; --green: #34d399; --pink: #f472b6; --orange: #fb923c;
+    --violet: #a78bfa; --yellow: #fbbf24; --red: #f87171;
+  }
+  body { background: var(--bg); color: var(--ink);
+         font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+         line-height: 1.65; padding: 32px 20px 80px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 34px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+             color: var(--dim2); margin-bottom: 10px; }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px; }
+  .lede { color: var(--dim); font-size: 15px; max-width: 66ch; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  nav.top { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  nav.top a { font-size: 12px; color: var(--dim); text-decoration: none;
+              border: 1px solid var(--line); border-radius: 5px; padding: 5px 11px; }
+  nav.top a:hover { color: var(--blue); border-color: var(--blue); }
+
+  /* summary table */
+  table { width: 100%; border-collapse: collapse; margin: 22px 0 40px; font-size: 13px; }
+  th { text-align: left; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--dim2); font-weight: 600; padding: 0 10px 8px 0;
+       border-bottom: 1px solid var(--line); }
+  td { padding: 9px 10px 9px 0; border-bottom: 1px solid #1e293b; color: var(--dim); vertical-align: top; }
+  td a { color: var(--ink); text-decoration: none; font-weight: 600; }
+  td a:hover { color: var(--blue); }
+  .tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+         text-transform: uppercase; padding: 2px 7px; border-radius: 3px; }
+  .tag.dead { background: #2a2130; color: #b98aa8; }
+  .tag.live { background: #10312a; color: var(--green); }
+
+  /* generation blocks */
+  .gen { position: relative; padding: 0 0 8px 28px; margin-bottom: 42px;
+         border-left: 2px solid var(--line); }
+  .gen:last-of-type { border-left-color: var(--green); }
+  .gen::before { content: ''; position: absolute; left: -7px; top: 6px;
+                 width: 12px; height: 12px; border-radius: 50%;
+                 background: var(--bg); border: 2px solid var(--line); }
+  .gen:last-of-type::before { border-color: var(--green); background: var(--green); }
+  .gen h2 { font-size: 19px; font-weight: 600; margin-bottom: 3px; }
+  .gen h2 .num { color: var(--dim2); font-variant-numeric: tabular-nums; margin-right: 8px; }
+  .meta { font-size: 11px; color: var(--dim2); margin-bottom: 16px; font-family: ui-monospace, Consolas, monospace; }
+  .gen p { color: var(--dim); font-size: 14px; margin-bottom: 12px; max-width: 68ch; }
+  .gen p strong, .gen li strong { color: var(--ink); font-weight: 600; }
+  .gen ul { margin: 0 0 12px 18px; color: var(--dim); font-size: 14px; }
+  .gen li { margin-bottom: 5px; }
+
+  figure { background: var(--panel2); border: 1px solid #1e293b; border-radius: 8px;
+           padding: 16px; margin: 0 0 16px; }
+  figure svg { display: block; width: 100%; height: auto; max-width: 420px; margin: 0 auto; }
+  figcaption { font-size: 11px; color: var(--dim2); text-align: center; margin-top: 10px; }
+
+  .callout { border-left: 3px solid var(--red); background: rgba(248,113,113,0.06);
+             padding: 12px 15px; border-radius: 0 6px 6px 0; margin: 0 0 14px; }
+  .callout.win { border-left-color: var(--green); background: rgba(52,211,153,0.06); }
+  .callout.open { border-left-color: var(--yellow); background: rgba(251,191,36,0.06); }
+  .callout .lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+                  font-weight: 700; color: var(--red); display: block; margin-bottom: 4px; }
+  .callout.win .lbl { color: var(--green); }
+  .callout.open .lbl { color: var(--yellow); }
+  .callout p { margin: 0; font-size: 13.5px; }
+  .callout p + p { margin-top: 8px; }
+
+  .params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1px; background: #1e293b; border: 1px solid #1e293b;
+            border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+  .params div { background: var(--panel2); padding: 8px 11px; }
+  .params dt { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: 0.06em; }
+  .params dd { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .params dd.hi { color: var(--green); }
+  .params dd.bad { color: var(--red); }
+
+  .stops { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .stops td { padding: 7px 10px 7px 0; border-bottom: 1px solid #1e293b; }
+  .stops td:first-child { width: 88px; font-weight: 700; }
+
+  h3 { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--dim2); margin: 30px 0 12px; }
+  section.closing { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 8px; }
+  section.closing ul { margin-left: 18px; color: var(--dim); font-size: 14px; }
+  section.closing li { margin-bottom: 7px; }
+  .dead-list li::marker { color: var(--red); }
+  .kept-list li::marker { color: var(--green); }
+
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line);
+           font-size: 12px; color: var(--dim2); }
+  footer a { color: var(--dim); }
+  a.inline { color: var(--blue); text-decoration: none; border-bottom: 1px solid rgba(96,165,250,0.35); }
+  a.inline:hover { border-bottom-color: var(--blue); }
+  @media (max-width: 620px) {
+    body { padding: 22px 14px 60px; } h1 { font-size: 24px; }
+    .gen { padding-left: 20px; } th:nth-child(2), td:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Motcore · open hardware</div>
+  <h1>Design Evolution</h1>
+  <p class="lede">Five generations of the same question: <strong>how does one motor
+  drive many axes independently, cheaply, and with real free rotation?</strong>
+  Each generation was killed by a specific, identifiable failure — not by taste.
+  This page records what each one was, what broke it, and what survived.</p>
+  <nav class="top">
+    <a href="https://github.com/motcore/poc">Repository</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry_v5.html">v5 visualiser</a>
+    <a href="https://github.com/motcore/poc/blob/main/docs/clutch-geometry.md">Geometry &amp; equations</a>
+  </nav>
+</header>
+
+<table>
+  <thead><tr><th>Gen</th><th>When</th><th>Mechanism</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#v1">v1</a></td><td>Mar–May 2026</td><td>LEGO + lateral friction wheels</td><td><span class="tag dead">superseded</span></td></tr>
+    <tr><td><a href="#v2">v2</a></td><td>May 2026</td><td>Bevel cone friction drive, common apex</td><td><span class="tag dead">superseded</span></td></tr>
+    <tr><td><a href="#v3">v3</a></td><td>Jun 2026</td><td>Flat motor disc + O-ring wheel, printed compliant neck</td><td><span class="tag dead">superseded</span></td></tr>
+    <tr><td><a href="#v4">v4</a></td><td>Jun–Jul 2026</td><td>Metal UJ + engagement blade, over-centre latch</td><td><span class="tag dead">superseded</span></td></tr>
+    <tr><td><a href="#v5">v5</a></td><td>Aug 2026</td><td>Vertical conical clutch, interleaved O-rings, captive pinion</td><td><span class="tag live">active</span></td></tr>
+  </tbody>
+</table>
+
+<p class="lede" style="font-size:13px;margin-bottom:38px">The numbering follows
+<strong>design generations</strong>, not files. There is no <code>_v2</code> or
+<code>_v4</code> visualiser — v2 is <code>clutch_geometry.html</code>, and v4 reused
+v3's because its cross-section geometry was unchanged.</p>
+
+
+<!-- ══════════ v1 ══════════ -->
+<article class="gen" id="v1">
+  <h2><span class="num">v1</span>LEGO proof of concept</h2>
+  <div class="meta">lateral friction wheels · ~Mar–May 2026</div>
+
+  <figure>
+    <svg viewBox="0 0 420 150" xmlns="http://www.w3.org/2000/svg">
+      <line x1="210" y1="18" x2="210" y2="132" stroke="#475569" stroke-width="7"/>
+      <text x="210" y="146" fill="#64748b" font-size="10" text-anchor="middle" font-family="Arial">central shaft (rotating)</text>
+      <circle cx="160" cy="62" r="26" fill="rgba(244,114,182,0.15)" stroke="#f472b6" stroke-width="2"/>
+      <circle cx="260" cy="62" r="26" fill="rgba(244,114,182,0.15)" stroke="#f472b6" stroke-width="2"/>
+      <line x1="186" y1="62" x2="205" y2="62" stroke="#fb923c" stroke-width="2" stroke-dasharray="3 3"/>
+      <line x1="215" y1="62" x2="234" y2="62" stroke="#fb923c" stroke-width="2" stroke-dasharray="3 3"/>
+      <text x="160" y="66" fill="#f472b6" font-size="10" text-anchor="middle" font-family="Arial">wheel A</text>
+      <text x="260" y="66" fill="#f472b6" font-size="10" text-anchor="middle" font-family="Arial">wheel B</text>
+      <text x="118" y="30" fill="#64748b" font-size="10" font-family="Arial">servo pushes →</text>
+      <text x="286" y="30" fill="#64748b" font-size="10" font-family="Arial">← servo pushes</text>
+      <text x="210" y="112" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="Arial">side determines direction</text>
+    </svg>
+    <figcaption>One shaft, two contact sides, four axes — direction by choice of side.</figcaption>
+  </figure>
+
+  <p>One 28BYJ-48 stepper turning continuously; four SG90 servos pushing friction
+  wheels against the sides of a central shaft. Output direction depended on which
+  side of the shaft the wheel touched. Frame in LEGO Technic.</p>
+
+  <div class="callout win"><span class="lbl">What it proved</span>
+  <p>Selective friction engagement works as a transmission method, and four axes
+  can be driven independently from one motor. This is the result the whole project
+  rests on.</p></div>
+
+  <div class="callout"><span class="lbl">Why it was superseded</span>
+  <p>LEGO tolerances, no real parameter control, and no way to reason about
+  contact geometry. It was a demonstrator, never a design.</p></div>
+
+  <p><strong>Survived:</strong> the two-Arduino architecture (controller + driver),
+  the touchscreen UI, and the basic BOM.</p>
+</article>
+
+
+<!-- ══════════ v2 ══════════ -->
+<article class="gen" id="v2">
+  <h2><span class="num">v2</span>Bevel cone, common apex</h2>
+  <div class="meta">motcore_plates.py · clutch_geometry.html · May 2026</div>
+
+  <figure>
+    <svg viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg">
+      <line x1="300" y1="14" x2="300" y2="120" stroke="#475569" stroke-width="6"/>
+      <text x="308" y="24" fill="#64748b" font-size="10" font-family="Arial">motor shaft</text>
+      <path d="M300 46 L268 88 L332 88 Z" fill="rgba(96,165,250,0.15)" stroke="#60a5fa" stroke-width="2"/>
+      <path d="M300 46 L196 106 L182 82 Z" fill="rgba(52,211,153,0.15)" stroke="#34d399" stroke-width="2"/>
+      <circle cx="300" cy="46" r="4" fill="#fbbf24"/>
+      <text x="300" y="38" fill="#fbbf24" font-size="10" text-anchor="middle" font-family="Arial">common apex</text>
+      <circle cx="70" cy="120" r="6" fill="none" stroke="#a78bfa" stroke-width="2"/>
+      <text x="70" y="144" fill="#a78bfa" font-size="10" text-anchor="middle" font-family="Arial">UJ pivot</text>
+      <line x1="70" y1="120" x2="196" y2="106" stroke="#34d399" stroke-width="3"/>
+      <line x1="70" y1="120" x2="200" y2="120" stroke="#334155" stroke-width="1" stroke-dasharray="4 4"/>
+      <text x="112" y="136" fill="#fbbf24" font-size="10" font-family="Arial">tilt A = 8° ↑</text>
+      <line x1="252" y1="64" x2="284" y2="72" stroke="#64748b" stroke-width="1"/>
+      <text x="248" y="60" fill="#64748b" font-size="10" text-anchor="end" font-family="Arial">generator-line contact</text>
+    </svg>
+    <figcaption>Two cones sharing an apex, tangent along a common generator line.</figcaption>
+  </figure>
+
+  <p>A truncated cone on each output shaft, tangent along a <strong>common
+  generator line</strong> to a cone on the motor shaft. The output shaft tilted
+  around a UJ pivot near the wall to bring the cones into contact. Both cones
+  shared an apex, so the bevel condition
+  <code>α_clutch + α_motor = 90° − A</code> held automatically for any choice of
+  parameters.</p>
+
+  <div class="params">
+    <div><dt>Tilt A</dt><dd>8°</dd></div>
+    <div><dt>Arm B</dt><dd>35 mm</dd></div>
+    <div><dt>Radii C / D</dt><dd>9 / 9 mm</dd></div>
+    <div><dt>Half-angles</dt><dd>≈ 49°</dd></div>
+  </div>
+
+  <div class="callout win"><span class="lbl">What it fixed</span>
+  <p>Differential slip. Line contact along a common generatrix means every point
+  on the contact line has matched surface speed — a flat wheel on a flat disc
+  does not.</p></div>
+
+  <div class="callout"><span class="lbl">Why it was superseded</span>
+  <p>Holding the common apex through a tilt made every dimension depend on the
+  engagement angle, and plastic-on-plastic contact had too little friction to be
+  useful at achievable normal forces.</p></div>
+
+  <p><strong>Survived:</strong> the common-apex idea itself — still the core of
+  v5, only now the apexes are held by translating a carriage instead of tilting
+  a shaft.</p>
+</article>
+
+
+<!-- ══════════ v3 ══════════ -->
+<article class="gen" id="v3">
+  <h2><span class="num">v3</span>Flat disc + O-ring wheel, compliant flexure</h2>
+  <div class="meta">motcore_v1.py · clutch_geometry_v3.html · Jun 2026</div>
+
+  <figure>
+    <svg viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg">
+      <line x1="300" y1="10" x2="300" y2="160" stroke="#475569" stroke-width="6"/>
+      <rect x="228" y="62" width="144" height="12" fill="rgba(96,165,250,0.18)" stroke="#60a5fa" stroke-width="2"/>
+      <rect x="228" y="102" width="144" height="12" fill="rgba(96,165,250,0.18)" stroke="#60a5fa" stroke-width="2"/>
+      <text x="380" y="60" fill="#60a5fa" font-size="10" text-anchor="end" font-family="Arial">disc: two usable faces</text>
+      <line x1="60" y1="94" x2="232" y2="78" stroke="#34d399" stroke-width="3"/>
+      <circle cx="240" cy="77" r="10" fill="rgba(244,114,182,0.45)" stroke="#f472b6" stroke-width="2"/>
+      <text x="240" y="52" fill="#f472b6" font-size="10" text-anchor="middle" font-family="Arial">O-ring</text>
+      <path d="M60 88 q 8 6 0 12" fill="none" stroke="#fbbf24" stroke-width="2"/>
+      <rect x="42" y="72" width="14" height="44" fill="#1e293b" stroke="#475569"/>
+      <text x="49" y="132" fill="#64748b" font-size="10" text-anchor="middle" font-family="Arial">wall</text>
+      <text x="98" y="122" fill="#fbbf24" font-size="10" font-family="Arial">printed compliant neck ↑</text>
+      <text x="150" y="66" fill="#94a3b8" font-size="10" font-family="Arial">tilt ±A = 3°</text>
+    </svg>
+    <figcaption>Tilt up for one direction, down for the other. Compliance in a printed neck.</figcaption>
+  </figure>
+
+  <p>The motor cone became a <strong>flat horizontal disc</strong> with two
+  usable faces. Each output shaft carried a wheel with a silicone O-ring in a
+  toroidal groove, and tilted ±A to press it against the top face (one direction)
+  or the bottom face (the other). The tilt came from flexure blades printed in
+  one piece with the wall, plus a compliant neck in the printed shaft.</p>
+
+  <div class="params">
+    <div><dt>Tilt A</dt><dd>3°</dd></div>
+    <div><dt>Contact force</dt><dd>4.85 N</dd></div>
+    <div><dt>Output torque</dt><dd>58 N·mm</dd></div>
+    <div><dt>Speed ratio</dt><dd class="bad">1.39×</dd></div>
+  </div>
+
+  <div class="callout win"><span class="lbl">What it fixed</span>
+  <p>Friction. Rubber on plastic (μ ≈ 0.6–0.9) beats cone-on-cone plastic by a
+  wide margin, and one disc with two faces gave both directions from a single
+  motor without reversing it.</p></div>
+
+  <div class="callout"><span class="lbl">Why it was superseded</span>
+  <p>The printed compliant neck was the weak link — it had to be soft enough to
+  tilt and stiff enough to carry output torque, and those two requirements pull
+  in opposite directions. Output torque stayed low, and the design
+  <em>multiplied speed</em> (1.39×) when a tree of actuators needs torque.</p></div>
+
+  <p><strong>Survived:</strong> O-rings as the friction element, and the
+  torque-limiter framing — a slipping clutch protects the drivetrain, and the
+  slip threshold is settable in software.</p>
+</article>
+
+
+<!-- ══════════ v4 ══════════ -->
+<article class="gen" id="v4">
+  <h2><span class="num">v4</span>Metal UJ + engagement blade, over-centre latch</h2>
+  <div class="meta">motcore_compliant_lever.py · Jun–Jul 2026 · the branch that got printed</div>
+
+  <figure>
+    <svg viewBox="0 0 420 170" xmlns="http://www.w3.org/2000/svg">
+      <line x1="316" y1="10" x2="316" y2="160" stroke="#475569" stroke-width="6"/>
+      <rect x="250" y="66" width="132" height="11" fill="rgba(96,165,250,0.18)" stroke="#60a5fa" stroke-width="2"/>
+      <rect x="250" y="100" width="132" height="11" fill="rgba(96,165,250,0.18)" stroke="#60a5fa" stroke-width="2"/>
+      <rect x="52" y="66" width="14" height="52" fill="#1e293b" stroke="#475569"/>
+      <circle cx="59" cy="92" r="9" fill="#334155" stroke="#a78bfa" stroke-width="2"/>
+      <text x="59" y="134" fill="#a78bfa" font-size="10" text-anchor="middle" font-family="Arial">metal UJ</text>
+      <line x1="68" y1="90" x2="248" y2="80" stroke="#94a3b8" stroke-width="4"/>
+      <circle cx="256" cy="80" r="10" fill="rgba(244,114,182,0.45)" stroke="#f472b6" stroke-width="2"/>
+      <path d="M120 60 q 6 14 0 26" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+      <line x1="120" y1="30" x2="120" y2="60" stroke="#fbbf24" stroke-width="3"/>
+      <text x="128" y="30" fill="#fbbf24" font-size="10" font-family="Arial">engagement blade (spring)</text>
+      <circle cx="150" cy="42" r="5" fill="#fb923c"/>
+      <line x1="150" y1="42" x2="176" y2="30" stroke="#fb923c" stroke-width="3"/>
+      <text x="182" y="30" fill="#fb923c" font-size="10" font-family="Arial">servo arm past dead point</text>
+      <text x="150" y="148" fill="#94a3b8" font-size="10" font-family="Arial">holds engaged with servo unpowered</text>
+    </svg>
+    <figcaption>The over-centre latch: current only flows during transitions.</figcaption>
+  </figure>
+
+  <p>The most developed of the superseded branches, and the one that got printed.
+  The printed neck was replaced by a purchased <strong>metal universal joint</strong>
+  (Ø11 × 23 mm) with metal Ø5 mm output shafts. All compliance moved into a printed
+  <strong>engagement blade</strong>: a thin spring section driven by a pin on a
+  short servo arm riding in a slot.</p>
+
+  <p>Its best trick was the <strong>over-centre latch</strong> — the servo arm
+  swept just past its 90° dead point onto a hard stop, so the spring held the
+  clutch engaged with the <em>servo unpowered</em>. Blade geometry was sized to
+  keep sustained latch stress ≈ 14 MPa, so PETG creep stayed negligible.</p>
+
+  <div class="params">
+    <div><dt>Tilt A</dt><dd>1.5°</dd></div>
+    <div><dt>Contact radius</dt><dd>15 mm</dd></div>
+    <div><dt>Output torque</dt><dd class="hi">≈ 250 N·mm</dd></div>
+    <div><dt>Speed ratio</dt><dd class="bad">1.34×</dd></div>
+  </div>
+
+  <p>Weeks of FDM work went into this branch: bearing seats, M3 clearance passes,
+  a dovetail O-ring groove to stop the ring slipping, a two-part printable motor
+  disc, a corner-post cage frame.</p>
+
+  <div class="callout"><span class="lbl">Why it was superseded — the important one</span>
+  <p>A friction clutch with a fixed threshold <strong>cannot give free
+  rotation</strong>. To let an arm fall under its own weight the clutch must
+  transmit nothing; to lift that same arm it must transmit torque. Both demand
+  the same magnitude of torque at the shaft, so <em>no threshold separates
+  them</em>. Loosening the clutch enough to let the arm fall also loses the
+  ability to lift it. Every fix within the tilting-clutch family runs into this
+  same wall.</p>
+  <p>Second problem: at ratio 0.75 the design still multiplied speed. Feeding one
+  axis into the next hub of a tree means torque has to be <em>regenerated</em> at
+  every level, and v4 spent it instead.</p></div>
+</article>
+
+
+<!-- ══════════ v5 ══════════ -->
+<article class="gen" id="v5">
+  <h2><span class="num">v5</span>Vertical cone, interleaved rings, captive pinion
+    <span class="tag live" style="vertical-align:middle;margin-left:6px">active</span></h2>
+  <div class="meta">clutch_geometry_v5.html · Aug 2026</div>
+
+  <figure>
+    <svg viewBox="0 0 460 215" xmlns="http://www.w3.org/2000/svg">
+      <!-- motor axis -->
+      <line x1="120" y1="16" x2="120" y2="196" stroke="#334155" stroke-width="1" stroke-dasharray="4 4"/>
+      <text x="120" y="208" fill="#475569" font-size="9" text-anchor="middle" font-family="Arial">motor axis (Z)</text>
+      <!-- motor cone (half-angle 55° from the vertical) -->
+      <path d="M120 95 L198 150 L42 150 Z" fill="rgba(96,165,250,0.13)" stroke="#60a5fa" stroke-width="2"/>
+      <rect x="112" y="150" width="16" height="30" fill="#475569"/>
+      <text x="88" y="144" fill="#60a5fa" font-size="9" text-anchor="middle" font-family="Arial">motor cone</text>
+      <!-- output cone, apex offset by the apex separation, axis horizontal -->
+      <path d="M151 113 L201 148 L201 38 L151 73 Z" fill="rgba(52,211,153,0.13)" stroke="#34d399" stroke-width="2"/>
+      <text x="176" y="60" fill="#34d399" font-size="9" text-anchor="middle" font-family="Arial">output cone</text>
+      <!-- interleaved rings along the shared generatrix -->
+      <g fill="rgba(244,114,182,0.5)" stroke="#f472b6" stroke-width="1.5">
+        <circle cx="151" cy="113" r="6"/><circle cx="163" cy="121" r="6"/><circle cx="176" cy="130" r="6"/>
+        <circle cx="188" cy="139" r="6"/><circle cx="201" cy="147" r="6"/>
+      </g>
+      <g fill="rgba(251,146,60,0.5)" stroke="#fb923c" stroke-width="1.5">
+        <circle cx="154" cy="113" r="6"/><circle cx="167" cy="122" r="6"/>
+        <circle cx="179" cy="130" r="6"/><circle cx="192" cy="139" r="6"/>
+      </g>
+      <text x="40" y="186" fill="#f472b6" font-size="9" font-family="Arial">rings interleaved, flank to flank</text>
+      <!-- guide rods + carriage -->
+      <line x1="240" y1="20" x2="240" y2="192" stroke="#64748b" stroke-width="3"/>
+      <line x1="250" y1="20" x2="250" y2="192" stroke="#64748b" stroke-width="3"/>
+      <rect x="232" y="82" width="26" height="22" fill="rgba(148,163,184,0.25)" stroke="#94a3b8"/>
+      <text x="245" y="208" fill="#94a3b8" font-size="9" text-anchor="middle" font-family="Arial">carriage ↕ on guide rods</text>
+      <!-- output shaft -->
+      <line x1="151" y1="93" x2="268" y2="93" stroke="#a78bfa" stroke-width="3"/>
+      <text x="148" y="90" fill="#a78bfa" font-size="9" text-anchor="end" font-family="Arial">output shaft (fixed) →</text>
+      <!-- insets: pinion inside corona -->
+      <line x1="292" y1="14" x2="292" y2="200" stroke="#1e293b" stroke-width="1"/>
+      <circle cx="376" cy="58" r="32" fill="none" stroke="#a78bfa" stroke-width="2"/>
+      <circle cx="376" cy="58" r="16" fill="none" stroke="#34d399" stroke-width="2"/>
+      <text x="376" y="16" fill="#94a3b8" font-size="9" text-anchor="middle" font-family="Arial">1 · FREE — centre dist 0</text>
+      <text x="376" y="104" fill="#64748b" font-size="8" text-anchor="middle" font-family="Arial">shaft carries nothing</text>
+      <circle cx="376" cy="152" r="32" fill="none" stroke="#a78bfa" stroke-width="2"/>
+      <circle cx="376" cy="168" r="16" fill="none" stroke="#34d399" stroke-width="2"/>
+      <text x="376" y="128" fill="#94a3b8" font-size="9" text-anchor="middle" font-family="Arial">2 · MESHED — centre dist e</text>
+      <text x="376" y="200" fill="#64748b" font-size="8" text-anchor="middle" font-family="Arial">pinion never leaves the ring</text>
+    </svg>
+    <figcaption>Left: the pinion never leaves the corona — only the centre distance changes.
+    Right: interleaved rings meet flank to flank as the carriage descends.</figcaption>
+  </figure>
+
+  <p>The motor cone sits on the central vertical shaft. The output cone rides a
+  <strong>carriage that translates vertically</strong> on two 3 mm guide rods —
+  no tilt, no pivot, no universal joint. One degree of freedom. Three ideas
+  answer v4's failures:</p>
+
+  <ul>
+    <li><strong>Free rotation is geometric, not frictional.</strong> A pinion
+    rigid to the output cone lives permanently <em>inside</em> an internal corona
+    fixed to the output shaft. Free = pinion <strong>concentric</strong> with the
+    corona, centre distance 0 — the output shaft carries nothing at all. No
+    threshold, no residual drag, no compromise between lifting and falling. The
+    pinion is captive by construction and cannot fall out.</li>
+
+    <li><strong>Rubber meets rubber.</strong> The motor cone carries <em>n</em>
+    O-rings, the output cone <em>n−1</em> offset by half a pitch, so the two sets
+    <strong>interdigitate</strong> and touch flank to flank. μ ≈ 1.2–1.5 instead
+    of 0.6–0.9, and the rings never touch the plastic. Preload is <em>radial
+    between flanks</em>, which decouples it from apex displacement.</li>
+
+    <li><strong>It reduces.</strong> Friction 1.428 × gear 0.500 =
+    <strong>0.714</strong>, i.e. 1.4× torque. Speed is the surplus resource in a
+    tree; torque is not.</li>
+  </ul>
+
+  <h3 style="margin-top:22px">Four carriage positions, descending</h3>
+  <table class="stops">
+    <tr><td style="color:var(--dim)">1 · Free</td><td>pinion concentric, rings separated, output shaft drives nothing</td></tr>
+    <tr><td style="color:var(--blue)">2 · Mesh</td><td>centre distance <code>e</code> reached, rings <strong>still separated</strong>, relative velocity zero → teeth engage without shock</td></tr>
+    <tr><td style="color:var(--pink)">3 · Contact</td><td>rubber flanks touch, normal force zero</td></tr>
+    <tr><td style="color:var(--orange)">4 · Preload</td><td>flanks compressed, torque transmitted</td></tr>
+  </table>
+
+  <div class="params">
+    <div><dt>Total ratio</dt><dd class="hi">0.714 → 1.4× torque</dd></div>
+    <div><dt>Carriage stroke</dt><dd>7.45 mm</dd></div>
+    <div><dt>Centre distance e</dt><dd>7.00 mm</dd></div>
+    <div><dt>Ring pitch q</dt><dd>2.25 mm &lt; d</dd></div>
+    <div><dt>Apex separation</dt><dd>1.33 mm</dd></div>
+    <div><dt>Micro-slip</dt><dd>≈ 7.4 %</dd></div>
+  </div>
+
+  <p>Preload travel is absorbed by the gear's own <strong>root clearance</strong>
+  (0.25 · m) — no slot, no floating ring, no compliant blade. Play with all of it
+  in the <a class="inline" href="https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry_v5.html">interactive
+  visualiser</a>.</p>
+
+  <div class="callout open"><span class="lbl">Still open — not settled</span>
+  <p><strong>Ring density vs micro-slip.</strong> More rings interdigitate better
+  but push the cones apart, separating the apexes. n=5 → 7.4 %, n=7 → 13.6 %,
+  n=3 → the flanks never touch at all. Narrow window; needs a sweep over L and d.</p>
+  <p><strong>Margin + preload exceeds root clearance at m = 1</strong>
+  (0.45 vs 0.25 mm). Unresolved — the visualiser flags it in red.</p>
+  <p><strong>Re-meshing while the output shaft is still turning</strong> (an arm
+  falling) clashes teeth. Firmware must gate engagement on an AS5600 velocity
+  check.</p>
+  <p><strong>How the rings are manufactured.</strong> Catalogue O-rings fix the
+  diameters, and the pitches then have to land on the generatrix.</p></div>
+</article>
+
+
+<section class="closing">
+  <h3>What carried through all five</h3>
+  <ul class="kept-list">
+    <li><strong>One motor, many axes, selectively engaged.</strong> Never in question since v1.</li>
+    <li><strong>Common apex / matched surface speed.</strong> Introduced in v2, still the core of v5.</li>
+    <li><strong>O-rings as the friction element.</strong> Introduced in v3.</li>
+    <li><strong>Friction as a per-axis, software-settable torque limiter.</strong> Introduced in v3.</li>
+    <li><strong>Two-Arduino split</strong>, controller and driver. Unchanged since v1.</li>
+  </ul>
+
+  <h3>Dead ends — do not re-propose</h3>
+  <ul class="dead-list">
+    <li><strong>Tilting a shaft to engage</strong> (universal joint, printed neck,
+    or flexure). v2, v3 and v4 all did this. Superseded by carriage translation.</li>
+    <li><strong>Laboratory conical rubber stoppers</strong> as friction elements.</li>
+    <li><strong>Fixed-threshold friction clutches to obtain free rotation.</strong>
+    Lifting and falling demand the same torque, so no threshold separates them.</li>
+    <li><strong>Any 1:1 or speed-multiplying stage.</strong> The tree needs
+    reduction at every level.</li>
+  </ul>
+</section>
+
+<footer>
+  Motcore — open hardware multi-axis actuator tree.
+  Hardware CERN-OHL-P-2.0 · software MIT · docs CC BY-SA 4.0.<br>
+  © 2025–2026 Javier Asensio Montiel ·
+  <a href="https://github.com/motcore/poc">github.com/motcore/poc</a>
+</footer>
+
+</div>
+</body>
+</html>

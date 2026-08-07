@@ -2,216 +2,197 @@
 
 ## What this project is
 
-Motcore is an open hardware **multi-axis friction drive actuator**.
-One central motor (Z axis, vertical) drives multiple output axes (±X, ±Y) via
-servo-controlled **O-ring friction clutches**. Each output axis has its own
-clutch module; engaging a clutch connects that axis to the rotating motor disc.
+Motcore is an open hardware **multi-axis actuator tree**. One central motor
+(Z axis, vertical) drives multiple output axes through **vertical conical
+friction clutches**. Each output axis has its own clutch module; engaging a
+clutch connects that axis to the rotating motor cone.
 
-All mechanical design files are in `cad/`. Firmware in `software/`.
+Each output feeds the **next hub of the tree**, so every level is a
+**reduction**, never 1:1 — torque has to be regenerated at each stage, and
+speed is the resource there is plenty of.
+
+All mechanical design files are in `cad/`. Firmware in `src/`.
 
 ---
 
 ## Physical layout
 
-- **Motor shaft**: vertical (Z axis), at the centre of the cube.
-- **Motor disc**: flat horizontal disc (like a plate) on the motor shaft.
-  Both faces (top and bottom) are contact surfaces.
-- **Output axes**: 4 horizontal shafts in a cross pattern (±X, ±Y), one per cube wall.
-- **Each output shaft** pivots around a UJ point near its wall and tilts ±A to engage
-  the top face (+) or bottom face (−) of the motor disc.
-- **Cube size**: ~116 × 116 mm (derived from B and R, see equations below).
+- **Motor cone**: on the central vertical shaft (Z), fixed height, rotating
+  continuously.
+- **Output cone**: mounted on a **carriage that translates vertically** on two
+  **3 mm guide rods**. No universal joint, no shaft tilt, no pivot.
+- **Output shaft**: horizontal, fixed, perpendicular to the motor axis.
+  Apexes of the two cones are (nominally) common.
+- **Contact**: interleaved **rubber O-rings** on both cones, meeting
+  **flank to flank** — rubber on rubber, never touching the plastic.
+- Actuation is a single degree of freedom: the vertical position of the carriage.
 
 ```
-        top view              side view (one axis)
+        side view (one axis, Y-Z cross-section)
 
-         [+Y]                   motor shaft (Z)
-          │                          │
-  [−X] ──●── [+X]        ┌──────────●──────────┐  ← top disc face
-          │               │       ↗              │
-         [−Y]             │  output shaft (tilt A)
-                          │                      │
-                          └──────────────────────┘  ← bottom disc face
+           motor axis (Z)
+                │
+                │        ┌───┐  ← output cone on carriage
+                │       ╱     ╲       (translates vertically ↕)
+                │      │  ○ ○  │ ── output shaft (fixed)
+              ╱ │ ╲     ╲     ╱       + internal corona
+             ╱  │  ╲     └───┘
+            ╱ ○ │ ○ ╲   ← O-rings interleaved, flank to flank
+           ╱────┴────╲
+             motor cone
 ```
 
 ---
 
-## Clutch mechanism — O-ring design
+## Clutch mechanism — v5, vertical cone
 
-Each output axis clutch works as follows:
+- The **motor cone** carries `n` O-rings seated on its generatrix; the
+  **output cone** carries `n − 1`, offset by half a pitch so the two sets
+  **interdigitate**.
+- Torque passes **rubber against rubber** (μ ≈ 1.2–1.5) instead of rubber on
+  plastic (μ ≈ 0.6–0.9).
+- **Preload is radial, between flanks.** That decouples it from apex
+  displacement — pushing harder does not need the cones to move axially into
+  each other.
+- **Gear stage**: a **pinion rigid to the output cone** lives **permanently
+  inside an internal corona (ring gear) fixed to the output shaft**. The
+  pinion never enters or leaves the ring — it is captive by construction.
+- **Free = pinion concentric with the corona** (centre distance 0). The output
+  shaft carries nothing at all → **real free rotation**, not a friction
+  threshold.
 
-- The **motor disc** is a smooth flat disc (PETG or metal) on the central Z shaft.
-  It rotates continuously. No groove, no O-ring on the disc.
-- The **output shaft** carries a **wheel** with an O-ring in a toroidal groove on its rim.
-- The shaft **tilts ±A around a pivot near the wall** to press the O-ring against the
-  top (+A) or bottom (−A) face of the motor disc → torque in either direction.
-- **Engagement actuation**: a servo drives the tilt through a **compliant engagement
-  blade** printed as one piece with the shaft bracket. The blade has a thin flexible
-  (spring) section near the top and a rigid arm below ending in a slot; a pin on the
-  short servo arm rides that slot. Servo position → blade deflection → normal force, so
-  the spring decouples servo position from reaction forces while the shaft spins.
-- **Over-centre latch**: the servo arm sweeps just past its 90° dead point to a hard
-  stop at the slot end. There the spring presses the pin against the stop, so the clutch
-  self-holds at full engagement **even with the servo unpowered** — the servo only draws
-  current during transitions.
-- **Torque control** (proportional regime, before the latch): more servo travel → more
-  blade deflection → more normal force → more friction torque transmitted.
+### Four carriage positions, descending
 
-The bevel cone geometry is **superseded**. Differential slip is not a concern with
-point/line contact.
+| # | Position | State |
+|---|----------|-------|
+| 1 | **Free**     | pinion concentric, rings separated, output shaft drives nothing |
+| 2 | **Mesh**     | correct centre distance `e` reached, rings **still separated**, relative velocity zero → teeth engage without shock |
+| 3 | **Contact**  | rubber flanks touch, normal force zero |
+| 4 | **Preload**  | flanks compressed, torque transmitted |
 
-### Two design branches
-
-| Branch | File | Tilt pivot | Compliance | Status |
-|--------|------|------------|------------|--------|
-| **Compliant lever** | `cad/motcore_compliant_lever.py` | purchased metal UJ (Ø11×23, 5 mm bore) | in the engagement blade | **ACTIVE** |
-| Solid | `cad/motcore_v1.py` | printed compliant neck in the shaft | in the shaft neck | parked |
-
-The **active** design uses **metal output shafts** (two Ø5 mm segments split at the UJ);
-the tilt compliance lives in the engagement blade, not the shaft. The parked solid branch
-instead put a flexible neck in the printed shaft and used a separate pinned lever — kept
-as a fallback.
+The preload travel is absorbed by the gear's own **root clearance**
+(`0.25 · m`). **No slot, no floating ring, no compliant blade.**
 
 ---
 
-## Clutch geometry — key parameters
+## Key parameters
 
 | Symbol | Default | Description |
 |--------|---------|-------------|
-| **A**  | 1.5°    | Engagement angle — shaft tilt from horizontal (small, to keep the neutral gap from eating the short servo-arm stroke) |
-| **B**  | 35 mm   | UJ pivot → output wheel centre (along shaft) |
-| **R**  | 20 mm   | Motor disc radius (rim) |
-| **dw** | 2.5 mm  | O-ring wire diameter |
+| **α**  | 55°   | motor cone half-angle (from the vertical axis) |
+| **m**  | 1.0   | gear module |
+| **Zp** | 14    | pinion teeth (on the output cone / carriage) |
+| **Zc** | 28    | corona teeth (on the output shaft) |
+| **L**  | 18 mm | contact line length along the generatrix |
+| **s₀** | 10 mm | apex → start of the contact line |
+| **d**  | 2.5 mm| O-ring wire diameter |
+| **n**  | 5     | rings on the motor cone (output carries n − 1) |
+| **g**  | 0.20 mm | margin: full mesh → rubber contact |
+| **δ**  | 0.25 mm | preload travel past contact |
 
-Derived (active branch, A=1.5°):
+Derived at defaults:
 
-| Symbol       | Formula                  | Value |
-|--------------|--------------------------|-----------------|
-| WT           | 3.2 × dw                 | 8.0 mm  — wheel & disc thickness |
-| R_out        | wc_dist − WT/2 − gap     | 15.0 mm — **actual contact radius** (set by the square no-overlap condition between adjacent wheels, so < R) |
-| Rw           | R_out − 0.4 × dw         | 14.0 mm — structural wheel radius |
-| contactY     | B·cosA − R·sinA          | 34.5 mm — contact point Y from UJ |
-| contactZ     | B·sinA + R_out·cosA      | 15.9 mm — contact point Z from UJ |
-| motorY       | contactY + R             | 54.5 mm — motor shaft distance from UJ |
-| cube_half    | motorY + wall_thick      | 58.5 mm — half cube side (cube ≈ 117 mm) |
-| disc_height  | 2 × contactZ             | 31.8 mm — motor disc total height |
-| transmission | R_out / R                | ≈0.75 (ω_out ≈ 1.34 × ω_motor) — no longer 1:1 |
-
----
-
-## Coordinate system (2D visualiser, Y-Z cross-section)
-
-- **UJ pivot** = origin (0, 0)
-- **Y axis** = horizontal, pointing from UJ toward motor shaft
-- **Z axis** = vertical, upward (= motor shaft direction)
-- Output shaft at angle θ ∈ [−A, +A] from horizontal
-
-Contact point at full engagement (matches `clutch_geometry_v3.html` and the macro):
-```
-contactY = B·cosA − R·sinA       (uses R — fixes the motor shaft position)
-contactZ = B·sinA + R_out·cosA   (uses R_out — where the O-ring actually meets the
-                                  disc face; top engagement, bottom = −contactZ)
-```
-
-Motor shaft at:
-```
-motorY = contactY + R
-```
-
-The output wheel contacts at R_out (< R) to avoid overlap between adjacent wheels, so
-the contact Z uses R_out while the motor shaft placement still uses R.
-
-## Coordinate system (3D FreeCAD macro)
-
-- **Origin** = cube centre = motor shaft axis at mid-height
-- **Z** = motor shaft, upward
-- **X, Y** = output shaft directions
-- UJ for each axis at distance `motorY` from origin along its axis direction
+| Quantity | Value |
+|----------|-------|
+| friction ratio | 1.428 |
+| gear ratio     | 0.500 |
+| **total ω_out/ω_motor** | **0.714** (→ 1.4× torque) |
+| centre distance `e` | 7.00 mm |
+| free float (no tooth touch) | 5.00 mm |
+| mesh travel | 2.00 mm |
+| **total stroke** | **7.45 mm** |
+| ring pitch `q` | 2.25 mm (< d ✓) |
+| apex separation | 1.33 mm |
+| micro-slip | ≈ 7.4 % |
 
 ---
 
 ## Governing equations
 
-### Normal force at contact
-
-The servo pin pushes the engagement blade with force F; a moment balance about the
-UJ tilt axis converts that into the contact normal force through the blade leverage:
-
 ```
-N = F · (pin_arm / contact_arm)
-```
+α_out       = 90 − α_motor                  (perpendicular axes, common apex)
 
-where `pin_arm` is the pin height above the tilt axis and `contact_arm` the wheel
-contact offset from it (≈1.9× with current geometry). F itself comes from the blade
-spring stiffness × deflection (set by servo angle), **not** directly from servo torque —
-the spring decouples the two. Servo torque is not the limiting factor (peak demand
-≈ 23 N·mm, far below any micro-servo).
+ratio_fric  = sin(α_m) / sin(α_o)           independent of position along the
+                                            contact line
+
+ratio_gear  = Zp / Zc                       internal mesh, reducing
+
+ratio_total = ratio_fric · ratio_gear
+
+e           = m · (Zc − Zp) / 2             centre distance at mesh
+free float  = e − 2m
+mesh travel = 2m
+
+q           = L / (2n − 2)                  ring pitch along the contact line
+apex sep    = sqrt(d² − q²) / sin(α_m)
+
+stroke      = e + g + δ
+```
 
 ### Transmitted torque
 
-```
-T_out = μ · N · R_out
-```
+Torque is set by the radial preload between rubber flanks, with
+μ ≈ 1.2–1.5 (rubber on rubber). It is also a **per-axis torque limiter**: it
+slips above the preload-set threshold, and the preload is set by carriage
+position, so each axis can cap its slip torque in software.
 
-where R_out ≈ 15 mm is the **actual** contact radius and μ ≈ 0.6 (conservative) to
-0.9 for silicone O-ring on PETG/metal. At the over-centre latch this gives
-T_out ≈ 250 N·mm ≈ 2× the servo's continuous torque — i.e. the rig transmits far more
-torque than the servo itself produces, which is the whole point of Motcore.
+---
 
-### Torque limiter
+## Coordinate system (2D visualiser, Y-Z cross-section)
 
-The friction clutch is also a **per-axis, software-adjustable torque limiter**: it slips
-(protecting shafts and gears) above μ·N·R_out, and N is set by servo position, so each
-axis can cap its slip torque anywhere from ~0 up to the latched maximum.
-
-### O-ring groove dimensions
-
-| Dimension    | Formula      | Value (dw=2.5mm) |
-|--------------|--------------|-----------------|
-| Groove depth | 0.6 × dw     | 1.5 mm          |
-| Groove width | 1.2 × dw     | 3.0 mm          |
-| O-ring protrusion beyond rim | 0.4 × dw | 1.0 mm |
-| Wheel rim radius (Rw) | R_out − 0.4 × dw | 14.0 mm |
-
-O-ring centre is 0.1 × dw (0.25 mm) below the wheel rim — protrudes 0.4 × dw outward.
-Wheel face never contacts motor disc (clearance 0.15–0.2 × dw at 20–25% compression).
+- **Z** = motor shaft, vertical, upward. Motor axis at Y = 0.
+- **Y** = horizontal, pointing from the motor axis toward the wall / output shaft.
+- The cross-section is the vertical plane containing both the motor axis and
+  the output shaft axis.
+- Carriage height reference: **contact = 0**, downward negative.
+  `z_free = g + e`, `z_mesh = g`, `z_contact = 0`, `z_preload = −δ`.
+- The output shaft axis is fixed at `z = g + e` (so the pinion is concentric
+  with the corona in position 1).
 
 ---
 
 ## Design invariants — do not violate these
 
-1. **O-ring on output wheel only.** Motor disc is smooth — no groove, no O-ring.
-2. **Disc must span both contact faces** — disc height ≥ 2 × contactZ so top and
-   bottom engagements both work.
-3. **Disc covers the contact point** — with defaults R=20 < contactY=34.5, so the disc
-   visual radius is extended to disc_vr = R + WT/2; the geometric contact is at the rim
-   (motorY − R = contactY). Satisfied by construction.
-4. **O-ring material: silicone** — higher μ and better thermal tolerance than NBR.
-5. **Disc material: PETG minimum** — PLA for prototyping only.
-6. **Clearance in neutral** — at θ = 0 the O-ring must not graze either disc face.
+1. **Reduction, not 1:1.** The output feeds the next hub of the tree; torque
+   must be regenerated at every level. Speed is the surplus resource.
+2. **Mesh BEFORE rubber contact, never after.** Teeth must engage at zero
+   relative velocity.
+3. **`g + δ ≤ 0.25 · m`** (root clearance) — otherwise the pinion jams into
+   the corona.
+4. **`q < d`**, or the flanks never touch at all.
+5. **`Zc − Zp ≥ 8`** — internal-mesh interference.
+6. **The AS5600 on every output shaft is structural, not optional.** Friction
+   slip accumulates non-repeatably in series along a tree; position is only
+   known by measuring it. The I2C address is fixed at **0x36**, so
+   multiplexing is required (analog output, PWM, or a TCA9548A).
+7. **Rubber on rubber only.** Ring flanks meet each other; they never contact
+   the plastic cone surface.
 
 ---
 
-## Mechanical design decisions (active — compliant lever)
+## Open questions — do NOT present these as settled
 
-- **Tilt pivot**: purchased **metal universal joint** (Ø11 × 23 mm, 5 mm bore each side),
-  straddling the wall. Replaces the printed pin/neck of the parked branch.
-- **Output shaft**: **metal**, Ø5 mm, in two segments split at the UJ. Not printed, no
-  flexible neck — so shaft shear is never the limiting factor.
-- **Output wheel**: printed, press-fit / fixed to the metal shaft (the shaft↔wheel
-  joint detail is still TBD). Carries the O-ring groove.
-- **Engagement blade**: printed in one piece with the wall + bracket. Thin flexible XZ
-  spring (14 × 4.5 mm) sized so the **sustained latch stress stays ≈ 14 MPa**, keeping
-  PETG stress relaxation (creep) negligible.
-- **Servo**: **MUST be positional** (≈180°, controls position) — e.g. MG90S or a
-  *positional* MG90D, metal gear preferred. ⚠️ **NOT a 360° continuous-rotation servo**
-  (those control speed, not position, and break the proportional control + latch). Torque
-  is not a selection constraint (peak demand ≈ 23 N·mm); choose for precision/durability.
-- **Servo arm**: short (r = 4 mm) so the pin sweeps to an over-centre latch within a
-  short slot at low sustained spring stress.
-- **Module per wall**: each wall carries one complete clutch module, removable as a unit
-  (modular foot, M3 screws with nut traps in the wall side-bars).
-- **Transmission ratio**: ≈0.75 : 1 (contact at R_out ≈ 15 mm on the wheel vs R = 20 mm
-  on the disc), so ω_out ≈ 1.34 × ω_motor — not 1:1.
+- **Ring density vs micro-slip.** More rings interdigitate better but push the
+  cones apart, separating the apexes. At n=5 slip is ≈ 7.4 %, at n=7 ≈ 13.6 %,
+  at n=3 the flanks never reach each other. Narrow window — needs a sweep over
+  `L` and `d`.
+- **`g + δ` exceeds the root clearance at m=1.** Unresolved (invariant 3 is
+  currently violated by the defaults; the visualiser flags it).
+- **Re-meshing while the output shaft is still turning** (e.g. an arm falling)
+  causes tooth clash. Firmware problem — requires a velocity check via the
+  AS5600 before engaging.
+- **How the rings are manufactured.** Catalogue O-rings fix the diameters, and
+  the ring pitches then have to land on the generatrix.
+
+---
+
+## Discarded — do not re-propose
+
+- **Tilting flat disc with a universal joint.** Superseded by the vertical cone.
+- **Laboratory conical rubber stoppers** as friction elements.
+- **Fixed-threshold friction clutches to obtain free rotation.** Lifting and
+  falling demand the same torque, so no threshold separates them. Free
+  rotation comes from the concentric-pinion geometry instead.
 
 ---
 
@@ -219,15 +200,18 @@ Wheel face never contacts motor disc (clearance 0.15–0.2 × dw at 20–25% com
 
 | File | Purpose |
 |------|---------|
-| `cad/motcore_compliant_lever.py` | FreeCAD macro — **active** design (metal UJ + compliant engagement blade + over-centre latch) |
-| `cad/motcore_v1.py` | FreeCAD macro — solid branch (printed compliant neck), parked fallback |
-| `cad/clutch_geometry_v3.html` | Interactive 2D visualiser (Y-Z cross-section) |
-| `cad/motcore_plates.py` | FreeCAD macro — bevel cone design (superseded) |
-| `cad/motcore_animate.py` | FreeCAD macro — bevel cone animation (superseded) |
-| `cad/calibration.py` | FreeCAD macro — FDM/PLA tolerance calibration coupon |
-| `docs/build-log.md` | Prototype build log — purchases, prints, calibrations, tests |
-| `software/controller/` | Arduino firmware — master (touchscreen UI) |
-| `software/driver/` | Arduino firmware — receiver (motor + servo control) |
+| `cad/clutch_geometry_v5.html` | Interactive 2D visualiser — **active**, v5 vertical cone clutch |
+| `cad/clutch_geometry_v3.html` | Visualiser for the superseded tilting-disc design |
+| `cad/clutch_geometry.html`    | Older visualiser (superseded) |
+| `cad/motcore_compliant_lever.py` | FreeCAD macro — tilting-disc branch (superseded) |
+| `cad/motcore_v1.py`           | FreeCAD macro — solid tilting branch (superseded) |
+| `cad/motcore_plates.py`       | FreeCAD macro — bevel cone design (superseded) |
+| `cad/motcore_animate.py`      | FreeCAD macro — bevel cone animation (superseded) |
+| `cad/calibration.py`          | FreeCAD macro — FDM tolerance calibration coupon |
+| `docs/build-log.md`           | Prototype build log — purchases, prints, calibrations, tests |
+| `docs/clutch-geometry.md`     | Clutch geometry notes |
+| `src/controller/`             | Arduino firmware — master (touchscreen UI) |
+| `src/driver/`                 | Arduino firmware — receiver (motor + servo control) |
 
 Web: `motcore.github.io/clutch-geometry.html` — live visualiser.
 
@@ -235,5 +219,7 @@ Web: `motcore.github.io/clutch-geometry.html` — live visualiser.
 
 ## Claude coding conventions
 
-- **Language**: all code (comments, variable names, docstrings) and all git commit messages must be in **English**.
-- Respond to the user in whatever language they use; only the code and commits must be English.
+- **Language**: all code (comments, variable names, docstrings) and all git
+  commit messages must be in **English**.
+- Respond to the user in whatever language they use; only the code and commits
+  must be English.

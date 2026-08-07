@@ -1,6 +1,6 @@
 # Motcore
 
-**Multi-Axis Friction Drive Actuator**
+**Multi-Axis Actuator Tree — one motor, many axes**
 
 ![License Hardware](https://img.shields.io/badge/license-CERN--OHL--P--2.0-blue)
 ![License Software](https://img.shields.io/badge/license-MIT-green)
@@ -9,7 +9,9 @@
 
 > A novel approach to multi-axis actuation: one motor, multiple independently controlled axes through selective friction engagement.
 
-[🎥 Demo Video](#) | [📖 Documentation](docs/) | [💬 Discussions](../../discussions) | [🐛 Issues](../../issues)
+<!-- TODO: demo video — once it's recorded and hosted, restore as the first item:
+     [🎥 Demo Video](URL) | -->
+[📖 Documentation](docs/) | [🧬 Design Evolution](docs/design-evolution.md) | [💬 Discussions](../../discussions) | [🐛 Issues](../../issues)
 
 ---
 
@@ -26,10 +28,14 @@ This is an **early-stage open hardware project** developed in spare time. The cu
 - ✅ Independent control of 4 output axes
 
 **What's being developed:**
+- 🔄 v5 vertical cone clutch — geometry settled, CAD pending
 - 🔄 3D-printable components (FreeCAD parametric models)
-- 🔄 Compliant mechanism for engagement system
 - 🔄 Comprehensive documentation
 - 🔄 BOM with standard components
+
+The mechanism has been through **five generations**. Four are superseded and
+should not be re-proposed — see [Design Evolution](docs/design-evolution.md) for
+what each one was and what killed it.
 
 **Timeline:** When it's ready. No pressure, no deadlines. Life happens. 🙂
 
@@ -53,26 +59,41 @@ Traditional multi-axis systems face a fundamental trade-off:
 
 ### Core Innovation
 
-A single continuously rotating motor transmits power to multiple output axes through **servo-controlled friction wheels**. By selectively engaging/disengaging friction contact, each axis can be independently controlled without requiring its own motor.
+A single continuously rotating motor drives multiple output axes through
+**vertical conical friction clutches**. Each axis has its own clutch module on a
+carriage that translates vertically; engaging a clutch connects that axis to the
+motor cone. Each output feeds the **next hub of the tree**, so every level is a
+reduction — torque is regenerated at each stage, and speed is the resource there
+is plenty of.
 
 ```
-     Friction Wheel A ← Central Motor (rotating) → Friction Wheel B
-                                  ↑
-                                  |
-                           Output Axis
-                      (moves laterally to engage A or B)
+        side view (one axis, Y-Z cross-section)
+
+           motor axis (Z)
+                │
+                │        ┌───┐  ← output cone on carriage
+                │       ╱     ╲       (translates vertically ↕)
+                │      │  ○ ○  │ ── output shaft (fixed)
+              ╱ │ ╲     ╲     ╱       + internal corona
+             ╱  │  ╲     └───┘
+            ╱ ○ │ ○ ╲   ← O-rings interleaved, flank to flank
+           ╱────┴────╲
+             motor cone
 ```
 
-**Key principle:** Selective friction engagement as a power transmission method.
+**Key principle:** selective friction engagement as a power transmission method —
+with **free rotation obtained geometrically**, not by loosening a clutch.
 
 ### Features
 
-✅ **Single inexpensive motor** - 28BYJ-48 stepper (€3)  
-✅ **Independent axis control** - 4+ axes, each controllable separately  
-✅ **Simple mechanics** - no complex gearboxes or clutches  
-✅ **Scalable** - add more axes without changing the central motor  
-✅ **Low cost** - complete system ~€50 in components  
-✅ **Educational platform** - demonstrates mechanical principles elegantly  
+✅ **Single inexpensive motor** — 28BYJ-48 stepper (€3)  
+✅ **Independent axis control** — 4+ axes, each controllable separately  
+✅ **Real free rotation** — a disengaged axis carries *nothing*, so an arm can fall under its own weight  
+✅ **Reduction at every level** — 1.4× torque per stage, not 1:1  
+✅ **Per-axis torque limiter** — slip threshold set in software by carriage position  
+✅ **Scalable** — add more axes without changing the central motor  
+✅ **Low cost** — complete system ~€50 in components  
+✅ **Educational platform** — demonstrates mechanical principles elegantly  
 
 ---
 
@@ -89,8 +110,10 @@ One motor powers multiple independent degrees of freedom through selective engag
 **Mechanical Intelligence** (Jansen's Strandbeests)  
 The mechanism's geometry and material properties do the "thinking", reducing software complexity.
 
-**Compliant Mechanisms**  
-The engagement system uses flexure-based compliance for smooth, reliable contact without complex joints.
+**Let the parts you already have do the work**  
+The engagement stroke needs compliance to preload the friction surfaces. Rather
+than add a spring, a slot or a flexure, v5 absorbs that travel in the **root
+clearance of the gear it already needed**. No extra part, nothing to tune.
 
 ### Why This Matters
 
@@ -102,7 +125,8 @@ This isn't just about cost - it's about design elegance.
 
 ## 🔧 Current Prototype: Arduino Cube
 
-![Motcore v0.1 Prototype](docs/images/prototype-v01.jpg)
+<!-- TODO: photo of the v0.1 LEGO prototype — save as docs/images/prototype-v01.jpg and restore:
+     ![Motcore v0.1 Prototype](docs/images/prototype-v01.jpg) -->
 *v0.1 proof of concept using LEGO Technic components*
 
 ### Technical Specifications
@@ -119,13 +143,17 @@ This isn't just about cost - it's about design elegance.
 | **Communication** | Serial (9600 baud) |
 | **Power** | 5V USB |
 
-### How It Works
+### How It Works (v0.1 prototype)
 
 1. **Central motor rotates continuously** at constant speed
 2. **Servos position friction wheels** to engage/disengage with output axes
 3. **Output axes move laterally** to contact different sides of the central shaft
 4. **Direction control** through selective engagement (clockwise/counterclockwise)
 5. **Independent operation** - each axis controlled separately via touchscreen
+
+*This describes the LEGO proof of concept, which validated the core principle.
+The engagement mechanism has been redesigned four times since — see
+[Design Evolution](docs/design-evolution.md).*
 
 ---
 
@@ -184,14 +212,14 @@ git clone https://github.com/Motcore/poc.git
 cd poc
 
 # Open in PlatformIO
-# OR open software/controller/ and software/driver/ in Arduino IDE
+# OR open src/controller/ and src/driver/ in Arduino IDE
 ```
 
 ### Quick Start
 
 1. **Upload firmware**
-   - Upload `software/controller/` to master Arduino
-   - Upload `software/driver/` to receiver Arduino
+   - Upload `src/controller/` to master Arduino
+   - Upload `src/driver/` to receiver Arduino
 
 2. **Wire according to schematic**
    - See [docs/wiring.md](docs/wiring.md) for pinout
@@ -208,6 +236,8 @@ cd poc
 
 | Document | Description |
 |----------|-------------|
+| [Design Evolution](docs/design-evolution.md) | The five generations, what killed each one, what survived |
+| [Clutch Geometry](docs/clutch-geometry.md) | v5 derivation — cone angles, ratios, ring interleaving, constraints |
 | [Assembly Guide](docs/assembly.md) | Step-by-step build instructions |
 | [Wiring Diagram](docs/wiring.md) | Electrical connections and pinout |
 | [Firmware Guide](docs/firmware.md) | Code architecture and customization |
@@ -219,80 +249,128 @@ cd poc
 
 | Tool | Description |
 |------|-------------|
-| [Bevel Clutch Geometry Visualizer](https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry.html) | Interactive Y-Z cross-section of the bevel friction clutch at engagement. Adjust parameters A, B, C, D with live sliders. |
-| [FreeCAD Macro — Plates](cad/motcore_plates.py) | Generates top/bottom plates, motor cone, clutch cone and shaft references in FreeCAD. |
-| [FreeCAD Macro — Animation](cad/motcore_animate.py) | Animates clutch engagement by tilting the output shaft around the UJ pivot. Run after the plates macro. |
+| **[v5 Vertical Cone Clutch Visualiser](https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry_v5.html)** | **Active.** Interactive Y-Z cross-section. Live sliders for α, m, Zp/Zc, L, s₀, d, n, g, δ; the four carriage stops; an inset showing the pinion inside the corona; and live constraint checking. |
+| [FreeCAD Macro — Calibration coupon](cad/calibration.py) | FDM tolerance calibration coupon. Print before anything else. |
+
+<details>
+<summary>Superseded design tools (kept for the record — do not build from these)</summary>
+
+| Tool | Generation |
+|------|------------|
+| [Bevel Clutch Geometry Visualizer](https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry.html) | v2 — bevel cone |
+| [O-ring Clutch Geometry Visualizer](https://htmlpreview.github.io/?https://github.com/motcore/poc/blob/main/cad/clutch_geometry_v3.html) | v3/v4 — tilting flat disc |
+| [FreeCAD Macro — Plates](cad/motcore_plates.py) | v2 — plates, motor cone, clutch cone |
+| [FreeCAD Macro — Animation](cad/motcore_animate.py) | v2 — tilt animation around the UJ pivot |
+| [FreeCAD Macro — v1 O-ring clutch](cad/motcore_v1.py) | v3 — printed compliant neck |
+| [FreeCAD Macro — Compliant lever](cad/motcore_compliant_lever.py) | v4 — metal UJ + engagement blade + over-centre latch |
+
+</details>
 
 ---
 
-## 🔩 v0.2 Design Notes (In Progress)
+## 🔩 v5 Design Notes — Vertical Cone Clutch
 
-Current work is in `cad/motcore_v1.py` — a FreeCAD Python macro that generates the full O-ring clutch geometry. Run it from FreeCAD: *Macro → Macros → motcore_v1.py → Execute*.
+Full derivation in [docs/clutch-geometry.md](docs/clutch-geometry.md); the
+interactive visualiser is `cad/clutch_geometry_v5.html`.
 
-### Compliant Flexure Mechanism
+### Mechanism
 
-The engagement system uses a **compliant mechanism** instead of a traditional pin-based UJ pivot. Each wall is a single printed part that integrates the wall, the flexure blades, and the bearing head.
+The motor cone sits on the central vertical shaft. The output cone rides a
+**carriage that translates vertically** on two 3 mm guide rods — no tilt, no
+pivot, no universal joint, one degree of freedom. Three ideas carry it:
 
-```
-Side view (Y-Z plane, one output axis):
+**1. Rubber meets rubber.** The motor cone carries `n` O-rings on its
+generatrix, the output cone `n − 1` offset by half a pitch, so the two sets
+**interdigitate** and touch flank to flank. That gives μ ≈ 1.2–1.5 instead of
+the 0.6–0.9 of rubber on plastic, and the rings never touch the plastic at all.
+Preload is **radial between flanks**, so it is decoupled from apex displacement.
 
-  wheel   [===head===]────blade────wall
-  O-ring  bearing bore   (flexes)  fused
+**2. Free rotation is geometric.** A pinion rigid to the output cone lives
+permanently **inside** an internal corona fixed to the output shaft — captive by
+construction, it can never fall out. Free = pinion **concentric** with the
+corona, centre distance 0, so the output shaft carries *nothing*. No friction
+threshold, which matters because lifting an arm and letting it fall demand the
+same torque; no threshold can separate them.
 
-  blade: thin in Z (bends for ±A tilt), wide in X (stiff horizontally)
-```
+**3. It reduces.** Friction 1.428 × gear 0.500 = **0.714**, i.e. 1.4× torque per
+stage. The output feeds the next hub of the tree, so torque has to be
+regenerated at every level.
 
-**How it works:**
-- Two thin flat blades connect the bearing head (near the wheel) to the wall
-- Blades flex ±A/2 to tilt the shaft into engagement
-- The output shaft has a single compliant neck in the free span that flexes the other ±A/2
-- The shaft rotates freely in the bearing bore (output torque)
-- No pin, no assembly — one printed part per wall
+### Four carriage positions, descending
+
+| # | Position | State |
+|---|----------|-------|
+| 1 | **Free** | pinion concentric, rings separated, output shaft drives nothing |
+| 2 | **Mesh** | centre distance `e` reached, rings **still separated**, relative velocity zero → teeth engage without shock |
+| 3 | **Contact** | rubber flanks touch, normal force zero |
+| 4 | **Preload** | flanks compressed, torque transmitted |
+
+Preload travel is absorbed by the gear's own **root clearance** (0.25 · m) — no
+slot, no floating ring, no compliant blade.
 
 ### Key Design Parameters
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
-| Engagement angle A | 3° | shaft tilt from horizontal |
-| Arm length B | 35 mm | bearing head → contact point |
-| Contact radius R | 20 mm | motor disc rim |
-| O-ring wire dw | 2.5 mm | silicone |
-| Blade thickness | 1.5 mm | in Z (bending direction) |
-| Blade width | 6.0 mm | in pa (horizontal stiffness) |
-| Neck diameter | 2.5 mm | torsion-limited (SF=1.32 vs slip) |
-| Neck length | 13.0 mm | centred in free span |
-| Cube size | ~116 × 116 mm | derived from B and R |
+| Motor cone half-angle α | 55° | from the vertical axis; output cone = 90 − α |
+| Gear module m | 1.0 | |
+| Pinion / corona teeth Zp / Zc | 14 / 28 | internal mesh, reducing |
+| Contact line length L | 18 mm | along the generatrix |
+| Apex → contact line s₀ | 10 mm | |
+| O-ring wire d | 2.5 mm | rubber on rubber |
+| Rings on motor cone n | 5 | output cone carries n − 1 |
+| Margin g | 0.20 mm | full mesh → rubber contact |
+| Preload δ | 0.25 mm | past contact |
 
-### Performance (SG90 servo)
+### Derived
 
 | Metric | Value |
 |--------|-------|
-| Contact force N | 4.85 N |
-| Max output torque | ~58 N·mm (0.57 kg·cm) |
-| Speed ratio | 1.39× motor (output faster) |
-| Flexure overhead | 4.2% of servo torque |
-| Clutch slips before neck breaks | ✓ |
+| Friction ratio | 1.428 |
+| Gear ratio | 0.500 |
+| **Total ω_out / ω_motor** | **0.714 → 1.4× torque** |
+| Centre distance `e` | 7.00 mm |
+| Free float / mesh travel | 5.00 / 2.00 mm |
+| **Total carriage stroke** | **7.45 mm** |
+| Ring pitch q | 2.25 mm (< d ✓) |
+| Apex separation | 1.33 mm |
+| Micro-slip | ≈ 7.4 % |
 
-### Pending for v0.2
+### Open questions — not settled
 
-- [ ] Servo mount on outer wall face
-- [ ] Reduce `blade_t` to ~0.8 mm (min printable) to further reduce engagement force
-- [ ] Bearings: current design uses printed bore (adequate for v1); add counterbore for 625ZZ (ID5mm) for durability
-- [ ] Top/bottom plates
+- [ ] **Ring density vs micro-slip.** More rings interdigitate better but push
+      the cones apart. n=5 → 7.4 %, n=7 → 13.6 %, n=3 → flanks never touch.
+      Narrow window; needs a sweep over `L` and `d`.
+- [ ] **`g + δ` exceeds root clearance at m = 1** (0.45 vs 0.25 mm). Unresolved.
+- [ ] **Re-meshing while the output shaft still turns** clashes teeth. Firmware
+      must gate engagement on an AS5600 velocity check.
+- [ ] **Ring manufacture.** Catalogue O-rings fix the diameters; the pitches then
+      have to land on the generatrix.
+- [ ] **CAD.** Geometry is settled in the visualiser; the FreeCAD macro is not
+      written yet.
+
+### Position feedback is structural
+
+Friction slip accumulates non-repeatably in series along a tree, so position is
+only known by **measuring** it. An **AS5600** on every output shaft is part of
+the mechanism, not an optional extra. Its I2C address is fixed at 0x36, so
+multiple encoders need multiplexing (analog output, PWM, or a TCA9548A).
 
 ---
 
 ## 🗺️ Roadmap
 
 ### v0.2 - 3D Printed Prototype (In Progress)
-- [ ] Parametric FreeCAD models of all components
-- [ ] Compliant mechanism for engagement system
-- [ ] Standard mechanical components (bearings, rods)
-- [ ] Improved friction wheel design (TPU or O-rings)
+- [ ] Parametric FreeCAD model of the v5 vertical cone clutch
+- [ ] Carriage + 3 mm guide rods, single-DOF actuation
+- [ ] Resolve `g + δ` vs root clearance
+- [ ] Sweep `L` and `d` for the ring density / micro-slip window
+- [ ] Source O-rings and land the ring pitches on the generatrix
 - [ ] Complete assembly documentation
 
 ### v0.3 - Refinement
-- [ ] Closed-loop position feedback
+- [ ] AS5600 on every output shaft, with multiplexing
+- [ ] Velocity-gated engagement (no re-mesh while the shaft turns)
 - [ ] Torque measurement and control
 - [ ] Multiple friction material testing
 - [ ] Calibration procedures
@@ -397,7 +475,8 @@ You are free to share and adapt the documentation, even commercially, as long as
 - Piezoelectric actuator design philosophy
 
 **Special thanks to:**
-- [Contributors will be listed here as they join]
+<!-- TODO: list contributors here as they join -->
+- Contributors will be listed here as they join
 
 ---
 
@@ -405,9 +484,13 @@ You are free to share and adapt the documentation, even commercially, as long as
 
 - **GitHub Issues:** [Bug reports and feature requests](../../issues)
 - **GitHub Discussions:** [Questions, ideas, and general chat](../../discussions)
-- **Email:** [opcional - tu email]
-- **Hackaday.io:** [cuando lo crees]
-- **LinkedIn:** [opcional - tu perfil]
+
+<!-- TODO: add contact channels once they exist —
+     - **Email:** <address>
+     - **Hackaday.io:** <project URL>
+     - **LinkedIn:** <profile URL>
+-->
+
 
 ---
 
@@ -429,7 +512,23 @@ Current prototype: low precision (proof of concept). v0.2+ will explore encoder 
 The current design is optimized for light loads (educational/prototyping). Load capacity depends on friction wheel material and contact pressure.
 
 ### Why friction drive instead of gears?
-Friction allows for variable torque transmission, compliance, and simpler engagement/disengagement. It's mechanically elegant but has trade-offs in efficiency and precision.
+Friction allows variable torque transmission, compliance, and simple
+engagement/disengagement — and it doubles as a per-axis torque limiter. The
+trade-off is efficiency and precision: slip accumulates non-repeatably, which is
+why v5 puts an encoder on every output shaft. v5 actually uses **both** — a
+friction stage for engagement and torque limiting, and a gear stage for
+reduction and for free rotation.
+
+### How can a friction clutch give true free rotation?
+It can't, and that's what killed four generations. Lifting an arm and letting it
+fall demand the same torque at the shaft, so no slip threshold separates them.
+v5 sidesteps it: free rotation comes from the **gear** stage, where the pinion
+sits concentric inside the corona at centre distance 0 and the output shaft
+carries nothing at all.
+
+### Why does the design reduce instead of running 1:1?
+Because each output feeds the next hub of a tree. Torque is consumed going down
+and must be regenerated at every level; speed is the resource there is plenty of.
 
 ---
 
