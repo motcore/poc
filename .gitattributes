@@ -1,0 +1,39 @@
+# Normalise line endings.
+#
+# Everything git detects as text is stored with LF in the repository. Working
+# trees still get whatever the platform wants, so Windows checkouts keep CRLF
+# locally without that showing up in diffs.
+* text=auto
+
+# Text formats, stated explicitly so detection never has to guess.
+*.md        text
+*.txt       text
+*.html      text diff=html
+*.css       text
+*.js        text
+*.py        text diff=python
+*.FCMacro   text diff=python
+*.ino       text
+*.h         text
+*.cpp       text
+*.json      text
+*.yml       text
+*.yaml      text
+*.svg       text
+.gitignore      text
+.gitattributes  text
+LICENSE*        text
+
+# Binary. Never touch these, never try to diff them as text.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.pdf       binary
+*.stl       binary
+*.3mf       binary
+*.step      binary
+*.stp       binary
+*.FCStd     binary
+*.FCStd1    binary
+*.zip       binary
