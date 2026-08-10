@@ -7,6 +7,11 @@ Each generation was killed by a specific, identifiable failure — not by taste.
 This document records what each one was, what broke it, and what survived into
 the next. Nothing here is a proposal; the only live design is **v5**.
 
+> This file is the source of truth. It is also published, with diagrams, at
+> **[motcore.github.io/evolution](https://motcore.github.io/evolution)**
+> (`src/pages/evolution.astro` in the `motcore.github.io` repo). Update this
+> file first, then mirror the change there.
+
 | Gen | Dates | Mechanism | Status |
 |-----|-------|-----------|--------|
 | **v1** | Mar–May 2026 | LEGO + lateral friction wheels | superseded |
