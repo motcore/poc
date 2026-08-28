@@ -166,24 +166,39 @@ to move axially into each other.
 **3. It reduces.** Friction ratio 1.428 × gear ratio 0.500 = **0.714**, i.e.
 **1.4× torque**. Speed is the surplus resource in a tree; torque is not.
 
+**4. Two motor cones, apex to apex — so each axis is bidirectional.** This is
+what v3/v4's "one disc, two usable faces" becomes in cone form. The two cones
+share the central shaft and turn the same way, but their flanks face opposite
+sides of the output axis: drive the carriage down and the output shaft turns
+one way, up and it turns the other. One motor, one axis, both directions,
+without ever reversing the motor.
+
 Actuation collapses to a single degree of freedom — the vertical position of a
-carriage on two 3 mm guide rods — passing through four stops on the way down:
+carriage on two 3 mm guide rods. **Free is the middle**, and the same four-stop
+ladder runs both ways from it:
 
-| # | Position | State |
-|---|----------|-------|
-| 1 | Free | pinion concentric, rings separated, shaft drives nothing |
-| 2 | Mesh | centre distance `e` reached, rings still separated, relative velocity zero → teeth engage without shock |
-| 3 | Contact | rubber flanks touch, normal force zero |
-| 4 | Preload | flanks compressed, torque transmitted |
+| # | Position | \|z\| from mid-plane | State |
+|---|----------|---------------------|-------|
+| 1 | Free | 0 | pinion concentric, rings separated, shaft drives nothing |
+| 2 | Mesh | `e` | centre distance reached, rings still separated, relative velocity zero → teeth engage without shock |
+| 3 | Contact | `e + g` | rubber flanks touch, normal force zero |
+| 4 | Preload | `e + g + δ` | flanks compressed, torque transmitted |
 
-Total stroke 7.45 mm at defaults. Preload travel is absorbed by the gear's own
-root clearance — no slot, no floating ring, no compliant blade.
+Half stroke 7.65 mm, full travel 15.30 mm at defaults. The motor cone apexes
+sit at ±(e + g) — derived, not chosen, since that is what keeps the apexes
+common at contact. Preload travel is absorbed by the gear's own root clearance
+— no slot, no floating ring, no compliant blade.
+
+Four axes, one per cube wall; the cube comes out ~130 mm a side.
 
 **Still open, not settled:** ring density versus micro-slip (≈ 7.4 % at n = 5,
-13.6 % at n = 7, flanks never touch at n = 3); `g + δ` exceeding root clearance
-at m = 1; tooth clash if the carriage re-meshes while the output shaft is still
-turning; and how the rings are actually manufactured. See the open questions in
-`CLAUDE.md`.
+13.6 % at n = 7, flanks never touch at n = 3); tooth clash if the carriage
+re-meshes while the output shaft is still turning; and how the rings are
+actually manufactured. See the open questions in `CLAUDE.md`.
+
+**Closed since:** `g + δ` exceeding the root clearance. It was a floor on the
+module all along (`m ≥ 4·(g + δ)`); the module is now 1.8 with 8/16 teeth,
+which satisfies it exactly — at zero margin, as is `Zc − Zp = 8`.
 
 ---
 
@@ -193,6 +208,9 @@ turning; and how the rings are actually manufactured. See the open questions in
 - **Common apex / matched surface speed.** Introduced in v2, still the core of v5.
 - **O-rings as the friction element.** Introduced in v3.
 - **Friction as a per-axis, software-settable torque limiter.** Introduced in v3.
+- **Both directions from one non-reversing motor**, by engaging one of two
+  opposed friction surfaces. v1 chose a side of the shaft, v3/v4 the top or
+  bottom face of the disc, v5 the lower or upper motor cone.
 - **Two-Arduino split**, controller and driver. Unchanged since v1.
 
 ## Dead ends — do not re-propose

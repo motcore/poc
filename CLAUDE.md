@@ -17,30 +17,54 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
 
 ## Physical layout
 
-- **Motor cone**: on the central vertical shaft (Z), fixed height, rotating
-  continuously.
-- **Output cone**: mounted on a **carriage that translates vertically** on two
-  **3 mm guide rods**. No universal joint, no shaft tilt, no pivot.
-- **Output shaft**: horizontal, fixed, perpendicular to the motor axis.
-  Apexes of the two cones are (nominally) common.
+- **Two motor cones**: on the central vertical shaft (Z), fixed, rotating
+  continuously. They face **apex to apex** — the lower one has its apex up and
+  flares downward, the upper one is the same part fitted upside down. Together
+  they form an hourglass with a waist at the mid-plane.
+- **Output cone**: ONE per axis, sitting in that waist, mounted on a
+  **carriage that translates vertically** on two **3 mm guide rods**. No
+  universal joint, no shaft tilt, no pivot.
+- **Output shaft**: horizontal, fixed, perpendicular to the motor axis, at the
+  mid-plane. Apexes are (nominally) common with whichever cone is engaged.
 - **Contact**: interleaved **rubber O-rings** on both cones, meeting
   **flank to flank** — rubber on rubber, never touching the plastic.
 - Actuation is a single degree of freedom: the vertical position of the carriage.
+- **Four axes**, one per cube wall.
 
 ```
         side view (one axis, Y-Z cross-section)
 
            motor axis (Z)
-                │
-                │        ┌───┐  ← output cone on carriage
-                │       ╱     ╲       (translates vertically ↕)
-                │      │  ○ ○  │ ── output shaft (fixed)
-              ╱ │ ╲     ╲     ╱       + internal corona
-             ╱  │  ╲     └───┘
-            ╱ ○ │ ○ ╲   ← O-rings interleaved, flank to flank
-           ╱────┴────╲
-             motor cone
+            ╲   │   ╱
+             ╲ ○│○ ╱      ← upper motor cone (apex down)
+              ╲ │ ╱
+               ╲│╱  apex          carriage UP   → output turns one way
+                ╳ ← ─────         carriage DOWN → the other way
+               ╱│╲  apex          middle        → free
+              ╱ │ ╲
+             ╱ ○│○ ╲      ← lower motor cone (apex up)
+            ╱   │   ╲
+
+                  ┌───┐  ← output cone on the carriage, in the waist
+                 ╱     ╲       (translates vertically ↕)
+                │  ○ ○  │ ── output shaft (fixed, at the mid-plane)
+                 ╲     ╱       + internal corona
+                  └───┘
 ```
+
+### Why two cones: one axis, both directions
+
+Both motor cones turn with the motor, always the same way — but their flanks
+face **opposite sides of the output axis**. Driving the carriage down brings the
+output cone's lower flank onto the lower motor cone; driving it up brings its
+upper flank onto the upper one, and the output shaft then turns **the other
+way**. One motor, one axis, both directions, without ever reversing the motor.
+
+This is the conical descendant of v3/v4's "one disc, two usable faces". It is
+also why **free is the middle** of the travel rather than one end.
+
+The pinion does not care about the sign: it is captive inside the corona and
+meshes at whatever azimuth it is offset to.
 
 ---
 
@@ -61,17 +85,31 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
   shaft carries nothing at all → **real free rotation**, not a friction
   threshold.
 
-### Four carriage positions, descending
+### Four carriage positions — symmetric, both ways from the middle
 
-| # | Position | State |
-|---|----------|-------|
-| 1 | **Free**     | pinion concentric, rings separated, output shaft drives nothing |
-| 2 | **Mesh**     | correct centre distance `e` reached, rings **still separated**, relative velocity zero → teeth engage without shock |
-| 3 | **Contact**  | rubber flanks touch, normal force zero |
-| 4 | **Preload**  | flanks compressed, torque transmitted |
+`z` is measured from the mid-plane, where the output shaft and its corona sit.
+**Free is z = 0**; the same ladder runs downward and upward, only the sign
+changes. Down engages the lower motor cone, up the upper one.
+
+| # | Position | \|z\| | State |
+|---|----------|-------|-------|
+| 1 | **Free**     | `0`         | pinion concentric, rings separated, output shaft drives nothing |
+| 2 | **Mesh**     | `e`         | correct centre distance reached, rings **still separated**, relative velocity zero → teeth engage without shock |
+| 3 | **Contact**  | `e + g`     | rubber flanks touch, normal force zero |
+| 4 | **Preload**  | `e + g + δ` | flanks compressed, torque transmitted |
 
 The preload travel is absorbed by the gear's own **root clearance**
 (`0.25 · m`). **No slot, no floating ring, no compliant blade.**
+
+**The apex separation is not a free parameter.** Each motor cone's apex must be
+exactly where the output cone's apex lands at *contact* on that side — that is
+what makes the apexes common, which is the whole basis of the matched-surface-
+speed contact. So:
+
+```
+motor cone apexes at z = ± (e + g)      separation = 2 · (e + g)
+full travel (down to up) = 2 · (e + g + δ)
+```
 
 ---
 
@@ -102,8 +140,15 @@ Derived at defaults:
 | mesh travel | 2.00 mm |
 | **total stroke** | **7.45 mm** |
 | ring pitch `q` | 2.25 mm (< d ✓) |
-| apex separation | 1.33 mm |
+| ring-induced apex offset | 1.33 mm |
 | micro-slip | ≈ 7.4 % |
+| motor cone apexes | z = ± 7.40 mm (separation 14.80 mm) |
+| full travel (down..up) | 15.30 mm |
+
+(The **stroke** row above is the half stroke, from free to preload on one side.
+Note the two distinct "apex" quantities: the *ring-induced apex offset* is the
+error the O-ring interleaving introduces, while the *motor cone apex*
+separation is the deliberate geometric layout of the two cones.)
 
 ---
 
@@ -124,9 +169,11 @@ free float  = e − 2m
 mesh travel = 2m
 
 q           = L / (2n − 2)                  ring pitch along the contact line
-apex sep    = sqrt(d² − q²) / sin(α_m)
+apex sep    = sqrt(d² − q²) / sin(α_m)      error from ring interleaving
 
-stroke      = e + g + δ
+stroke      = e + g + δ                     half stroke, free → preload
+motor apex  = ± (e + g)                     the two cones' apexes
+travel      = 2 · (e + g + δ)               full down-to-up travel
 ```
 
 ### Transmitted torque
@@ -144,10 +191,12 @@ position, so each axis can cap its slip torque in software.
 - **Y** = horizontal, pointing from the motor axis toward the wall / output shaft.
 - The cross-section is the vertical plane containing both the motor axis and
   the output shaft axis.
-- Carriage height reference: **contact = 0**, downward negative.
-  `z_free = g + e`, `z_mesh = g`, `z_contact = 0`, `z_preload = −δ`.
-- The output shaft axis is fixed at `z = g + e` (so the pinion is concentric
-  with the corona in position 1).
+- Carriage height reference: **free (the mid-plane) = 0**, and the ladder is
+  symmetric: `|z_free| = 0`, `|z_mesh| = e`, `|z_contact| = e + g`,
+  `|z_preload| = e + g + δ`. Negative z engages the lower motor cone, positive
+  the upper one.
+- The output shaft axis is fixed at `z = 0` (so the pinion is concentric with
+  the corona at rest, in position 1).
 
 ---
 
@@ -167,6 +216,11 @@ position, so each axis can cap its slip torque in software.
    multiplexing is required (analog output, PWM, or a TCA9548A).
 7. **Rubber on rubber only.** Ring flanks meet each other; they never contact
    the plastic cone surface.
+8. **Free is the middle of the travel, not an end.** The two motor cones make
+   each axis bidirectional; a ladder that runs only one way throws away half
+   the mechanism.
+9. **The motor cone apexes sit at ±(e + g).** Derived, never dialled in by
+   hand — that is what keeps the apexes common at contact.
 
 ---
 
@@ -200,7 +254,8 @@ position, so each axis can cap its slip torque in software.
 
 | File | Purpose |
 |------|---------|
-| `cad/clutch_geometry_v5.html` | Interactive 2D visualiser — **active**, v5 vertical cone clutch |
+| `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — **active**, full cube: 4 bidirectional axes, 2 motor cones. Prints its own constraint + interference checks on every run |
+| `cad/clutch_geometry_v5.html` | Interactive 2D visualiser — v5 geometry. **Note:** predates the two-cone/bidirectional layout; it still draws a single motor cone and the one-sided stop ladder |
 | `cad/clutch_geometry_v3.html` | Visualiser for the superseded tilting-disc design |
 | `cad/clutch_geometry.html`    | Older visualiser (superseded) |
 | `cad/motcore_compliant_lever.py` | FreeCAD macro — tilting-disc branch (superseded) |
