@@ -3,13 +3,18 @@
 ## What this project is
 
 Motcore is an open hardware **multi-axis actuator tree**. One central motor
-(Z axis, vertical) drives multiple output axes through **vertical conical
-friction clutches**. Each output axis has its own clutch module; engaging a
-clutch connects that axis to the rotating motor cone.
+(Z axis, vertical) drives multiple output axes through **conical friction
+clutches**. Each output axis has its own clutch module; engaging a clutch
+connects that axis to the rotating motor cone.
 
 Each output feeds the **next hub of the tree**, so every level is a
 **reduction**, never 1:1 — torque has to be regenerated at each stage, and
 speed is the resource there is plenty of.
+
+The target application is **passive-dynamic walkers** (a rocking biped, a
+bouncing quadruped), which changes what matters: a genuinely free "free" state,
+back-drivability and low reflected inertia are features, not compromises. See
+`docs/clutch-geometry-v6.md` §2 and the open questions.
 
 All mechanical design files are in `cad/`. Firmware in `src/`.
 
@@ -17,18 +22,18 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
 
 ## Physical layout
 
-- **Two motor cones**: on the central vertical shaft (Z), fixed, rotating
-  continuously. They face **apex to apex** — the lower one has its apex up and
-  flares downward, the upper one is the same part fitted upside down. Together
-  they form an hourglass with a waist at the mid-plane.
-- **Output cone**: ONE per axis, sitting in that waist, mounted on a
-  **carriage that translates vertically** on two **3 mm guide rods**. No
-  universal joint, no shaft tilt, no pivot.
-- **Output shaft**: horizontal, fixed, perpendicular to the motor axis, at the
-  mid-plane. Apexes are (nominally) common with whichever cone is engaged.
-- **Contact**: interleaved **rubber O-rings** on both cones, meeting
-  **flank to flank** — rubber on rubber, never touching the plastic.
-- Actuation is a single degree of freedom: the vertical position of the carriage.
+- **Two motor cones** on the central vertical shaft (Z), fixed in height,
+  rotating continuously, flaring away from a common apex at the origin.
+- **Output cone**: ONE per axis, sitting in the waist, on a carriage that
+  **pivots ±2° about that common apex**. The carriage hangs on a **four-bar
+  linkage** whose link axes converge on the apex, so the pivot is virtual —
+  nothing physical sits at the apex, which is just as well because the motor
+  shaft is there.
+- **Output shaft**: horizontal, fixed, perpendicular to the motor axis at rest,
+  **centred on the wall**.
+- **Contact**: a **continuous rubber layer** on both cones, meeting along the
+  shared generatrix — rubber on rubber, never plastic.
+- Actuation is a single degree of freedom: the carriage's tilt angle.
 - **Four axes**, one per cube wall.
 
 ```
@@ -36,80 +41,71 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
 
            motor axis (Z)
             ╲   │   ╱
-             ╲ ○│○ ╱      ← upper motor cone (apex down)
+             ╲  │  ╱       ← upper motor cone (apex down)
               ╲ │ ╱
-               ╲│╱  apex          carriage UP   → output turns one way
-                ╳ ← ─────         carriage DOWN → the other way
-               ╱│╲  apex          middle        → free
-              ╱ │ ╲
-             ╱ ○│○ ╲      ← lower motor cone (apex up)
+               ╲│╱
+                ◉ ← ONE common apex = the pivot (virtual)
+               ╱│╲
+              ╱ │ ╲        ← lower motor cone (apex up)
+             ╱  │  ╲
             ╱   │   ╲
 
-                  ┌───┐  ← output cone on the carriage, in the waist
-                 ╱     ╲       (translates vertically ↕)
-                │  ○ ○  │ ── output shaft (fixed, at the mid-plane)
-                 ╲     ╱       + internal corona
-                  └───┘
+                 ┌────┐ ← output cone, pivots ±2° about the apex
+                ╱      ╲      tilt UP   → output turns one way
+               │   ○    │ ─── tilt DOWN → the other way
+                ╲      ╱      middle    → free
+                 └────┘       + pinion, idlers, corona (all meshed, always)
 ```
 
 ### Why two cones: one axis, both directions
 
 Both motor cones turn with the motor, always the same way — but their flanks
-face **opposite sides of the output axis**. Driving the carriage down brings the
-output cone's lower flank onto the lower motor cone; driving it up brings its
-upper flank onto the upper one, and the output shaft then turns **the other
-way**. One motor, one axis, both directions, without ever reversing the motor.
+face **opposite sides of the output axis**. Tilting the carriage one way brings
+the output cone onto the lower motor cone; the other way onto the upper one, and
+the output shaft then turns **the other way**. One motor, one axis, both
+directions, without ever reversing the motor.
 
-This is the conical descendant of v3/v4's "one disc, two usable faces". It is
-also why **free is the middle** of the travel rather than one end.
-
-The pinion does not care about the sign: it is captive inside the corona and
-meshes at whatever azimuth it is offset to.
+This is why **free is the middle** of the travel rather than one end.
 
 ---
 
-## Clutch mechanism — v5, vertical cone
+## Clutch mechanism — v6 "Apex Pivot"
 
-- The **motor cone** carries `n` O-rings seated on its generatrix; the
-  **output cone** carries `n − 1`, offset by half a pitch so the two sets
-  **interdigitate**.
-- Torque passes **rubber against rubber** (μ ≈ 1.2–1.5) instead of rubber on
-  plastic (μ ≈ 0.6–0.9).
-- **Preload is radial, between flanks.** That decouples it from apex
-  displacement — pushing harder does not need the cones to move axially into
-  each other.
-- **Gear stage**: a **pinion rigid to the output cone** lives **permanently
-  inside an internal corona (ring gear) fixed to the output shaft**. The
-  pinion never enters or leaves the ring — it is captive by construction.
-- **Free = pinion concentric with the corona** (centre distance 0). The output
-  shaft carries nothing at all → **real free rotation**, not a friction
-  threshold.
+Full derivation, numbers and rejected alternatives: **`docs/clutch-geometry-v6.md`**.
+Read that before proposing changes. Summary:
 
-### Four carriage positions — symmetric, both ways from the middle
+- **The apex is the hinge.** It never moves, in any position. Preload therefore
+  acts exactly along the contact normal (100%, against 87% for v5's vertical
+  push) and adds zero apex error.
+- **Continuous rubber layer**, thickness `t`, replacing v5's interleaved
+  O-rings. The **plastic** apexes are pulled back by `t / sin(half-angle)` so
+  the **rubber** surfaces are what converge on the origin. Micro-slip ≈ 0
+  (v5: 7.4%).
+- **The gear stage never disengages.** Free rotation comes from the rubber
+  separating, not from the gears letting go; the residual drag is the cone's
+  reflected inertia, ~2% of a leg's, with no torque threshold.
+- **Idler gears centre the output shaft.** Pinion (8t, on the carriage) →
+  idlers (8t, fixed axes, **left and right in X, never up/down**) → corona
+  (24t, output). Ratio 1/3, output on the wall centre.
+- **Actuation**: servo → crank → telescopic link with two springs inside → pin
+  on the carriage's bearing housing, ~46 mm from the apex. No slot, no external
+  guide. The springs make the preload force-controlled rather than
+  position-controlled.
 
-`z` is measured from the mid-plane, where the output shaft and its corona sit.
-**Free is z = 0**; the same ladder runs downward and upward, only the sign
-changes. Down engages the lower motor cone, up the upper one.
+### Three carriage positions — symmetric, both ways from the middle
 
-| # | Position | \|z\| | State |
+The angle `φ` is measured from the mid position. There is **no mesh step**: the
+gears are always engaged.
+
+| # | Position | \|φ\| | State |
 |---|----------|-------|-------|
-| 1 | **Free**     | `0`         | pinion concentric, rings separated, output shaft drives nothing |
-| 2 | **Mesh**     | `e`         | correct centre distance reached, rings **still separated**, relative velocity zero → teeth engage without shock |
-| 3 | **Contact**  | `e + g`     | rubber flanks touch, normal force zero |
-| 4 | **Preload**  | `e + g + δ` | flanks compressed, torque transmitted |
+| 1 | **Free**     | `0`        | rubber separated, output shaft drives nothing |
+| 2 | **Contact**  | `φc`       | rubber surfaces touch, normal force zero |
+| 3 | **Preload**  | `φc + δφ`  | rubber compressed, torque transmitted |
 
-The preload travel is absorbed by the gear's own **root clearance**
-(`0.25 · m`). **No slot, no floating ring, no compliant blade.**
-
-**The apex separation is not a free parameter.** Each motor cone's apex must be
-exactly where the output cone's apex lands at *contact* on that side — that is
-what makes the apexes common, which is the whole basis of the matched-surface-
-speed contact. So:
-
-```
-motor cone apexes at z = ± (e + g)      separation = 2 · (e + g)
-full travel (down to up) = 2 · (e + g + δ)
-```
+`φc = 90° − α − β` — the free gap angle **is** the cone geometry. That coupling
+is the central fact of v6: you cannot open the travel without thinning the
+output cone, which is why the concentric pinion does not fit (see the doc, §9).
 
 ---
 
@@ -118,85 +114,71 @@ full travel (down to up) = 2 · (e + g + δ)
 | Symbol | Default | Description |
 |--------|---------|-------------|
 | **α**  | 55°   | motor cone half-angle (from the vertical axis) |
-| **m**  | 1.0   | gear module |
-| **Zp** | 14    | pinion teeth (on the output cone / carriage) |
-| **Zc** | 28    | corona teeth (on the output shaft) |
+| **β**  | 33°   | output cone half-angle (from its own axis) |
+| **t**  | 2.0 mm | rubber layer thickness |
 | **L**  | 18 mm | contact line length along the generatrix |
 | **s₀** | 10 mm | apex → start of the contact line |
-| **d**  | 2.5 mm| O-ring wire diameter |
-| **n**  | 5     | rings on the motor cone (output carries n − 1) |
-| **g**  | 0.20 mm | margin: full mesh → rubber contact |
-| **δ**  | 0.25 mm | preload travel past contact |
+| **m**  | 1.0   | gear module |
+| **Zp** | 8     | pinion teeth (on the carriage) |
+| **Zi** | 8     | idler teeth |
+| **Zc** | 24    | corona teeth (on the output shaft) |
+| **R_push** | 46 mm | apex → servo push point (bearing housing) |
+| **δφ** | ~0.6° | preload rotation past contact |
 
 Derived at defaults:
 
 | Quantity | Value |
 |----------|-------|
-| friction ratio | 1.428 |
-| gear ratio     | 0.500 |
-| **total ω_out/ω_motor** | **0.714** (→ 1.4× torque) |
-| centre distance `e` | 7.00 mm |
-| free float (no tooth touch) | 5.00 mm |
-| mesh travel | 2.00 mm |
-| **total stroke** | **7.45 mm** |
-| ring pitch `q` | 2.25 mm (< d ✓) |
-| ring-induced apex offset | 1.33 mm |
-| micro-slip | ≈ 7.4 % |
-| motor cone apexes | z = ± 7.40 mm (separation 14.80 mm) |
-| full travel (down..up) | 15.30 mm |
-
-(The **stroke** row above is the half stroke, from free to preload on one side.
-Note the two distinct "apex" quantities: the *ring-induced apex offset* is the
-error the O-ring interleaving introduces, while the *motor cone apex*
-separation is the deliberate geometric layout of the two cones.)
+| free gap angle `φc` | **2°** |
+| friction ratio | 1.503 |
+| gear ratio | 0.333 |
+| **total ω_out/ω_motor** | **0.501** (→ ×2.0 torque) |
+| plastic apex offset, motor cones | 2.44 mm each |
+| plastic apex offset, output cone | 3.67 mm |
+| micro-slip from the ring/layer geometry | ≈ 0 (v5: 7.4%) |
+| residual apex drift from the four-bar | 0.22 mm at full preload ≈ 1% slip |
+| lever (R_push / mean rubber distance) | ≈ ×2.4 |
+| output torque per newton of actuator force | ≈ 0.098 Nm/N **(upper bound, unverified)** |
 
 ---
 
 ## Governing equations
 
 ```
-α_out       = 90 − α_motor                  (perpendicular axes, common apex)
+φc          = 90 − α − β                   free gap angle = the cone geometry
 
-ratio_fric  = sin(α_m) / sin(α_o)           independent of position along the
-                                            contact line
+apex offset = t / sin(half-angle)          plastic pulled back so the RUBBER
+                                           surfaces share the apex
 
-ratio_gear  = Zp / Zc                       internal mesh, reducing
+travel(p)   = distance(p, apex) · φ        every point moves by its own radius —
+                                           this is what makes v6 unlike v5
 
-ratio_total = ratio_fric · ratio_gear
+ratio_fric  = sin α / sin β
+ratio_gear  = Zp / Zc                      idlers do not change the ratio
+ratio_total = ratio_fric · ratio_gear      must stay < 1
 
-e           = m · (Zc − Zp) / 2             centre distance at mesh
-free float  = e − 2m
-mesh travel = 2m
-
-q           = L / (2n − 2)                  ring pitch along the contact line
-apex sep    = sqrt(d² − q²) / sin(α_m)      error from ring interleaving
-
-stroke      = e + g + δ                     half stroke, free → preload
-motor apex  = ± (e + g)                     the two cones' apexes
-travel      = 2 · (e + g + δ)               full down-to-up travel
+ΣN          = F · R_push / s̄               normal force from actuator force
+T_out       ≈ μ · F · R_push · sin β · (Zc/Zp)
 ```
 
 ### Transmitted torque
 
-Torque is set by the radial preload between rubber flanks, with
-μ ≈ 1.2–1.5 (rubber on rubber). It is also a **per-axis torque limiter**: it
-slips above the preload-set threshold, and the preload is set by carriage
-position, so each axis can cap its slip torque in software.
+Set by the preload between rubber layers, μ ≈ 1.2–1.5 (rubber on rubber). It is
+also a **per-axis torque limiter**: it slips above the preload-set threshold, and
+the preload is set by servo angle against the series spring, so each axis caps
+its own slip torque. Slipping also makes the joint back-drivable, which the
+passive-dynamics goal wants.
 
 ---
 
-## Coordinate system (2D visualiser, Y-Z cross-section)
+## Coordinate system (Y-Z cross-section)
 
 - **Z** = motor shaft, vertical, upward. Motor axis at Y = 0.
-- **Y** = horizontal, pointing from the motor axis toward the wall / output shaft.
-- The cross-section is the vertical plane containing both the motor axis and
-  the output shaft axis.
-- Carriage height reference: **free (the mid-plane) = 0**, and the ladder is
-  symmetric: `|z_free| = 0`, `|z_mesh| = e`, `|z_contact| = e + g`,
-  `|z_preload| = e + g + δ`. Negative z engages the lower motor cone, positive
+- **Y** = horizontal, from the motor axis toward the wall / output shaft.
+- **Origin = the common apex = the pivot.** Everything is measured from it.
+- Carriage tilt `φ`: 0 is free, negative engages the lower motor cone, positive
   the upper one.
-- The output shaft axis is fixed at `z = 0` (so the pinion is concentric with
-  the corona at rest, in position 1).
+- The output shaft axis lies along Y through the origin (centred on the wall).
 
 ---
 
@@ -204,49 +186,65 @@ position, so each axis can cap its slip torque in software.
 
 1. **Reduction, not 1:1.** The output feeds the next hub of the tree; torque
    must be regenerated at every level. Speed is the surplus resource.
-2. **Mesh BEFORE rubber contact, never after.** Teeth must engage at zero
-   relative velocity.
-3. **`g + δ ≤ 0.25 · m`** (root clearance) — otherwise the pinion jams into
-   the corona.
-4. **`q < d`**, or the flanks never touch at all.
-5. **`Zc − Zp ≥ 8`** — internal-mesh interference.
-6. **The AS5600 on every output shaft is structural, not optional.** Friction
-   slip accumulates non-repeatably in series along a tree; position is only
-   known by measuring it. The I2C address is fixed at **0x36**, so
-   multiplexing is required (analog output, PWM, or a TCA9548A).
-7. **Rubber on rubber only.** Ring flanks meet each other; they never contact
-   the plastic cone surface.
+2. **All three cones share ONE apex, and it is the pivot.** What must converge
+   there are the **rubber** surfaces, so the plastic apexes are offset by
+   `t / sin(half-angle)`. Never dial this in by hand.
+3. **Rubber on rubber only.** The plastic cone surfaces never touch.
+4. **The gear stage never disengages.** Free comes from the rubber separating.
+5. **The cone axis must pass through the apex**, which is why the output shaft
+   is the thing that gets centred by idlers, not the pinion.
+6. **Idlers on the X axis, never on Z.** The pinion moves vertically when the
+   carriage tilts; idlers above/below would jam on one side and disengage on the
+   other.
+7. **`Zc − Zp ≥ 8`** — internal-mesh interference.
 8. **Free is the middle of the travel, not an end.** The two motor cones make
-   each axis bidirectional; a ladder that runs only one way throws away half
-   the mechanism.
-9. **The motor cone apexes sit at ±(e + g).** Derived, never dialled in by
-   hand — that is what keeps the apexes common at contact.
+   each axis bidirectional.
+9. **The AS5600 on every output shaft is structural, not optional.** Friction
+   slip accumulates non-repeatably in series along a tree; position is only
+   known by measuring it. I2C address fixed at **0x36**, so multiplexing is
+   required (analog output, PWM, or a TCA9548A).
 
 ---
 
 ## Open questions — do NOT present these as settled
 
-- **Ring density vs micro-slip.** More rings interdigitate better but push the
-  cones apart, separating the apexes. At n=5 slip is ≈ 7.4 %, at n=7 ≈ 13.6 %,
-  at n=3 the flanks never reach each other. Narrow window — needs a sweep over
-  `L` and `d`.
-- **`g + δ` exceeds the root clearance at m=1.** Unresolved (invariant 3 is
-  currently violated by the defaults; the visualiser flags it).
-- **Re-meshing while the output shaft is still turning** (e.g. an arm falling)
-  causes tooth clash. Firmware problem — requires a velocity check via the
-  AS5600 before engaging.
-- **How the rings are manufactured.** Catalogue O-rings fix the diameters, and
-  the ring pitches then have to land on the generatrix.
+- **Rubber stiffness. The number everything hangs on.** How much normal force
+  does a 2 mm layer develop at ~0.2 mm of squeeze? Until it is measured on the
+  bench, every torque figure here is an estimate. It decides the spring, the
+  servo and whether the cones must grow.
+- **Spring rate, and how the extra travel splits between spring and rubber.**
+  The 10:1 currently assumed is invented.
+- **Four-bar drift.** "< 0.1 mm over ±2°" is an estimate; the macro should
+  compute and print it.
+- **How the rubber layer is made.** A cone unrolls into a flat sector, so a cut
+  sheet can be wrapped on — untested (adhesive, seam, uniformity).
+- **Packaging**: servo placement, idler support bracket, and the frame pivots
+  for the links (they sit at z ≈ ±44 mm, past where the motor cones end).
+- **Central motor sizing.** Depends on the rubber measurement and on how many
+  axes engage at once — demands **add**, they do not divide.
 
 ---
 
 ## Discarded — do not re-propose
 
-- **Tilting flat disc with a universal joint.** Superseded by the vertical cone.
+- **Tilting flat disc with a universal joint** (v3/v4). Superseded.
 - **Laboratory conical rubber stoppers** as friction elements.
 - **Fixed-threshold friction clutches to obtain free rotation.** Lifting and
-  falling demand the same torque, so no threshold separates them. Free
-  rotation comes from the concentric-pinion geometry instead.
+  falling demand the same torque, so no threshold separates them.
+- **Interleaved O-rings** (v5). The interdigitation forces the cones apart and
+  costs 7.4% micro-slip, uncorrectably. Replaced by the continuous layer.
+- **Concentric pinion in v6** (free = pinion concentric). Needs a gap angle of
+  10–12° whatever you do, because rotation moves the pinion ~3× faster than the
+  rubber and lengthening the shaft gains and loses in the same proportion. A
+  conical/beveloid pair makes the tilt a design angle and a working point does
+  exist, but at ~0.4 mm of clearance margin and module 0.85 — rejected as too
+  tight, not as impossible. Full reasoning in the doc, §9.
+- **Cam (disc or drum) for a variable ratio.** Unnecessary: the series spring
+  already gives fast-then-powerful, because the load changes, not the ratio.
+- **Scotch yoke with slot and rail.** Replaced by the telescopic spring link.
+- **Belt or pulley reduction at the joint.** Breaks stacking symmetry.
+- **Flexure virtual pivot.** Deferred to v7, not rejected — PLA creeps under
+  sustained load.
 
 ---
 
@@ -254,8 +252,11 @@ position, so each axis can cap its slip torque in software.
 
 | File | Purpose |
 |------|---------|
-| `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — **active**, full cube: 4 bidirectional axes, 2 motor cones. Prints its own constraint + interference checks on every run |
-| `cad/clutch_geometry_v5.html` | Interactive 2D visualiser — v5 geometry. **Note:** predates the two-cone/bidirectional layout; it still draws a single motor cone and the one-sided stop ladder |
+| `docs/clutch-geometry-v6.md` | **v6 design — the source of truth.** Geometry, actuation, rejected alternatives, open questions, next steps |
+| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **to be written**, from the v5 macro |
+| `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — v5, superseded. Still the best reference for cone solids, FDM hole compensation, gear helpers and the self-check scaffolding |
+| `cad/clutch_geometry_v6.html` | Interactive 2D visualiser for v6 — four-bar, spring link, gear front view. Self-contained (no deps), meant for motcore.github.io |
+| `cad/clutch_geometry_v5.html` | 2D visualiser — superseded, two generations stale (single motor cone, one-sided ladder) |
 | `cad/clutch_geometry_v3.html` | Visualiser for the superseded tilting-disc design |
 | `cad/clutch_geometry.html`    | Older visualiser (superseded) |
 | `cad/motcore_compliant_lever.py` | FreeCAD macro — tilting-disc branch (superseded) |
@@ -264,7 +265,8 @@ position, so each axis can cap its slip torque in software.
 | `cad/motcore_animate.py`      | FreeCAD macro — bevel cone animation (superseded) |
 | `cad/calibration.py`          | FreeCAD macro — FDM tolerance calibration coupon |
 | `docs/build-log.md`           | Prototype build log — purchases, prints, calibrations, tests |
-| `docs/clutch-geometry.md`     | Clutch geometry notes |
+| `docs/clutch-geometry.md`     | v5 clutch geometry notes (superseded by the v6 doc) |
+| `docs/design-evolution.md`    | History of all generations |
 | `src/controller/`             | Arduino firmware — master (touchscreen UI) |
 | `src/driver/`                 | Arduino firmware — receiver (motor + servo control) |
 

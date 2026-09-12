@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motcore v6 — Apex Pivot Cone Clutch</title>
+<style>
+:root{
+  --bg:#faf9f7; --card:#fff; --text:#1a1a18; --text2:#5f5e5a; --border:#d3d1c7;
+  --gray:#888780; --gray-s:#5f5e5a; --teal:#1d9e75; --teal-s:#0f6e56;
+  --coral:#d85a30; --coral-h:#993c1d; --blue:#378add; --blue-s:#185fa5;
+  --amber:#ba7517; --purple:#7f77dd;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#1a1a18; --card:#232320; --text:#f1efe8; --text2:#b4b2a9; --border:#444441; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.7 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:32px 20px 64px}
+h1{font-size:24px;font-weight:500;margin:0 0 4px}
+h2{font-size:18px;font-weight:500;margin:32px 0 8px}
+p{color:var(--text2);margin:0 0 16px;max-width:70ch}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:20px 0}
+svg{display:block;width:100%;height:auto}
+.t{font-size:14px;fill:var(--text)}
+.ts{font-size:12px;fill:var(--text2)}
+.th{font-size:14px;font-weight:500;fill:var(--text)}
+.ctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 0;font-size:13px;color:var(--text2)}
+button{font:inherit;color:var(--text);background:transparent;border:1px solid var(--border);
+  border-radius:8px;padding:6px 14px;cursor:pointer;min-width:104px}
+button:hover{border-color:var(--text2)}
+label{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+input[type=range]{flex:1;min-width:160px;accent-color:var(--teal)}
+.leg{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--text2);margin:10px 0 0}
+.leg span{display:flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:2px;display:inline-block}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}
+.stat{flex:1;min-width:132px;border:1px solid var(--border);border-radius:8px;padding:8px 12px}
+.stat .k{font-size:12px;color:var(--text2)}
+.stat .v{font-size:16px;font-variant-numeric:tabular-nums}
+#phase{color:var(--text)}
+footer{margin-top:40px;font-size:13px;color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Motcore v6 — Apex Pivot</h1>
+<p>Vertical cross-section of one cube axis. The output cone does not translate:
+it <strong>pivots about ±2° around the vertex it shares with the two motor cones</strong>.
+That vertex falls inside the motor shaft, so no bearing can sit there — the rotation comes
+from a four-bar linkage whose link axes converge on exactly that point.</p>
+
+<div class="card">
+<svg viewBox="0 0 900 600" role="img" aria-label="Animated cross-section of the v6 cone clutch">
+<g id="fixed">
+  <rect x="110" y="80" width="11" height="440" fill="var(--gray)" fill-opacity=".55" stroke="var(--gray-s)" stroke-width=".5"/>
+  <polygon points="110,318.3 120.8,318.3 232.5,396.5 110,396.5" fill="var(--gray)" fill-opacity=".35" stroke="var(--gray-s)" stroke-width=".5"/>
+  <polygon points="110,281.7 120.8,281.7 232.5,203.5 110,203.5" fill="var(--gray)" fill-opacity=".35" stroke="var(--gray-s)" stroke-width=".5"/>
+  <line id="mrL" x1="143.5" y1="328.9" x2="208.4" y2="374.3" stroke="var(--coral)" stroke-width="8.8"/>
+  <line id="mrU" x1="143.5" y1="271.1" x2="208.4" y2="225.7" stroke="var(--coral)" stroke-width="8.8"/>
+  <rect x="336.6" y="234" width="35.2" height="132" fill="var(--gray)" fill-opacity=".22" stroke="var(--gray-s)" stroke-width=".5" stroke-dasharray="4 3"/>
+  <rect x="371.8" y="289" width="37.4" height="22" fill="var(--gray)" fill-opacity=".55" stroke="var(--gray-s)" stroke-width=".5"/>
+</g>
+<polyline id="trO" fill="none" stroke="var(--teal-s)" stroke-width="1"/>
+<polyline id="trIC" fill="none" stroke="var(--purple)" stroke-width="1"/>
+<polygon id="oc" fill="var(--teal)" fill-opacity=".32" stroke="var(--teal-s)" stroke-width=".5"/>
+<line id="or1" stroke="var(--coral)" stroke-width="8.8"/>
+<line id="or2" stroke="var(--coral)" stroke-width="8.8"/>
+<polygon id="sh" fill="var(--gray)" fill-opacity=".55" stroke="var(--gray-s)" stroke-width=".5"/>
+<polygon id="pn" fill="var(--teal)" fill-opacity=".45" stroke="var(--teal-s)" stroke-width=".5"/>
+<line id="st1" stroke="var(--teal-s)" stroke-width="5"/>
+<line id="st2" stroke="var(--teal-s)" stroke-width="5"/>
+<g id="drv">
+  <polygon id="svb" points="277.2,432 347.6,432 347.6,520 277.2,520" fill="var(--gray-s)" fill-opacity=".3" stroke="var(--gray-s)" stroke-width=".5"/>
+  <line id="lnk" stroke="var(--blue-s)" stroke-width="7" stroke-linecap="round"/>
+  <polyline id="spr" fill="none" stroke="var(--amber)" stroke-width="1.8"/>
+  <line id="crk" stroke="var(--blue-s)" stroke-width="4" stroke-linecap="round"/>
+  <circle id="hub" r="5" fill="var(--blue-s)"/>
+  <circle id="pinJ" r="3.4" fill="var(--card)" stroke="var(--blue-s)" stroke-width="1.4"/>
+  <polygon id="tab" fill="var(--teal)" fill-opacity=".75" stroke="var(--teal-s)" stroke-width=".5"/>
+  <circle id="tabJ" r="3.4" fill="var(--card)" stroke="var(--teal-s)" stroke-width="1.4"/>
+</g>
+<line id="ex1" stroke="var(--purple)" stroke-width="1" stroke-dasharray="6 5"/>
+<line id="ex2" stroke="var(--purple)" stroke-width="1" stroke-dasharray="6 5"/>
+<line id="lk1" stroke="var(--teal)" stroke-width="7" stroke-linecap="round"/>
+<line id="lk2" stroke="var(--teal)" stroke-width="7" stroke-linecap="round"/>
+<circle cx="274.1" cy="104.6" r="6" fill="var(--gray)" stroke="var(--gray-s)" stroke-width="1"/>
+<circle cx="274.1" cy="495.4" r="6" fill="var(--gray)" stroke="var(--gray-s)" stroke-width="1"/>
+<circle id="b1" r="5" fill="var(--teal-s)"/>
+<circle id="b2" r="5" fill="var(--teal-s)"/>
+<line x1="100" y1="300" x2="120" y2="300" stroke="var(--text)" stroke-width="1.5"/>
+<line x1="110" y1="290" x2="110" y2="310" stroke="var(--text)" stroke-width="1.5"/>
+<circle id="ic" r="9" fill="none" stroke="var(--purple)" stroke-width="2.5"/>
+<circle id="op" r="3.5" fill="var(--teal-s)"/>
+<g id="gin">
+  <path d="M700,190 a75,75 0 1,0 150,0 a75,75 0 1,0 -150,0 Z M720,190 a55,55 0 1,0 110,0 a55,55 0 1,0 -110,0 Z"
+        fill="var(--gray)" fill-opacity=".3" fill-rule="evenodd" stroke="var(--gray-s)" stroke-width=".5"/>
+  <circle cx="775" cy="190" r="60" fill="none" stroke="var(--gray-s)" stroke-width=".5" stroke-dasharray="3 3"/>
+  <circle cx="735" cy="190" r="25" fill="var(--blue)" fill-opacity=".3" stroke="var(--blue-s)" stroke-width=".5"/>
+  <circle cx="815" cy="190" r="25" fill="var(--blue)" fill-opacity=".3" stroke="var(--blue-s)" stroke-width=".5"/>
+  <circle cx="735" cy="190" r="2.5" fill="var(--blue-s)"/>
+  <circle cx="815" cy="190" r="2.5" fill="var(--blue-s)"/>
+  <circle id="gp" cx="775" cy="190" r="25" fill="var(--teal)" fill-opacity=".45" stroke="var(--teal-s)" stroke-width=".5"/>
+  <circle id="gpc" cx="775" cy="190" r="2.5" fill="var(--teal-s)"/>
+  <line x1="768" y1="190" x2="782" y2="190" stroke="var(--text)" stroke-width="1.2"/>
+  <line x1="775" y1="183" x2="775" y2="197" stroke="var(--text)" stroke-width="1.2"/>
+  <text class="ts" x="775" y="290" text-anchor="middle">gear stage, seen face-on</text>
+  <text class="ts" x="775" y="308" text-anchor="middle">the pinion rides up and down, never leaves the mesh</text>
+</g>
+</svg>
+
+<div class="leg">
+<span><span class="sw" style="background:var(--gray)"></span>fixed: motor cones, corona, output shaft</span>
+<span><span class="sw" style="background:var(--teal)"></span>carriage, output cone and pinion</span>
+<span><span class="sw" style="background:var(--coral)"></span>rubber layer</span>
+<span><span class="sw" style="background:var(--blue)"></span>servo, link and idler gears</span>
+<span><span class="sw" style="background:var(--amber)"></span>springs inside the link</span>
+<span><span class="sw" style="border:2px solid var(--purple);border-radius:50%"></span>actual centre of rotation</span>
+</div>
+
+<div class="ctl">
+  <button id="play">Pause</button>
+  <span>Position</span>
+  <input type="range" id="pos" min="-100" max="100" value="0" autocomplete="off">
+</div>
+<div class="ctl">
+  <label><input type="checkbox" id="exag" autocomplete="off"> Exaggerate tilt ×3 (hides servo and gears)</label>
+  <label><input type="checkbox" id="trace" checked autocomplete="off"> Show trace</label>
+</div>
+<div class="ctl"><span id="phase">Free: the carriage follows the servo</span></div>
+
+<div class="stats">
+  <div class="stat"><div class="k">Servo</div><div class="v" id="vpsi">0°</div></div>
+  <div class="stat"><div class="k">Carriage tilt</div><div class="v" id="vphi">+0.00°</div></div>
+  <div class="stat"><div class="k">Spring compression</div><div class="v" id="vspr">0.00 mm</div></div>
+  <div class="stat"><div class="k">Apex drift</div><div class="v" id="vdr">0.000 mm</div></div>
+  <div class="stat"><div class="k">Instant centre drift</div><div class="v" id="vic">0.00 mm</div></div>
+</div>
+</div>
+
+<h2>What you are looking at</h2>
+<p>The <strong>dashed purple lines</strong> are the axes of the two links, extended. They
+cross at the purple ring: that is where the carriage is actually turning at that instant,
+even though nothing physical sits there. The cross marks the vertex shared by all three
+cones, and the green dot is the carriage's own vertex.</p>
+
+<p>Notice that <strong>the green dot barely leaves the cross</strong> — 0.22 mm over the
+whole stroke. That is the error that matters, because it is the one that displaces the real
+vertex and puts sliding into the contact. The purple ring, on the other hand, does wander
+once you leave the centre: the instant centre of a four-bar always travels, and only
+coincides with the vertex in the neutral position. Put another way, the mechanism does not
+turn exactly about the vertex — it turns <em>almost</em> about the vertex, and that
+"almost" is two tenths of a millimetre.</p>
+
+<p>The servo does not push the carriage through a slider but through a
+<strong>telescopic link with two springs inside</strong>, pinned at both ends. At first the
+carriage follows it with almost no load. The moment the rubber layers touch, the carriage
+stops and every remaining degree of servo travel goes into compressing the spring: preload
+is set by force, not by position. And because the crank works near its dead centre during
+that phase, the servo pushes hard while barely loading its gearbox.</p>
+
+<footer>
+Motcore — v6 "Apex Pivot". Figures, derivations and the alternatives that were rejected
+are in <code>docs/clutch-geometry-v6.md</code>.
+</footer>
+</div>
+
+<script>
+const S=4.4,OX=110,OY=300,R2D=180/Math.PI,D2R=1/R2D;
+const X=y=>OX+S*y, Z=z=>OY-S*z, pt=p=>X(p[0]).toFixed(1)+','+Z(p[1]).toFixed(1);
+const $=id=>document.getElementById(id), poly=a=>a.map(pt).join(' ');
+const A1=[37.3,44.4],A2=[37.3,-44.4],B10=[27,32.2],B20=[27,-32.2];
+const L1=Math.hypot(B10[0]-A1[0],B10[1]-A1[1]),L2=Math.hypot(B20[0]-A2[0],B20[1]-A2[1]);
+const CPL=Math.hypot(B20[0]-B10[0],B20[1]-B10[1]);
+const a10=Math.atan2(B10[1]-A1[1],B10[0]-A1[0]),ang0=Math.atan2(B20[1]-B10[1],B20[0]-B10[0]);
+const OC=[[6.19,1.63],[32.18,18.52],[32.18,-18.52],[6.19,-1.63]];
+const OR1=[[8.94,4.61],[24.04,14.42]],OR2=[[8.94,-4.61],[24.04,-14.42]];
+const SH=[[6,2.5],[56.5,2.5],[56.5,-2.5],[6,-2.5]],PN=[[51.5,5],[56.5,5],[56.5,-5],[51.5,-5]];
+const J=[33,0],PC=[54,0],TP=[46,0];
+const CK=[46,-28],RC=6.3,LNK=28,AMP=6.0,CONT=1.6,RHO=1/11,RPUSH=46,PHIEX=8*D2R,PER=3000;
+let playing=true,exag=false,trace=true,thPos=0,thNeg=0,sgn=1,t0=performance.now(),u=0,lastU=null;
+const trIC=[],trO=[];
+function circInt(p0,r0,p1,r1,ref){const dx=p1[0]-p0[0],dy=p1[1]-p0[1],d=Math.hypot(dx,dy);
+ if(d>r0+r1||d<Math.abs(r0-r1))return null;const a=(r0*r0-r1*r1+d*d)/(2*d),h=Math.sqrt(Math.max(r0*r0-a*a,0));
+ const xm=p0[0]+a*dx/d,ym=p0[1]+a*dy/d,s1=[xm+h*dy/d,ym-h*dx/d],s2=[xm-h*dy/d,ym+h*dx/d];
+ return Math.hypot(s1[0]-ref[0],s1[1]-ref[1])<Math.hypot(s2[0]-ref[0],s2[1]-ref[1])?s1:s2;}
+function pose(th){const B1=[A1[0]+L1*Math.cos(a10+th),A1[1]+L1*Math.sin(a10+th)];
+ const B2=circInt(A2,L2,B1,CPL,B20);if(!B2)return null;
+ return{B1,B2,phi:Math.atan2(B2[1]-B1[1],B2[0]-B1[0])-ang0};}
+function lineInt(p1,p2,p3,p4){const d=(p1[0]-p2[0])*(p3[1]-p4[1])-(p1[1]-p2[1])*(p3[0]-p4[0]);
+ if(Math.abs(d)<1e-9)return null;
+ const t=((p1[0]-p3[0])*(p3[1]-p4[1])-(p1[1]-p3[1])*(p3[0]-p4[0]))/d;
+ return[p1[0]+t*(p2[0]-p1[0]),p1[1]+t*(p2[1]-p1[1])];}
+function setL(id,a,b){const e=$(id);e.setAttribute('x1',X(a[0]).toFixed(1));e.setAttribute('y1',Z(a[1]).toFixed(1));
+ e.setAttribute('x2',X(b[0]).toFixed(1));e.setAttribute('y2',Z(b[1]).toFixed(1));}
+function setC(id,a){const e=$(id);e.setAttribute('cx',X(a[0]).toFixed(1));e.setAttribute('cy',Z(a[1]).toFixed(1));}
+function calib(){const Phi=(exag?8.5:2.6)*D2R,st=0.0005;let tp=0,tn=0;
+ for(let i=0;i<8000;i++){const p=pose(tp+st);if(!p||Math.abs(p.phi)>=Phi)break;tp+=st;}
+ for(let i=0;i<8000;i++){const p=pose(tn-st);if(!p||Math.abs(p.phi)>=Phi)break;tn-=st;}
+ thPos=tp;thNeg=tn;sgn=Math.sign(pose(tp).phi)||1;trIC.length=0;trO.length=0;lastU=null;}
+function solve(phiT){let lo=thNeg,hi=thPos;const g=sgn*phiT;
+ for(let i=0;i<48;i++){const m=(lo+hi)/2,p=pose(m);if(p&&sgn*p.phi<g)lo=m;else hi=m;}
+ return pose((lo+hi)/2);}
+function drive(zc){const s=Math.sign(zc)||1,a=Math.abs(zc);
+ const D=zc-CK[1];let c=(D*D+RC*RC-LNK*LNK)/(2*D*RC);c=Math.max(-1,Math.min(1,c));
+ const psi=Math.acos(c),pin=[CK[0]+RC*Math.sin(psi),CK[1]+RC*Math.cos(psi)];
+ if(a<=CONT)return{zh:zc,e:0,contact:false,psi,pin};
+ const ex=a-CONT;return{zh:s*(CONT+ex*RHO),e:ex*(1-RHO),contact:true,psi,pin};}
+function zig(p0,p1,n,amp){const dx=p1[0]-p0[0],dy=p1[1]-p0[1],L=Math.hypot(dx,dy)||1;
+ const nx=-dy/L,ny=dx/L,ptsArr=[p0];
+ for(let i=1;i<2*n;i++){const f=i/(2*n),b=(i%2?1:-1)*amp;
+  ptsArr.push([p0[0]+f*dx+b*nx,p0[1]+f*dy+b*ny]);}
+ ptsArr.push(p1);return poly(ptsArr);}
+function draw(uu){let st=null,phiT;
+ if(exag){phiT=PHIEX*uu;}else{st=drive(AMP*uu);phiT=st.zh/RPUSH;}
+ const p=solve(phiT);if(!p)return;const c=Math.cos(p.phi),s=Math.sin(p.phi);
+ const T=q=>{const dx=q[0]-B10[0],dy=q[1]-B10[1];return[c*dx-s*dy+p.B1[0],s*dx+c*dy+p.B1[1]];};
+ $('oc').setAttribute('points',poly(OC.map(T)));$('sh').setAttribute('points',poly(SH.map(T)));
+ $('pn').setAttribute('points',poly(PN.map(T)));
+ setL('or1',T(OR1[0]),T(OR1[1]));setL('or2',T(OR2[0]),T(OR2[1]));
+ const j=T(J);setL('st1',p.B1,j);setL('st2',p.B2,j);
+ setL('lk1',A1,p.B1);setL('lk2',A2,p.B2);setC('b1',p.B1);setC('b2',p.B2);
+ const ic=lineInt(A1,p.B1,A2,p.B2),o=T([0,0]);setC('op',o);
+ if(ic){setL('ex1',A1,ic);setL('ex2',A2,ic);setC('ic',ic);}
+ if(trace&&uu!==lastU){if(ic)trIC.push(ic);trO.push(o);
+  if(trIC.length>420)trIC.shift();if(trO.length>420)trO.shift();lastU=uu;}
+ $('trIC').setAttribute('points',trace?poly(trIC):'');$('trO').setAttribute('points',trace?poly(trO):'');
+ const up=st&&st.contact&&st.zh>0,lo=st&&st.contact&&st.zh<0;
+ $('mrU').setAttribute('stroke',up?'var(--coral-h)':'var(--coral)');
+ $('or1').setAttribute('stroke',up?'var(--coral-h)':'var(--coral)');
+ $('mrL').setAttribute('stroke',lo?'var(--coral-h)':'var(--coral)');
+ $('or2').setAttribute('stroke',lo?'var(--coral-h)':'var(--coral)');
+ const f=(v,d)=>(v>=0?'+':'')+v.toFixed(d)+'°';
+ $('vphi').textContent=f(p.phi*R2D,2);$('vdr').textContent=Math.hypot(o[0],o[1]).toFixed(3)+' mm';
+ $('vic').textContent=ic?Math.hypot(ic[0],ic[1]).toFixed(2)+' mm':'—';
+ if(exag){['vpsi','vspr'].forEach(i=>$(i).textContent='—');
+  $('phase').textContent='Exaggerated: links only — the cones would intersect';return;}
+ const tab=T(TP);
+ $('tab').setAttribute('points',poly([[TP[0]-3,4],[TP[0]+3,4],[TP[0]+3,-4],[TP[0]-3,-4]].map(T)));
+ setC('tabJ',tab);setL('lnk',st.pin,tab);setC('pinJ',st.pin);
+ setL('crk',CK,st.pin);setC('hub',CK);
+ $('spr').setAttribute('points',zig(st.pin,tab,7,1.9));
+ const gz=T(PC)[1];$('gp').setAttribute('cy',(190-5*gz).toFixed(1));$('gpc').setAttribute('cy',(190-5*gz).toFixed(1));
+ $('vpsi').textContent=(st.psi*R2D).toFixed(0)+'°';$('vspr').textContent=Math.abs(st.e).toFixed(2)+' mm';
+ $('phase').textContent=st.contact
+  ?('Contact with the '+(st.zh>0?'upper':'lower')+' cone: the carriage stops and the spring compresses')
+  :'Free: the carriage follows the servo';}
+let posEcho=0;
+function frame(now){if(playing){u=Math.sin((now-t0)/PER*2*Math.PI);
+ posEcho=Math.round(u*100);$('pos').value=posEcho;draw(u);}
+ requestAnimationFrame(frame);}
+$('play').onclick=()=>{playing=!playing;
+ if(playing)t0=performance.now()-Math.asin(Math.max(-1,Math.min(1,u)))/(2*Math.PI)*PER;
+ $('play').textContent=playing?'Pause':'Play';};
+$('pos').oninput=e=>{const v=+e.target.value;if(v===posEcho)return;
+ playing=false;$('play').textContent='Play';u=v/100;draw(u);};
+$('exag').onchange=e=>{exag=e.target.checked;$('fixed').style.opacity=exag?.25:1;
+ ['drv','gin'].forEach(g=>$(g).style.opacity=exag?0:1);calib();draw(u);};
+$('trace').onchange=e=>{trace=e.target.checked;trIC.length=0;trO.length=0;lastU=null;draw(u);};
+$('exag').checked=false;$('trace').checked=true;$('pos').value=0;
+exag=false;trace=true;playing=true;$('play').textContent='Pause';
+calib();draw(0);requestAnimationFrame(frame);
+</script>
+</body>
+</html>
