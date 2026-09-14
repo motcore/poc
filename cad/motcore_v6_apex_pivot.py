@@ -122,6 +122,13 @@ link_x     = 9.0      # mm — X of the link plane (two sets, at +-link_x, for
                        #      out-of-plane stiffness)
 link_t     = 5.0      # mm — link thickness (along X)
 link_w     = 10.0     # mm — link width
+link_knuckle = 5.0    # mm — radius of the knuckle joining the pair into one
+                       #      part. It sits ON the carriage pivot, which is the
+                       #      one place with room: the span between the pivots
+                       #      is taken by the frame lug hanging down the centre,
+                       #      and a tail out past the pivot reaches down into
+                       #      the motor cone once the bar's own half-width is
+                       #      counted.
 pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 
 # ── Actuation: servo → crank → telescopic spring link → carriage trunnion ────
@@ -144,7 +151,14 @@ crank_hub     = (46.0, -28.0)  # mm (y, z) — servo output shaft. It belongs
                         #      instead, see act_x.
 crank_r       = 6.3    # mm — crank radius
 act_link_len  = 28.0   # mm — telescopic link, free length
-act_x         = 20.0   # mm — X of the actuation plane (link + trunnion).
+act_x         = 24.0   # mm — X of the actuation plane (link + trunnion).
+                        #      Set by the clamp nuts, which stand 2.4 mm proud
+                        #      of the block's outer face at x = 17: at 22 the
+                        #      link sat 0.1 mm off one of them.
+                        #      Moved out from 20 when the arms became L-shaped:
+                        #      their uprights run straight down at y = 37..46,
+                        #      which is exactly where the crank pin swings, and
+                        #      the diagonal arms used to pass inboard of it.
                         #      OUTBOARD of the carriage side plate: inboard of
                         #      it the only gap is the 4 mm between the housing
                         #      (r = 8) and the plate, and the link is 5 thick.
@@ -155,6 +169,18 @@ act_x         = 20.0   # mm — X of the actuation plane (link + trunnion).
                         #      symmetric push would need a fork straddling the
                         #      bearing housing, or a second servo.
 servo_body    = (12.2, 23.0, 29.0)   # mm (X, Y, Z) — MG90-class placeholder
+servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
+servo_tab_out = 4.7    # mm — how far each tab reaches past the body (an MG90 is
+                        #      32.2 long over the tabs against 22.8 of body)
+servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
+servo_plate_t = 3.0    # mm — bracket face plate thickness
+servo_spline_h = 4.0   # mm — how far the output spline stands off the servo's
+                        #      top face. The crank rides on the spline, which is
+                        #      what lets it sweep OVER the two tab screws: its
+                        #      own swept radius is 10.3 mm and the screws sit at
+                        #      8.15, so with the crank flat on the case face
+                        #      they collide.
+servo_foot_z  = -39.0  # mm — Z of the bracket's two screws into the wall
 
 # ── Render pose ──────────────────────────────────────────────────────────────
 CARRIAGE_STOP = "contact"   # "free" | "contact" | "preload"
@@ -169,26 +195,49 @@ AXES_SHOWN = 1     # 0..4 — output axes built (mechanism + wall). 1 keeps the
 hous_x        = 17.0   # mm — bearing block half-width (X). The side arms are
                         #      slices of this same block, so it reaches out to
                         #      side_x + side_t/2.
-hous_z        = 9.0    # mm — bearing block half-height (Z)
+hous_z        = 12.0   # mm — bearing block half-height (Z). Taller than the
+                        #      bearing seats need, to leave room beside them
+                        #      for the clamp bolts.
 hous_y0       = 33.5   # mm — block, cone-side face. The output cone's base rim
                         #      sweeps to y = 32.5 within |z| < hous_z at full
                         #      preload, so this is a 1 mm running clearance.
-hous_y1       = 46.5   # mm — housing, pinion-side face
+hous_y1       = 49.0   # mm — block, pinion-side face. Runs past the push
+                        #      trunnion (y = R_push = 46, Ø5, so it ends at
+                        #      48.5) instead of stopping level with it, which
+                        #      left the pin emerging from the very corner. The
+                        #      idler bracket's arm at y = 50 is the stop: at
+                        #      full preload the block's top corner swings to
+                        #      y = 49.3.
 side_x        = 14.5   # mm — X of the carriage side plates (two, mirrored).
                         #      Must clear the output cone's base radius: the
                         #      arms are routed around it, see make_carriage.
 side_t        = 5.0    # mm — side plate thickness
 arm_w         = 9.0    # mm — carriage arm width
-arm_root      = (44.0, 5.0)   # mm (y, |z|) — where each arm leaves the hub box
-                               #      on its way to a four-bar pivot. NOT free:
-                               #      the arm has to cross the output cone's
-                               #      base plane outside the cone, and the cone
-                               #      is 18.5 mm in radius there while the plate
-                               #      sits at |x| = 12, so the arm must cross
-                               #      y = 32 above |z| = 13.9. Leaving from
-                               #      (40, 4) it crossed at 9.4 and cut into
-                               #      the cone; from here it crosses at ~15.7.
-trunnion_d    = 5.0    # mm — push trunnion diameter
+arm_root      = (44.0, 5.0)   # mm (y, |z|) — where each arm leaves the block
+                               #      on its way to a four-bar pivot. Diagonal,
+                               #      not an L: once the part is printed lying
+                               #      on its side the two are equally printable,
+                               #      and the diagonal is the lighter and
+                               #      stiffer load path. NOT free, though: the
+                               #      arm has to cross the output cone's base
+                               #      plane outside the cone, which is 18.2 mm
+                               #      in radius there against the plate at
+                               #      |x| = 12, so it must cross y = 32 above
+                               #      |z| = 13.9. From here it crosses at 15.7;
+                               #      from (40, 4) it crossed at 9.4 and cut
+                               #      into the cone.
+bolt_y        = (36.0, 46.5)  # mm — clamp bolts, one pair beside each bearing
+bolt_z        = 8.5    # mm — |Z| of the clamp bolts: clear of the Ø10.3 seat
+                        #      (5.15) and of the block's own face (12.0)
+bolt_d        = 3.0    # mm ┐
+bolt_head_d   = 5.5    # mm │ M3 socket head and nut, as envelopes. Modelled as
+bolt_head_h   = 3.0    # mm │ solids and not just as holes, because a hole
+bolt_nut_d    = 6.4    # mm │ collides with nothing: it was the HEAD that ran
+bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see it.
+trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
+                        #      the project already buys, NOT a printed boss)
+trunnion_x_in = 6.0    # mm — |X| the trunnion is pressed in to; clear of the
+                        #      Ø10.3 bearing seat, which reaches 5.15
 
 # ── Gear stage packaging ─────────────────────────────────────────────────────
 gear_face_w   = 5.0    # mm — pinion / idler / corona face width
@@ -224,6 +273,11 @@ fp_lug_x      = 6.0    # mm — frame-pivot lug half-width in X (the links sit
 fp_bracket_x  = 14.0   # mm — bracket plate half-width in X
 fp_bracket_y0 = 31.0   # mm — bracket plate, inboard end
 
+foot_t        = 3.0    # mm — thickness of a bracket's foot against the wall
+foot_screw_d  = 3.0    # mm — M3 through the wall into a bracket foot
+foot_hole_d   = 3.8    # mm — modelled Ø for it (printer runs holes under)
+foot_flange   = 9.0    # mm — how far a frame-bracket foot turns inboard to give
+                        #      its screws something to pass through
 wall_thick     = 4.0   # mm — cube wall thickness
 wall_gap       = 6.0   # mm — clearance, outermost rotating part → wall
 wall_shaft_clr = 2.0   # mm — radial clearance of the wall's output-shaft hole
@@ -249,6 +303,11 @@ brg_fit_press = 0.15   # mm — radial add for a press fit (→ Ø10.3), FDM
 # real hardware is modelled oversize by a measured amount, not at nominal.
 fdm_shaft_hole_d = 5.8  # mm — modelled Ø for a Ø5 rod (measured, coupon v2)
 fdm_pin_hole_d   = 4.6  # mm — modelled Ø for a Ø4 pin (extrapolated — verify)
+fdm_bolt_hole_d  = 3.8  # mm — modelled Ø for an M3 clamp bolt to pass through
+fdm_dowel_hole_d = 5.5  # mm — modelled Ø for the Ø5 trunnion dowel, INTERFERENCE
+                         #      (5.8 is the measured slip fit, so this is 0.3
+                         #      tighter). Extrapolated, not measured — verify on
+                         #      a coupon before relying on it.
 
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED
@@ -537,7 +596,7 @@ def bar_yz(p, q, w, x0, thick):
             .fuse(disc_yz(q, w / 2.0, x0, thick)))
 
 
-def box_yz(y0, y1, z0, z1, x0, thick):
+def box_yz(y0, y1, z0, z1, x0=0.0, thick=1.0):
     return Part.makeBox(thick, y1 - y0, z1 - z0, v(x0, y0, z0))
 
 
@@ -555,6 +614,33 @@ def pose_state(phi_t):
     zc, psi, pin = actuator(phi_t)
     return {"phi": phi_t, "T": T, "B1": pose[0], "B2": pose[1],
             "pin": pin, "tab": T((R_push, 0.0)), "zc": zc, "psi": psi}
+
+
+def make_screw(base, direction, d, length, head_d, head_h):
+    """A screw as an envelope: shank from `base` along `direction`, head on the
+    near side. Modelled as a solid, not as a hole — a hole collides with
+    nothing, which is how a clamp nut ended up inside the actuation link."""
+    head_base = v(base.x - direction.x * head_h,
+                  base.y - direction.y * head_h,
+                  base.z - direction.z * head_h)
+    return cyl(d / 2.0, length, base, direction).fuse(
+        cyl(head_d / 2.0, head_h, head_base, direction))
+
+
+def wall_screws():
+    """(x, z) of every screw that passes through this axis's wall. One list, so
+    the wall and the brackets cannot disagree about where the holes are."""
+    out = []
+    for sd in (1, -1):
+        for dx in (-(idler_arm_w / 2.0 + 3.5), idler_arm_w / 2.0 + 3.5):
+            out.append((sd * idler_x + dx, idler_leg_z - idler_leg_t / 2.0))
+    for zs in (1, -1):
+        z_in = zs * (fb_A[1] + fp_plate_gap)
+        for dx in (-12.0, 12.0):
+            out.append((dx, z_in - zs * foot_flange / 2.0))
+    for dx in (4.0, 11.0):
+        out.append((servo_box()[0] + servo_tab_t + dx, servo_foot_z))
+    return out
 
 
 def place_carriage(shape, st):
@@ -628,33 +714,56 @@ def make_carriage_shaft():
                v(0, out_bore_end_y, 0), Y_AXIS)
 
 
-def make_housing():
-    """Bearing block: the stiffest part of the carriage, the part the actuator
-    pushes on, and the part both arms grow out of. Two MR105ZZ, one seated at
-    each end, with a shoulder between them (possible only because the pinion is
-    a separate part — at m = 1.0 it would have had to be integral with the
-    shaft, which forces a straight-through bore and loses the shoulder).
+def make_carriage_half(sd):
+    """HALF the carriage: bearing block, arms and push trunnion, cut on the
+    x = 0 plane. The two halves are identical and bolt together around the
+    shaft.
 
-    A plain rectangular block, spanning the full width out to the arms. It was
-    a cylinder with a web bridging out to two separate side plates, which was
-    three lumps pretending to be a part; a block is one solid by construction,
-    prints flat on its own face and needs no web at all."""
-    body = Part.makeBox(2 * hous_x, hous_y1 - hous_y0, 2 * hous_z,
-                        v(-hous_x, hous_y0, -hous_z))
+    This is a printing decision, and it is the only one that changes anything.
+    Everything in this part is built from prisms swept along X — boxes, bars and
+    discs in the Y-Z plane — so the whole carriage is a 2.5D extrusion in X and
+    prints without a single overhang when laid on its side. Everything except
+    the bearing seats, whose axis is Y: printed that way they would be bridged
+    horizontal holes, out of round, and they are the one press fit in the part.
+    Splitting on x = 0 turns each seat into a half-round pocket opening in the
+    print direction, and every pin and bolt hole into a vertical one.
+
+    v5 considered splitting the carriage and rejected it, but for a different
+    reason: there the bolt had to run the length of the carriage. Here they run
+    across its 34 mm width — M3 x 40.
+
+    Making both halves carry a trunnion is what makes them identical, and it is
+    also the fork mounting the doc asks for, which would take the twist out of
+    the single-sided push. (The idea that the push pin could double as a clamp
+    bolt does not survive contact with the geometry: it sits at z = 0, on the
+    bore's own axis.)"""
+    x_out = sd * hous_x
+    x0, x1 = sorted((0.0, x_out))
+    body = Part.makeBox(x1 - x0, hous_y1 - hous_y0, 2 * hous_z,
+                        v(x0, hous_y0, -hous_z))
+    # Cut with the FULL cylinders: each half keeps its own half of them, and
+    # the two halves then clamp the bearing between them.
     body = body.cut(cyl(shaft_d / 2.0 + 0.75, hous_y1 - hous_y0 + 2,
                         v(0, hous_y0 - 1, 0), Y_AXIS))
-    for y_face, sd in ((hous_y0, 1), (hous_y1, -1)):
-        y_start = min(y_face, y_face + sd * brg_w)
+    for y_face, sgn in ((hous_y0, 1), (hous_y1, -1)):
+        y_start = min(y_face, y_face + sgn * brg_w)
         body = body.cut(cyl(brg_od / 2.0 + brg_fit_press, brg_w,
                             v(0, y_start, 0), Y_AXIS))
-    return body
+    body = body.fuse(make_carriage_arms(sd))
+    # Holes come out LAST. Cut into the bare block and then fused over, the
+    # arm's root disc grows straight back across the y = 46.5 bolt pair — a hole
+    # that closes again is invisible to every interference check in this file,
+    # so there is one below that probes them.
+    for by in bolt_y:
+        for bz in (bolt_z, -bolt_z):
+            body = body.cut(pin_x((by, bz), fdm_bolt_hole_d,
+                                  x0 - 1.0, (x1 - x0) + 2.0))
+    return body.cut(trunnion_bore(sd, x_out))
 
 
-def make_carriage_side(sd):
-    """The two arms on one side, growing out of the bearing block at arm_root
-    and reaching the four-bar pivots. Routed AROUND the output cone: the pivots
-    sit at radius 42 from the apex, well outside the cone, but the straight line
-    to them grazes the cone's base — hence arm_root, see the parameter."""
+def make_carriage_arms(sd):
+    """The two arms on one side, from the block out to the four-bar pivots.
+    Routed around the output cone — see arm_root."""
     x0 = sd * side_x - side_t / 2.0
     part = None
     for zs in (1, -1):
@@ -666,15 +775,37 @@ def make_carriage_side(sd):
     return part
 
 
-def make_trunnion():
-    """Push pin. On the carriage side plate at the housing's own centre line
-    (y = R_push, z = 0) — the doc puts it on the bearing housing itself, which
-    would need a fork straddling it; this is the single-sided first pass, and
-    it leaves a twisting moment of F * act_x about the shaft axis for the two
-    link sets to take."""
-    x_in = hous_x - side_t
-    x_out = act_x + link_t / 2.0 + 0.5
-    return cyl(trunnion_d / 2.0, x_out - x_in, v(x_in, R_push, 0.0), X_AXIS)
+def make_clamp_bolt(by, bz):
+    """One M3 through both halves, head outboard on -X and nut on +X. An
+    envelope, not a thread — enough for the interference check to do its job."""
+    shank = cyl(bolt_d / 2.0, 2 * hous_x + bolt_nut_h + 2.0,
+                v(-hous_x - 1.0, by, bz), X_AXIS)
+    head = cyl(bolt_head_d / 2.0, bolt_head_h,
+               v(-hous_x - bolt_head_h, by, bz), X_AXIS)
+    nut = cyl(bolt_nut_d / 2.0, bolt_nut_h, v(hous_x, by, bz), X_AXIS)
+    return shank.fuse(head).fuse(nut)
+
+
+def make_trunnion(sd):
+    """Push pin: a length of the Ø5 rod the project already buys, pressed into a
+    blind hole in each half — deliberately not a printed boss. Laid on its cut
+    face the half prints beautifully, but a boss here becomes a vertical pillar
+    and the actuator load bends it ACROSS the layers, the one direction FDM has
+    no strength in: Ø5 over an 8 mm overhang at the top of the force range is
+    ~58 MPa of interlayer tension, against 30-40 MPa for PLA.
+
+    Both halves carry one, which is what keeps them the same part and is also
+    the fork mounting the doc wants. The link in this model still uses only the
+    +X pin, so the twisting moment of F * act_x about the shaft axis stays until
+    the link becomes a fork."""
+    lo, hi = sorted((sd * trunnion_x_in, sd * (act_x + link_t / 2.0 + 0.5)))
+    return cyl(trunnion_d / 2.0, hi - lo, v(lo, R_push, 0.0), X_AXIS)
+
+
+def trunnion_bore(sd, x_out):
+    """The blind hole the dowel presses into, from the half's outer face in."""
+    lo, hi = sorted((sd * trunnion_x_in, x_out + sd * 1.0))
+    return cyl(fdm_dowel_hole_d / 2.0, hi - lo, v(lo, R_push, 0.0), X_AXIS)
 
 
 def make_carriage_bearing(y_face, sd):
@@ -685,11 +816,25 @@ def make_carriage_bearing(y_face, sd):
 
 
 def make_link(A, B):
-    """One four-bar link, drawn between the pivots as the linkage puts them."""
-    x0 = -link_t / 2.0
-    body = bar_yz(A, B, link_w, x0, link_t)
-    for p in (A, B):
-        body = body.cut(pin_x(p, fdm_pin_hole_d, x0 - 1, link_t + 2))
+    """One four-bar link — ONE part carrying both arms, not two loose plates.
+
+    The two arms at +-link_x are the same rigid body (they move identically, by
+    construction), so joining them costs nothing, makes the pair self-squaring,
+    and actually delivers the out-of-plane stiffness that having two of them was
+    for. They meet at a knuckle on the carriage pivot — see link_knuckle for why
+    that is the only place it fits."""
+    body = None
+    for xs in (1, -1):
+        arm = bar_yz(A, B, link_w, xs * link_x - link_t / 2.0, link_t)
+        body = arm if body is None else body.fuse(arm)
+    # Overlaps each arm by 1 mm rather than meeting it on a coincident face,
+    # which fuses far more reliably.
+    web_x = link_x - link_t / 2.0 + 1.0
+    body = body.fuse(disc_yz(B, link_knuckle, -web_x, 2 * web_x))
+
+    reach = link_x + link_t / 2.0 + 2.0
+    for q in (A, B):
+        body = body.cut(pin_x(q, fdm_pin_hole_d, -reach, 2 * reach))
     return body
 
 
@@ -710,9 +855,18 @@ def make_frame_bracket(zs):
                  -fp_lug_x, 2 * fp_lug_x)
     lug = lug.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                            -fp_lug_x, 2 * fp_lug_x))
-    part = plate.fuse(lug)
+    # Foot turning inboard off the plate's end, so its screws pass through
+    # material instead of into the end of a horizontal plate.
+    z_f0, z_f1 = sorted((z_in, z_in - zs * foot_flange))
+    foot = Part.makeBox(2 * fp_bracket_x, foot_t, z_f1 - z_f0,
+                        v(-fp_bracket_x, cube_half - foot_t, z_f0))
+    part = plate.fuse(lug).fuse(foot)
     part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_hole_d,
                           -fp_lug_x - 1, 2 * fp_lug_x + 2))
+    for sx, sz in wall_screws():
+        if abs(sx) < 13.0 and sz * zs > 0:
+            part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
+                                v(sx, cube_half - foot_t - 1, sz), Y_AXIS))
     return part
 
 
@@ -733,7 +887,18 @@ def make_idler_bracket(sd):
                        v(x0, y0, idler_leg_z - idler_leg_t))
     axle = cyl(idler_axle_d / 2.0, gear_face_w + 3.0,
                v(sd * idler_x, y0, 0), Y_AXIS)
-    return arm.fuse(leg).fuse(axle)
+    # Foot against the wall's inner face: a flange wide enough in X to put a
+    # screw either side of the leg, rather than driving into the leg's own end
+    # grain, which on a printed part is the weakest joint available.
+    foot = Part.makeBox(idler_arm_w + 14.0, foot_t, idler_leg_t,
+                        v(sd * idler_x - (idler_arm_w + 14.0) / 2.0,
+                          cube_half - foot_t, idler_leg_z - idler_leg_t))
+    body = arm.fuse(leg).fuse(axle).fuse(foot)
+    for sx, sz in wall_screws():
+        if abs(sx - sd * idler_x) < 12.0:
+            body = body.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
+                                v(sx, cube_half - foot_t - 1, sz), Y_AXIS))
+    return body
 
 
 def make_corona_plate():
@@ -771,20 +936,78 @@ def make_act_link(st):
     return body
 
 
-def make_servo_body():
-    """MG90-class placeholder, output shaft on the crank hub."""
+def servo_box():
+    """(x0, y0, z0, bx, by, bz) of the servo body. Its top face — the one the
+    shaft comes out of — is at x0, against the crank."""
     bx, by, bz = servo_body
-    x0 = act_x + link_t / 2.0 + 4.0
-    return Part.makeBox(bx, by, bz,
-                        v(x0, crank_hub[0] - by / 4.0, crank_hub[1] - bz + 5.0))
+    x0 = act_x + link_t / 2.0 + 0.5 + 3.5 + servo_spline_h
+    return (x0, crank_hub[0] - by / 4.0, crank_hub[1] - bz + 5.0, bx, by, bz)
 
 
-def make_wall(rot_deg):
-    wall = Part.makeBox(2 * cube_out, wall_thick, 2 * cube_out,
+def make_servo_body():
+    """MG90-class placeholder: body plus the two mounting tabs, which are what
+    it actually hangs from."""
+    x0, y0, z0, bx, by, bz = servo_box()
+    body = Part.makeBox(bx, by, bz, v(x0, y0, z0))
+    tabs = Part.makeBox(servo_tab_t, by + 2 * servo_tab_out, bz,
+                        v(x0, y0 - servo_tab_out, z0))
+    body = body.fuse(tabs)
+    for sy in servo_screw_ys():
+        body = body.cut(cyl(servo_screw_d / 2.0 + 0.1, servo_tab_t + 2,
+                            v(x0 - 1, sy, crank_hub[1]), X_AXIS))
+    return body
+
+
+def servo_screw_ys():
+    """Y of the two tab screws: an MG90's holes are 27.8 apart."""
+    _, y0, _, _, by, _ = servo_box()
+    return (y0 - servo_tab_out / 2.0, y0 + by + servo_tab_out / 2.0)
+
+
+def make_servo_bracket():
+    """What the servo hangs from, which until now was nothing at all.
+
+    A face plate across the servo's tabs with the body passing through it, and a
+    foot onto the wall — the only structure within reach, 5.5 mm past the end of
+    the body. The obvious alternative, standing it on the bottom frame bracket,
+    does not work: that deck's top face is at z = -50.9 and the servo's own base
+    reaches -52, so the body wants the space the deck is in."""
+    x0, y0, z0, bx, by, bz = servo_box()
+    px0 = x0 + servo_tab_t
+    plate = Part.makeBox(servo_plate_t, 34.5, 37.0,
+                         v(px0, 34.0, z0 - 4.0))
+    plate = plate.cut(Part.makeBox(servo_plate_t + 2, by + 0.8, bz + 0.8,
+                                   v(px0 - 1, y0 - 0.4, z0 - 0.4)))
+    # Outboard of the face plate, not inboard: the servo's own tabs run the
+    # full height of the body and reach to y = 68, so a foot on that side of
+    # the plate passes straight through them.
+    foot = Part.makeBox(15.0, foot_t, 12.0,
+                        v(px0, cube_half - foot_t, servo_foot_z - 6.0))
+    part = plate.fuse(foot)
+    for sx, sz in wall_screws():
+        if abs(sx) > 25.0:
+            part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
+                                v(sx, cube_half - foot_t - 1, sz), Y_AXIS))
+    for sy in servo_screw_ys():
+        part = part.cut(cyl(servo_screw_d / 2.0 + 0.4, servo_plate_t + 2,
+                            v(px0 - 1, sy, crank_hub[1]), X_AXIS))
+    return part
+
+
+def make_wall():
+    """One cube wall. It stops at the neighbour's inner face on one side and
+    runs out to the full corner on the other, so the four of them interlock in a
+    pinwheel: no overlap and no gap, and the same part four times. Spanning the
+    full width both ways -- which is what it did while the wall sat outside the
+    interference check -- put 2320 mm3 of two walls inside each other, one
+    corner post per corner."""
+    wall = Part.makeBox(cube_out + cube_half, wall_thick, 2 * cube_out,
                         v(-cube_out, cube_half, -cube_out))
     wall = wall.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, wall_thick + 2,
                         v(0, cube_half - 1, 0), Y_AXIS))
-    wall.rotate(ORIGIN, Z_AXIS, rot_deg)
+    for sx, sz in wall_screws():
+        wall = wall.cut(cyl(foot_hole_d / 2.0, wall_thick + 2,
+                            v(sx, cube_half - 1, sz), Y_AXIS))
     return wall
 
 
@@ -1029,15 +1252,17 @@ else:
 coronashaft = corona_shape.fuse(make_corona_plate()).fuse(make_output_shaft_ref())
 
 # ── Carriage, built at rest then moved by the linkage ────────────────────────
-carriage_body = (make_housing()
-                 .fuse(make_carriage_side(1))
-                 .fuse(make_carriage_side(-1))
-                 .fuse(make_trunnion()))
-
 CARRIAGE_REST = [
     ("OutputCone",    make_output_cone(),                     (0.20, 0.80, 0.60), 0),
     ("OutputRubber",  make_output_rubber(),                   (0.15, 0.15, 0.18), 0),
-    ("CarriageBody",  carriage_body,                          (0.70, 0.70, 0.72), 0),
+    ("CarriageHalfP", make_carriage_half(1),                  (0.70, 0.70, 0.72), 0),
+    ("CarriageHalfN", make_carriage_half(-1),                 (0.72, 0.70, 0.70), 0),
+    ("PushPinP",      make_trunnion(1),                       (0.60, 0.60, 0.60), 0),
+    ("PushPinN",      make_trunnion(-1),                      (0.60, 0.60, 0.60), 0),
+] + [
+    (f"ClampBolt{i}", make_clamp_bolt(by, bz), (0.45, 0.45, 0.50), 0)
+    for i, (by, bz) in enumerate((y, z) for y in bolt_y for z in (bolt_z, -bolt_z))
+] + [
     ("CarriageShaft", make_carriage_shaft(),                  (0.60, 0.60, 0.60), 0),
     ("Pinion",        pinion_shape,                           (0.85, 0.65, 0.10), 0),
     ("BearingCone",   make_carriage_bearing(hous_y0, 1),      (0.30, 0.30, 0.32), 0),
@@ -1054,6 +1279,20 @@ FIXED_PARTS = [
     ("FrameBracketT", make_frame_bracket(1),                  (0.75, 0.75, 0.78), 0),
     ("FrameBracketB", make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
+    ("ServoBracket",  make_servo_bracket(),                   (0.75, 0.75, 0.78), 0),
+    ("Wall",          make_wall(),                            (0.45, 0.55, 0.75), 70),
+] + [
+    (f"ServoScrew{i}",
+     make_screw(v(servo_box()[0], sy, crank_hub[1]), v(1, 0, 0), servo_screw_d,
+                servo_tab_t + servo_plate_t, 3.8, 2.0),
+     (0.45, 0.45, 0.50), 0)
+    for i, sy in enumerate(servo_screw_ys())
+] + [
+    (f"WallScrew{i}",
+     make_screw(v(sx, cube_out, sz), v(0, -1, 0), foot_screw_d,
+                wall_thick + foot_t, bolt_head_d, bolt_head_h),
+     (0.45, 0.45, 0.50), 0)
+    for i, (sx, sz) in enumerate(wall_screws())
 ]
 
 _LINK_COL = (0.90, 0.45, 0.20)
@@ -1066,20 +1305,17 @@ def moving_parts(st):
     links with their pins, and the actuation train."""
     out = [(n, place_carriage(sh, st), c, t) for n, sh, c, t in CARRIAGE_REST]
     pin_reach = link_x + link_t / 2.0 + 1.0
+    pin_reach_b = side_x + side_t / 2.0 + 1.0
     for zs, A, B in ((1, A1, st["B1"]), (-1, A2, st["B2"])):
         tag = "T" if zs > 0 else "B"
-        lnk = make_link(A, B)
-        for xs in (1, -1):
-            sh = lnk.copy()
-            sh.translate(v(xs * link_x, 0, 0))
-            out.append((f"Link{tag}{'P' if xs > 0 else 'N'}", sh, _LINK_COL, 0))
+        out.append((f"Link{tag}", make_link(A, B), _LINK_COL, 0))
         out.append((f"PinA{tag}",
                     pin_x(A, pin_d, -pin_reach, 2 * pin_reach), _PIN_COL, 0))
-        for xs in (1, -1):
-            x0 = xs * (link_x - link_t / 2.0 - 1.0)
-            out.append((f"PinB{tag}{'P' if xs > 0 else 'N'}",
-                        pin_x(B, pin_d, min(x0, x0 + xs * 10.0), 10.0),
-                        _PIN_COL, 0))
+        # One pin per link now, right through both carriage arms, both link
+        # arms and the web, instead of a short stub on each side.
+        out.append((f"PinB{tag}",
+                    pin_x(B, pin_d, -pin_reach_b, 2 * pin_reach_b),
+                    _PIN_COL, 0))
     out.append(("Crank", make_crank(st), _ACT_COL, 0))
     out.append(("ActLink", make_act_link(st), _ACT_COL, 0))
     return out
@@ -1112,8 +1348,6 @@ for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
     for _pname, _pshape, _pcolor, _ptrans in AXIS_PARTS:
         add(doc, f"{_pname}_{_ax_name}", place(_pshape, _ax_rot),
             color=_pcolor, transparency=_ptrans)
-    add(doc, f"Wall_{_ax_name}", make_wall(_ax_rot),
-        color=(0.45, 0.55, 0.75), transparency=70)
 
 # ── Central column ──────────────────────────────────────────────────────────
 for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
@@ -1273,6 +1507,30 @@ _asm_rot = _asm.copy()
 _asm_rot.rotate(ORIGIN, Z_AXIS, 90.0)
 _adj_overlap = _asm.common(_asm_rot).Volume
 
+# Can a bolt actually pass? A hole that a later fuse closes back up leaves a
+# perfectly valid solid of the right volume in the right place, so nothing else
+# here would notice.
+_halves = [BY_NAME["CarriageHalfP"], BY_NAME["CarriageHalfN"]]
+_bolt_blocked = 0.0
+for _by in bolt_y:
+    for _bz in (bolt_z, -bolt_z):
+        _probe = pin_x((_by, _bz), fdm_bolt_hole_d - 0.4,
+                       -hous_x - 2.0, 2 * hous_x + 4.0)
+        _probe = place_carriage(_probe, STATE)
+        for _h in _halves:
+            _bolt_blocked += _probe.common(_h).Volume
+
+# The two halves have to be the SAME printed part, not a chiral pair: rotating
+# one 180 deg about the shaft axis must land it exactly on the other. That holds
+# only while the part stays symmetric in Z, which the trunnion on both faces and
+# the arms above and below currently make true — and which a single asymmetric
+# feature would quietly destroy.
+_half_p = make_carriage_half(1)
+_half_n = make_carriage_half(-1)
+_half_rot = _half_p.copy()
+_half_rot.rotate(ORIGIN, Y_AXIS, 180.0)
+_half_diff = (_half_rot.cut(_half_n).Volume + _half_n.cut(_half_rot).Volume)
+
 # Output cone tip vs the motor shaft it points at.
 _tip_clr = out_tip_y - shaft_d / 2.0
 
@@ -1322,6 +1580,10 @@ checks = [
      out_bore_depth, ">= 15", out_bore_depth >= 15.0),
     ("output cone tip clears the motor shaft  (mm)",
      _tip_clr, "> 1.0", _tip_clr > 1.0),
+    ("clamp bolts have a clear path through both halves  (mm3)",
+     _bolt_blocked, "== 0", _bolt_blocked < 1e-6),
+    ("the two carriage halves are the SAME part, 180 deg apart  (mm3)",
+     _half_diff, "== 0", _half_diff < 1e-3),
     ("bearing shoulder inside the housing  (mm)",
      hous_y1 - hous_y0 - 2 * brg_w, "> 0", hous_y1 - hous_y0 - 2 * brg_w > 0),
     ("crank + link reach the whole stroke  (mm to dead centre)",
@@ -1517,12 +1779,21 @@ print("-" * 72)
 for label, value, target, ok in checks:
     print(f"  [{'OK ' if ok else 'FAIL'}] {label}:  {value:.3f}  ({target})")
 print("-" * 72)
+_hbb = _half_p.BoundBox
+print(f"  Carriage half: {_hbb.YLength:.0f} x {_hbb.ZLength:.0f} mm footprint,"
+      f" {_hbb.XLength:.0f} mm tall, printed on its cut face — every hole"
+      f" vertical, no supports")
 print(f"  CUBE side {2 * cube_out:.1f} mm"
       f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
-print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone, CarriageBody,")
+print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone,")
+print("           CarriageHalf x2 (the same part twice, split on x = 0),")
 print("           Pinion, Idler x2, CoronaShaft, IdlerBracket x2, FrameBracket x2,")
 print("           Link x4, Crank, ActLink")
-print("  PURCHASED: 2x MR105ZZ, Ø5 rod, Ø4 pin stock, rubber sheet, springs, servo")
+print("  PURCHASED, per axis: 2x MR105ZZ, Ø5 rod (shaft + 2 push pins),")
+print("             Ø4 pin stock (4 pivot pins), 4x M3x40 + nuts to clamp the")
+print(f"             carriage halves, {len(wall_screws())}x M3x8 through the wall"
+      f" into the bracket feet,")
+print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo")
 print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
       f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
 print("=" * 72)
