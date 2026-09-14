@@ -30,8 +30,10 @@ the whole carriage swings on. It never moves, in any position.
   (at ±(e+g)); in v6 their rubber surfaces converge on a single point, so the
   hourglass waist closes and the cube gets shorter.
 - **The carriage is a lever.** The push point sits further from the apex than
-  the rubber does, so the actuator gets mechanical advantage for free
-  (≈ ×2.4 with the current numbers).
+  the rubber does, so a newton of actuator force becomes **×1.60** of total
+  normal force (macro, measuring s̄ at the squeeze's own centroid). Read that as
+  force, not as torque: see §8 — where the contact sits cancels out of the
+  output torque exactly.
 
 ---
 
@@ -99,6 +101,33 @@ tested** — see open questions.
 
 Rubber on rubber stays the rule: the plastic surfaces never touch.
 
+### Park in free, always
+
+Idler-wheel turntables — Garrard, Lenco — drove exactly like this, a thin rubber
+tyre on a rigid hub transmitting by friction. Their classic failure was a **flat
+spot**: left switched off with the idler still pressed against the motor spindle,
+the rubber took a permanent set at that one point, and afterwards it thumped once
+per revolution. Good decks lifted the idler when you switched off.
+
+The same applies here, and the numbers are not comfortable: the working squeeze
+is ~0.08 mm on a 2 mm layer, and butyl — the obvious prototype material, since a
+bicycle inner tube is one — is among the worst rubbers for compression set. Thirty
+percent of that squeeze taken as permanent set is 0.024 mm, a third of the
+preload, at **one azimuth of each cone**. That is the turntable thump again.
+
+v6 looks immune because free is the middle of the travel, with the rubber clear
+on both sides — but the carriage does not return there by itself. Gravity acts
+**within** the tilt plane on all four axes (each tilt plane contains Z), so it
+pulls toward the lower motor cone rather than toward the middle, and with the
+servo unpowered what actually holds the carriage is the servo's own gearbox,
+which is stiff to back-drive. The carriage stays wherever firmware left it.
+
+So it is a firmware rule, not a property of the mechanism: **command free before
+cutting power, and do not rest in preload between movements.** Making it true
+even through a crash or a flat battery would need a centring spring on the
+carriage itself — the four-bar links are the natural place — and that is design,
+not a line of code.
+
 ---
 
 ## 5. The virtual pivot (four-bar)
@@ -157,14 +186,32 @@ pinion (on the carriage, centred)  →  idler(s) on fixed axes  →  corona (out
 
 | | Teeth | Module | Pitch radius |
 |---|---|---|---|
-| Pinion (carriage) | 8 | 1 | 4 mm |
-| Idlers | 8 | 1 | 4 mm |
-| Corona (output) | 24 | 1 | 12 mm |
+| Pinion (carriage) | 8 | 1.8 | 7.2 mm |
+| Idlers | 8 | 1.8 | 7.2 mm |
+| Corona (output) | 24 | 1.8 | 21.6 mm |
+
+**The module was 1.0 here and 1.0 is not buildable.** At `Zp = 8` the pinion's
+root radius is `m·(Zp/2 − 1.25)` = 2.75 mm, and the bore for the Ø5 output shaft
+is 2.90 mm once the printer's undersize is compensated: the bore eats the hub and
+the gear comes out as eight loose teeth. The floor for a 2 mm hub wall is
+
+```
+m  ≥  (bore radius + wall) / (Zp/2 − 1.25)  =  1.78
+```
+
+hence 1.8, which is also where v5's module floor landed for an unrelated reason.
+The alternatives, if 1.8 is too big: more pinion teeth, a stepped Ø3 shaft end
+(but Ø3 steel is at its torsional limit near 0.5 Nm), or a pinion integral with
+the shaft — which then cannot be plastic, since it carries the full output
+torque. Note the module does **not** touch the clutch geometry in v6: the gears
+never disengage, so there is no mesh travel and no root-clearance constraint.
+It is purely a packaging cost, unlike v5 where `m` was on the critical path.
 
 Ratio 1/3, same as the offset single pair would have given, with the output shaft
 on the wall centre. Two idlers, **placed left and right in X, never above and
 below**: the pinion moves vertically when the carriage tilts, so idlers on the X
-axis see the centre distance change only to second order (+0.35 mm worst case,
+axis see the centre distance change only to second order (+0.20 mm worst case
+at m = 1.8, measured in the macro,
 i.e. slightly more backlash), while idlers on the Z axis would have one jam and
 the other disengage. One idler is enough functionally; two balance the radial
 load on the pinion.
@@ -230,8 +277,23 @@ T_out   ≈ μ · F · R_push · sin β · (Zc/Zp)
 ```
 
 With μ = 1.3, R_push = 46 mm, β = 33°, Zc/Zp = 3: **≈ 0.098 Nm of output torque
-per newton of actuator force** — so ~2.4 Nm at 25 N and ~8.8 Nm at 90 N. That is
-roughly 3× v5, from the lever (×2.1) and the bigger gear ratio (×1.5).
+per newton of actuator force** — so ~2.4 Nm at 25 N and ~8.8 Nm at 90 N.
+
+**Where the contact sits does not appear in that, and the cancellation is
+exact.** Moments about the apex give `F·R_push = ∫ n(s)·s ds`, because a force
+perpendicular to the generatrix at distance `s` from the pivot has moment arm
+exactly `s`. The output torque is `μ·∫ n(s)·(s·sin β) ds`, the same integral —
+so `T = μ·sin β·F·R_push` whatever the pressure distribution. Moving the rubber
+outward buys friction radius and costs normal force in the same proportion. It
+is the same property of the apex pivot that matches the surface speeds:
+everything scales with `s`.
+
+So `R_push / s̄` is **not** a torque multiplier, and reading it as one is a trap
+this document previously set. What it gives is the total NORMAL force, which is
+what the rubber has to develop inside the available squeeze — open question 1.
+The macro measures `s̄` at the centroid of the actual squeeze, 28.8 mm, giving
+**×1.60**; the band's midpoint, which is what an earlier ×2.4 came from,
+overstates it by half because the contact is not where the band's middle is.
 
 **This is an upper bound.** It assumes the rubber actually develops that normal
 force within the available squeeze, which is exactly the unmeasured number below.

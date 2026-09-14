@@ -118,7 +118,7 @@ output cone, which is why the concentric pinion does not fit (see the doc, §9).
 | **t**  | 2.0 mm | rubber layer thickness |
 | **L**  | 18 mm | contact line length along the generatrix |
 | **s₀** | 10 mm | apex → start of the contact line |
-| **m**  | 1.0   | gear module |
+| **m**  | 1.8   | gear module — 1.0 is NOT buildable, see the doc §6 |
 | **Zp** | 8     | pinion teeth (on the carriage) |
 | **Zi** | 8     | idler teeth |
 | **Zc** | 24    | corona teeth (on the output shaft) |
@@ -137,7 +137,7 @@ Derived at defaults:
 | plastic apex offset, output cone | 3.67 mm |
 | micro-slip from the ring/layer geometry | ≈ 0 (v5: 7.4%) |
 | residual apex drift from the four-bar | 0.22 mm at full preload ≈ 1% slip |
-| lever (R_push / mean rubber distance) | ≈ ×2.4 |
+| force lever (R_push / s̄, s̄ at the squeeze centroid) | **×1.60** — normal force, NOT torque |
 | output torque per newton of actuator force | ≈ 0.098 Nm/N **(upper bound, unverified)** |
 
 ---
@@ -158,7 +158,15 @@ ratio_gear  = Zp / Zc                      idlers do not change the ratio
 ratio_total = ratio_fric · ratio_gear      must stay < 1
 
 ΣN          = F · R_push / s̄               normal force from actuator force
-T_out       ≈ μ · F · R_push · sin β · (Zc/Zp)
+T_out       = μ · F · R_push · sin β · (Zc/Zp)
+
+                                           s̄ does NOT appear in T_out, and the
+                                           cancellation is exact: the moment
+                                           arm and the friction radius are both
+                                           s, so the contact's position divides
+                                           out. Moving the rubber outward buys
+                                           radius and costs normal force
+                                           equally. Doc §8.
 ```
 
 ### Transmitted torque
@@ -203,6 +211,14 @@ passive-dynamics goal wants.
    slip accumulates non-repeatably in series along a tree; position is only
    known by measuring it. I2C address fixed at **0x36**, so multiplexing is
    required (analog output, PWM, or a TCA9548A).
+10. **Park in free.** Rubber left compressed takes a permanent set at that one
+    spot, and a flat on a friction drive is a once-per-revolution thump — the
+    failure that killed idler-wheel turntables. The working squeeze is ~0.08 mm
+    and butyl sets badly, so this is not a small effect. Free being the middle
+    of the travel does **not** make it automatic: gravity acts within the tilt
+    plane and pulls toward the lower cone, and an unpowered servo's gearbox
+    holds wherever firmware left the carriage. Command free before power-down
+    and between movements. Doc §4.
 
 ---
 
