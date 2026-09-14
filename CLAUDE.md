@@ -228,7 +228,13 @@ passive-dynamics goal wants.
 ## Discarded — do not re-propose
 
 - **Tilting flat disc with a universal joint** (v3/v4). Superseded.
-- **Laboratory conical rubber stoppers** as friction elements.
+- **Laboratory conical rubber stoppers** as friction elements. Their taper is
+  7-10° of half-angle where the design needs 33° and 55°, and `α+β` is the
+  angle between the axes, so they would put the output shaft nearly parallel
+  to the motor. More fundamentally, a solid rubber cone winds up ~105° at
+  2.4 Nm carrying the torque through its own body, against ~6° for a 2 mm
+  bonded layer: the rubber must be thin and backed by something rigid. Full
+  numbers in `docs/design-evolution.md`.
 - **Fixed-threshold friction clutches to obtain free rotation.** Lifting and
   falling demand the same torque, so no threshold separates them.
 - **Interleaved O-rings** (v5). The interdigitation forces the cones apart and

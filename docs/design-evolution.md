@@ -217,7 +217,24 @@ which satisfies it exactly — at zero margin, as is `Zc − Zp = 8`.
 
 - **Tilting a shaft (universal joint, printed neck, or flexure) to engage.**
   v2, v3 and v4 all did this. Superseded by carriage translation.
-- **Laboratory conical rubber stoppers** as friction elements.
+- **Laboratory conical rubber stoppers** as friction elements. Two reasons, and
+  the second one rules out any bulk-rubber element, not just stoppers. First,
+  the taper: a standard stopper is 7-10° of half-angle (a #11 is 56/47 mm over
+  25 mm high, i.e. 10.2°) where the design needs 33° and 55° — and `α+β` *is*
+  the angle between the axes at contact, so a pair of stoppers would put the
+  output shaft nearly parallel to the motor shaft instead of perpendicular to
+  it. Two equal cones would also give `ratio_fric = 1`, against invariant 1.
+  Second, and deeper: a solid rubber cone has to carry the output torque
+  through its own body in torsion. For R ≈ 12 mm, L ≈ 25 mm and G ≈ 1 MPa,
+  `θ = T·L/(G·J)` is **~105° of wind-up at 2.4 Nm** (still 22° at 0.5 Nm),
+  against ~6° for a 2 mm layer bonded to a rigid cone, whose shear path is 2 mm
+  instead of 25. That is the real reason the rubber must be **thin and backed
+  by something stiff**, and it is the same reason the drive load goes straight
+  through the layer into the cone rather than along it. The instinct behind the
+  idea — one seamless bulk rubber part, no wrapping and no seam — survives as
+  **casting** the layer onto the cone.
+  *(Reason recorded 2026-09-14; the original entry carried none, which is why
+  it came back up.)*
 - **Fixed-threshold friction clutches to obtain free rotation.** Lifting and
   falling demand the same torque, so no threshold separates them.
 - **Any 1:1 or speed-multiplying stage.** The tree needs reduction at every level.
