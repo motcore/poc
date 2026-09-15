@@ -1,8 +1,9 @@
 # Clutch geometry — v6 "Apex Pivot"
 
-Status: **active design**, settled 2026-09-12. Supersedes v5 (vertical carriage).
-No FreeCAD macro yet — `cad/motcore_v6_apex_pivot.py` is the next thing to build,
-starting from `cad/motcore_v5_vertical_clutch.py`.
+Status: **active design**, settled 2026-09-12, repacked 2026-09-15. Supersedes
+v5 (vertical carriage). The macro is `cad/motcore_v6_apex_pivot.py`; it builds
+the assembly and self-checks it (26 numeric checks), and every number quoted
+below that says "measured" comes from its own output.
 
 ---
 
@@ -29,11 +30,15 @@ the whole carriage swings on. It never moves, in any position.
 - **The motor cones can share one apex.** v5 had to hold them 14.8 mm apart
   (at ±(e+g)); in v6 their rubber surfaces converge on a single point, so the
   hourglass waist closes and the cube gets shorter.
-- **The carriage is a lever.** The push point sits further from the apex than
-  the rubber does, so a newton of actuator force becomes **×1.60** of total
-  normal force (macro, measuring s̄ at the squeeze's own centroid). Read that as
-  force, not as torque: see §8 — where the contact sits cancels out of the
-  output torque exactly.
+- **The carriage is a lever.** The push arrives further from the apex than the
+  rubber does, so a newton of actuator force becomes **×1.53** of total normal
+  force (macro, measuring s̄ at the squeeze's own centroid). Read that as force,
+  not as torque: see §8 — where the contact sits cancels out of the output
+  torque exactly.
+- **The box got shorter.** Hollowing the output cone and putting the bearing
+  housing inside it moved the whole gear stack behind the push point: 145 mm
+  cube → **119 mm**, with the corona's running clearance now the thing that
+  sets it.
 
 ---
 
@@ -140,22 +145,33 @@ Current geometry (Y-Z plane, apex at origin):
 
 | | |
 |---|---|
-| Link axis angles | ±50° from the Y axis, both through the origin |
-| Frame pivots | radius 58 mm |
-| Carriage pivots | radius 42 mm |
-| Link length | 16 mm |
-| Sets | two, one at each side in X, for out-of-plane stiffness |
+| Link axis angles | ±40° from the Y axis, both through the origin |
+| Frame pivots | radius 62 mm |
+| Carriage pivots | radius 40.5 mm |
+| Link length | 21.5 mm |
+| Sets | two, one at each side in X, joined at the carriage pivot into one part |
 
-**Measured in the v6 visualiser, 2026-09-12** (the earlier "< 0.1 mm" estimate was
-wrong): at full preload (±2.49°) the point that started at the apex moves
-**0.22 mm**, and about 0.14 mm at contact. That is a residual apex error worth
-roughly 1% of slip at full preload — an order better than v5's 7.4%, but **not
-zero**, so do not quote "≈ 0" for the total slip. It is tunable through the link
-angles and lengths; the macro should compute it and print it as a check.
+The ray came down from 50° and the carriage pivot moved out from 42 mm when the
+output cone became a shell: the carriage's arms now start *inside* the cone and
+can only leave through its mouth at y = 30.8, so their pivot has to be beyond
+that. Tilting the ray is what keeps the link long while doing it — and a long
+link is what keeps the drift small.
+
+**Measured by the macro** (`apex_drift`, on the linkage's own solved pose, not on
+an ideal rotation): at full preload the point that started at the apex moves
+**0.133 mm**, and 0.093 mm at contact — against 0.226 mm for the ±50°/16 mm
+layout this replaces. Residual slip **0.44%** of the contact line, against v5's
+7.4%. Not zero: do not quote "≈ 0".
+
+The drift decomposes into a component **along** the shared generatrix (the part
+that slips, +0.103 mm) and one **normal** to it (−0.085 mm), which is a preload
+error worth 4% of the rubber's thickness — enough that contact arrives at the rim
+first and spreads inward rather than landing along the whole line at once. The
+macro prints both.
 
 The **instant centre** itself wanders much further, ~10 mm at full stroke. That is
 normal four-bar behaviour and is not a fault: what matters is how far the apex
-*point* travels, which is the 0.22 mm above.
+*point* travels, which is the 0.133 mm above.
 
 Links must not be at ±35°: that is exactly the shared generatrix direction, i.e.
 the cone surfaces. Anything between 33° and 35° is inside the clearance wedge.
@@ -228,14 +244,26 @@ The pinion tilts ±2° inside the mesh, which modest crowning handles.
 ## 7. Actuation
 
 ```
-servo  →  crank  →  telescopic link with two springs inside  →  pin on the carriage's bearing housing
+servo  →  crank  →  telescopic link with two springs inside  →  pin on the carriage's horn
 ```
 
-- **Push point: the bearing housing**, on the centre line, ~46 mm from the apex,
-  between the cone base and the pinion. Centred means the push is purely
-  tangential (vertical at the centre line) and both links share the load evenly.
-  It is also the stiffest part of the carriage, which matters because the whole
-  travel to contact is only ~1.6 mm.
+- **Push point: a horn on the carriage**, at y = 40 mm, z = −30 mm — not on the
+  centre line. The centre line is where the output shaft is, and straight out
+  from the housing is where the gear plane is, so the horn drops below the
+  corona's 25.6 mm rim first and then runs forward. It carries a Ø5 steel pin
+  pressed through it, not a printed boss: the load bends that pin across the
+  layers, which is the one direction FDM has none.
+- **R_push is not the lever.** The force arrives along the link, and the link
+  comes up off the floor at a shallow angle, so the moment arm about the apex is
+  the perpendicular distance from the apex to the link's *line of action* —
+  **42.3–43.2 mm** over the stroke, measured by the macro (`push_lever`). Swept
+  over R_push = 32…50 mm that distance barely moves: pushing from further out
+  costs as much angle as it gains radius. So R_push is chosen for packaging,
+  and the horn is as short as the corona's rim allows.
+- Because the push point sits 30 mm below the axis, the link's large **Y**
+  component earns a moment of its own about the apex and very nearly makes up
+  for the Z component it gives up. That is why the servo could be pulled inboard
+  along the floor at all.
 - **No slot, no external guide.** The link is pinned at both ends; the only
   sliding left is the coaxial tube-in-tube inside the link, which is what the
   springs compress against. This replaced an earlier Scotch-yoke-plus-rail
@@ -254,12 +282,39 @@ Working numbers (first pass):
 | | |
 |---|---|
 | Servo | MG90D (digital, ~0.22 Nm, ~0.08–0.1 s/60°) |
-| Crank radius | ~6.3 mm |
-| Sweep | ±85°, contact at ~15° |
-| Travel to contact at the push point | ~1.6 mm |
-| Spring travel | ~4.5 mm |
+| Crank radius | 6.3 mm |
+| Servo-side travel | ±6 mm |
+| Travel to contact at the push point | 1.40 mm |
+| Spring travel | ~4.6 mm |
 | Spring rate | ~20 N/mm **(placeholder)** |
-| Spring/rubber split | 10:1 **(placeholder, needs the rubber measurement)** |
+| Spring/rubber split | 10:1 at R = 50 mm **(placeholder, needs the rubber measurement)** |
+
+**The split is a ratio, not a constant.** A given spring and a given rubber look
+like a *different* ratio from a different radius, because the same push-point
+travel becomes a bigger tilt and the tilt is what squeezes the rubber — it goes
+as 1/R². The macro derives `spring_split` from the invented 10:1 and the radius
+it was invented at, so shortening the horn cannot quietly raise the preload.
+(Before that was fixed, going from R = 50 to R = 40 took the preload squeeze
+from 4.0 to 7.4 mm³ on a change that was only supposed to be about packaging.)
+
+### Packaging
+
+- The **servo lies on the deck**, shaft on X, case running *inboard* along that
+  shaft axis. Outboard is the neighbouring axis' wall, 55.5 mm out, and the
+  stack (link, crank, standoff, 29 mm of case) needs 60. Inboard, under the
+  motor cone and above the deck, there is a pocket with nothing in it.
+- The **crank sits inboard of the link plane**, with its pin reaching outboard
+  through the link. Outboard, the crank's boss would have to cross the link
+  plane at the hub — and near dead centre the link lies right on top of the hub.
+- **Alternate axes are assembled turned over**: the same parts, rotated 180°
+  about their own radius, so their servo, crank and horn lie against the other
+  deck. It is a rotation, not a mirror, so it costs no new parts, and the shared
+  motor cones are symmetric in Z, so a turned-over axis still meshes with them.
+  Without it two neighbouring servos want the same corner of the same floor, and
+  no arrangement inside this box avoids it — the case is 29 mm along the shaft
+  and the crank has to sit beside the horn, so it reaches across the middle.
+  The decks and walls therefore carry **both hands** of every bracket's screw
+  pattern; a boss nothing screws into costs a gram.
 
 **Pick the servo on speed, not torque.** Torque is comfortable; the binding spec
 is getting free→contact done inside a push-off window of 50–150 ms. Digital also
@@ -272,27 +327,31 @@ matters for its small deadband, because preload is set by small angle changes.
 Moment balance about the apex gives a closed form:
 
 ```
-ΣN      = F · R_push / s̄                    normal force from the actuator force
-T_out   ≈ μ · F · R_push · sin β · (Zc/Zp)
+ΣN      = F · lever / s̄                     normal force from the actuator force
+T_out   ≈ μ · F · lever · sin β · (Zc/Zp)
 ```
 
-With μ = 1.3, R_push = 46 mm, β = 33°, Zc/Zp = 3: **≈ 0.098 Nm of output torque
-per newton of actuator force** — so ~2.4 Nm at 25 N and ~8.8 Nm at 90 N.
+`lever` is the perpendicular distance from the apex to the actuation link's line
+of action (§7), **not** R_push — R_push would be the arm only if the push were
+vertical.
+
+With μ = 1.3, lever = 42.3 mm, β = 33°, Zc/Zp = 3: **≈ 0.090 Nm of output torque
+per newton of actuator force** — so ~2.2 Nm at 25 N and ~8.1 Nm at 90 N.
 
 **Where the contact sits does not appear in that, and the cancellation is
-exact.** Moments about the apex give `F·R_push = ∫ n(s)·s ds`, because a force
+exact.** Moments about the apex give `F·lever = ∫ n(s)·s ds`, because a force
 perpendicular to the generatrix at distance `s` from the pivot has moment arm
 exactly `s`. The output torque is `μ·∫ n(s)·(s·sin β) ds`, the same integral —
-so `T = μ·sin β·F·R_push` whatever the pressure distribution. Moving the rubber
+so `T = μ·sin β·F·lever` whatever the pressure distribution. Moving the rubber
 outward buys friction radius and costs normal force in the same proportion. It
 is the same property of the apex pivot that matches the surface speeds:
 everything scales with `s`.
 
-So `R_push / s̄` is **not** a torque multiplier, and reading it as one is a trap
+So `lever / s̄` is **not** a torque multiplier, and reading it as one is a trap
 this document previously set. What it gives is the total NORMAL force, which is
 what the rubber has to develop inside the available squeeze — open question 1.
-The macro measures `s̄` at the centroid of the actual squeeze, 28.8 mm, giving
-**×1.60**; the band's midpoint, which is what an earlier ×2.4 came from,
+The macro measures `s̄` at the centroid of the actual squeeze, 27.7 mm, giving
+**×1.53**; the band's midpoint, which is what an earlier ×2.4 came from,
 overstates it by half because the contact is not where the band's middle is.
 
 **This is an upper bound.** It assumes the rubber actually develops that normal
@@ -351,14 +410,21 @@ output must present the same interface as the input so cubes can chain.
    together with a micrometer screw and a kitchen scale, and record N/cm at 0.04,
    0.1 and 0.2 mm. Half an hour of work; it decides the spring, the servo and
    whether the cones need to grow.
-2. **Spring rate and the spring/rubber split.** The 10:1 in §7 is invented.
-3. **Four-bar drift.** The "< 0.1 mm over ±2°" is an estimate. The macro should
-   compute the apex position at the engaged stops and print it as a check.
+2. **Spring rate and the spring/rubber split.** The 10:1 in §7 is invented. It
+   is now carried across changes of radius correctly (§7), but the number itself
+   still has to be measured.
+3. ~~**Four-bar drift.**~~ **Answered.** The macro solves the linkage and
+   measures the apex's travel at every stop: 0.133 mm at preload, split into
+   0.103 mm of slip along the generatrix and 0.085 mm of preload error normal to
+   it. See §5.
 4. **Making the rubber layer.** Wrapping a flat sector onto the cone is
    geometrically right but untested: adhesive, seam, thickness uniformity.
-5. **Packaging.** Servo placement, idler support bracket, link geometry and the
-   frame pivots' brackets (they sit at z ≈ ±44 mm, well past where the motor
-   cones end, so they need new structure).
+5. ~~**Packaging.**~~ **Answered, and checked.** Servo on the deck with its case
+   inboard, idler on a D-shaped bracket screwed to the wall from inside, frame
+   pivots on posts standing on the decks, alternate axes turned over (§7). The
+   macro checks every pair of parts at every stop, and each axis against all
+   three of its neighbours. What is left is not layout but sizing: none of the
+   brackets has been loaded or FEA'd.
 6. **Central motor sizing.** Depends on (1) and on how many axes are engaged at
    once. Note the demands add, they do not divide: two engaged axes ask the motor
    for the sum of their slip torques.
@@ -367,13 +433,14 @@ output must present the same interface as the input so cubes can chain.
 
 ## 11. Next steps
 
-1. Build `cad/motcore_v6_apex_pivot.py` from the v5 macro. Reusable almost
-   verbatim: cone solids, the FDM hole compensations, the gear helpers, the
-   document/placement/interference-check scaffolding. New: single-apex layout
-   with rubber-surface compensation, rubber layer instead of grooves, four-bar
-   instead of guide rods, idlers, and the checks in §5 and §10.3.
+1. **Done 2026-09-15:** `cad/motcore_v6_apex_pivot.py` — single-apex layout with
+   rubber-surface compensation, the continuous rubber band (with its 1:1 cutting
+   template, `cad/motcore_v6_flat_pattern.svg`), the four-bar with its drift
+   measured, the idler stage, the fasteners as solids, and 26 numeric checks.
 2. Run the rubber measurement (open question 1) before committing to a spring or
-   a servo.
+   a servo. It is the only thing still blocking a torque figure.
+3. Print one axis. Everything above is geometry that has never been in a
+   printer.
 3. **Done 2026-09-12:** `cad/clutch_geometry_v6.html`, a standalone interactive
    visualiser (four-bar with the instant centre traced, telescopic spring link,
    gear front view with the idlers). Self-contained, no dependencies, ready to

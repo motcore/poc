@@ -88,9 +88,16 @@ Read that before proposing changes. Summary:
   idlers (8t, fixed axes, **left and right in X, never up/down**) → corona
   (24t, output). Ratio 1/3, output on the wall centre.
 - **Actuation**: servo → crank → telescopic link with two springs inside → pin
-  on the carriage's bearing housing, ~46 mm from the apex. No slot, no external
-  guide. The springs make the preload force-controlled rather than
-  position-controlled.
+  on a **horn** on the carriage, below the corona's rim, 40 mm from the apex in
+  Y and 30 mm below the axis. No slot, no external guide. The springs make the
+  preload force-controlled rather than position-controlled.
+  **R_push is not the moment arm**: the force arrives along the link, so the arm
+  is the perpendicular distance from the apex to the link's line — 42.3 mm,
+  measured. Doc §7.
+- **The servo lies on the deck**, case running inboard along its shaft axis, and
+  **alternate axes are assembled turned over** (180° about their own radius —
+  the same parts, and the shared cones are symmetric in Z). Two neighbouring
+  servos otherwise want the same corner of the same floor. Doc §7.
 
 ### Three carriage positions — symmetric, both ways from the middle
 
@@ -122,7 +129,9 @@ output cone, which is why the concentric pinion does not fit (see the doc, §9).
 | **Zp** | 8     | pinion teeth (on the carriage) |
 | **Zi** | 8     | idler teeth |
 | **Zc** | 24    | corona teeth (on the output shaft) |
-| **R_push** | 46 mm | apex → servo push point (bearing housing) |
+| **R_push** | 40 mm | apex → push point in Y (on the horn, 30 mm below the axis) |
+| **lever** | 42.3 mm | apex → the LINK's line of action. This is the moment arm |
+| **cube** | 119 mm | outside, set by the corona's running clearance |
 | **δφ** | ~0.6° | preload rotation past contact |
 
 Derived at defaults:
@@ -136,9 +145,9 @@ Derived at defaults:
 | plastic apex offset, motor cones | 2.44 mm each |
 | plastic apex offset, output cone | 3.67 mm |
 | micro-slip from the ring/layer geometry | ≈ 0 (v5: 7.4%) |
-| residual apex drift from the four-bar | 0.22 mm at full preload ≈ 1% slip |
-| force lever (R_push / s̄, s̄ at the squeeze centroid) | **×1.60** — normal force, NOT torque |
-| output torque per newton of actuator force | ≈ 0.098 Nm/N **(upper bound, unverified)** |
+| residual apex drift from the four-bar | 0.133 mm at full preload = 0.44% slip |
+| force lever (lever / s̄, s̄ at the squeeze centroid) | **×1.53** — normal force, NOT torque |
+| output torque per newton of actuator force | ≈ 0.090 Nm/N **(upper bound, unverified)** |
 
 ---
 
@@ -157,8 +166,11 @@ ratio_fric  = sin α / sin β
 ratio_gear  = Zp / Zc                      idlers do not change the ratio
 ratio_total = ratio_fric · ratio_gear      must stay < 1
 
-ΣN          = F · R_push / s̄               normal force from actuator force
-T_out       = μ · F · R_push · sin β · (Zc/Zp)
+ΣN          = F · lever / s̄                normal force from actuator force
+T_out       = μ · F · lever · sin β · (Zc/Zp)
+
+                                           lever, NOT R_push: the push arrives
+                                           along the link, not vertically.
 
                                            s̄ does NOT appear in T_out, and the
                                            cancellation is exact: the moment
@@ -229,13 +241,14 @@ passive-dynamics goal wants.
   bench, every torque figure here is an estimate. It decides the spring, the
   servo and whether the cones must grow.
 - **Spring rate, and how the extra travel splits between spring and rubber.**
-  The 10:1 currently assumed is invented.
-- **Four-bar drift.** "< 0.1 mm over ±2°" is an estimate; the macro should
-  compute and print it.
+  The 10:1 currently assumed is invented. It is a ratio *at a radius* and scales
+  as 1/R², which the macro now carries across; the number itself is still a
+  guess.
 - **How the rubber layer is made.** A cone unrolls into a flat sector, so a cut
   sheet can be wrapped on — untested (adhesive, seam, uniformity).
-- **Packaging**: servo placement, idler support bracket, and the frame pivots
-  for the links (they sit at z ≈ ±44 mm, past where the motor cones end).
+- **Bracket sizing**: the layout is settled and the macro checks every pair of
+  parts at every stop, and each axis against all three neighbours — but no
+  bracket has been loaded or FEA'd, and nothing has been printed.
 - **Central motor sizing.** Depends on the rubber measurement and on how many
   axes engage at once — demands **add**, they do not divide.
 
@@ -275,7 +288,8 @@ passive-dynamics goal wants.
 | File | Purpose |
 |------|---------|
 | `docs/clutch-geometry-v6.md` | **v6 design — the source of truth.** Geometry, actuation, rejected alternatives, open questions, next steps |
-| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **to be written**, from the v5 macro |
+| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **the v6 assembly**. Run it headless (`freecadcmd`) and read its report: 26 numeric checks, the four-bar's measured drift, the actuation lever, the cube's driver, and the printed/purchased lists |
+| `cad/motcore_v6_flat_pattern.svg` | 1:1 cutting template for the rubber bands, regenerated by the macro on every run |
 | `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — v5, superseded. Still the best reference for cone solids, FDM hole compensation, gear helpers and the self-check scaffolding |
 | `cad/clutch_geometry_v6.html` | Interactive 2D visualiser for v6 — four-bar, spring link, gear front view. Self-contained (no deps), meant for motcore.github.io |
 | `cad/clutch_geometry_v5.html` | 2D visualiser — superseded, two generations stale (single motor cone, one-sided ladder) |

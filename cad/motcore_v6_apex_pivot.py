@@ -2269,21 +2269,25 @@ print(f"    {_crank_tilt(-phi_c):+.0f} deg at contact — positive is downward."
 print(f"    contact is reached in the first eighth of the sweep; the rest of"
       f" the sweep is preload")
 # The "lever" is NOT a torque multiplier, and reading it as one is a trap.
-# Moments about the apex give  F*R_push = INTEGRAL n(s)*s ds, and the output
-# torque is  mu * INTEGRAL n(s)*(s*sin beta) ds  =  mu*sin(beta)*F*R_push:
+# Moments about the apex give  F*lever = INTEGRAL n(s)*s ds, and the output
+# torque is  mu * INTEGRAL n(s)*(s*sin beta) ds  =  mu*sin(beta)*F*lever:
 # the contact's position cancels out exactly. That is the same property of the
 # apex pivot that matches the surface speeds — every quantity scales with s.
-# What R_push/s_bar really gives is the total NORMAL force, which is what has
+# What lever/s_bar really gives is the total NORMAL force, which is what has
 # to be developed inside the available squeeze (open question 1), not torque.
+#
+# `lever`, not R_push. R_push would be the arm if the push were vertical, and
+# this one is not: it arrives along the link.
 _mu_ref = 1.3
-print(f"    normal force per newton of actuator force: R_push / s_bar ="
-      f" {R_push / _sq_sbar:.2f}"
+print(f"    the LINK's lever about the apex is {min(_lever):.1f}..{max(_lever):.1f}"
+      f" mm, against R_push = {R_push:.1f}. The link comes up off the floor at a"
+      f" shallow angle, but the push point is {abs(push_z):.0f} mm below the"
+      f" axis, so the link's Y component earns a moment of its own and very"
+      f" nearly makes up for what its Z component gives up.")
+print(f"    normal force per newton of actuator force: lever / s_bar ="
+      f" {min(_lever) / _sq_sbar:.2f}"
       f"  (s_bar = {_sq_sbar:.1f} mm, the squeeze's own centroid, not the"
       f" band's midpoint)")
-print(f"    the LINK's lever about the apex is {min(_lever):.1f}..{max(_lever):.1f}"
-      f" mm over the whole stroke, against R_push = {R_push:.1f}: the link comes"
-      f" up off the floor at a shallow angle, but the push point is 30 mm below"
-      f" the axis, so its Y component earns most of what its Z component gives up")
 print(f"    output torque per newton: mu*sin(beta)*lever*(Zc/Zp) ="
       f" {_mu_ref * math.sin(beta) * min(_lever) / 1000.0 * (Zc / Zp):.4f} Nm/N"
       f" at mu = {_mu_ref}")
