@@ -441,7 +441,35 @@ output must present the same interface as the input so cubes can chain.
    a servo. It is the only thing still blocking a torque figure.
 3. Print one axis. Everything above is geometry that has never been in a
    printer.
-3. **Done 2026-09-12:** `cad/clutch_geometry_v6.html`, a standalone interactive
+4. **Done 2026-09-12:** `cad/clutch_geometry_v6.html`, a standalone interactive
    visualiser (four-bar with the instant centre traced, telescopic spring link,
    gear front view with the idlers). Self-contained, no dependencies, ready to
    publish on motcore.github.io. `cad/clutch_geometry_v5.html` can be retired.
+
+---
+
+## 12. Next session — raised 2026-09-15, not yet worked
+
+Notes as raised, not designs. Nothing here has been checked against the macro.
+
+1. **Give the output cone material at its tip.** It is a shell truncated 3 mm
+   from its own plastic apex, so the tip is the thinnest and least supported part
+   of the piece, and it is the end that points at the motor shaft.
+2. **The four-bar links look like they foul the motor cone** — and if they do,
+   this is where the "L" belongs: dog-leg the link out around the cone rather
+   than run it straight from pivot to pivot. Worth checking the *checks* at the
+   same time: the macro reports no contact at any stop, so either the clearance
+   is real and merely tight, or the motor cones are getting past the interference
+   matrix the way the wall and the decks once did.
+3. **The rubber band's edge is not square.** The band ends on a cut that is not
+   perpendicular to the surface it is bonded to; decide what that edge should be
+   and make the flat pattern cut it that way.
+4. **Get rid of the corona.** Two routes, both bigger than they look:
+   - a **flexible shaft** from the output cone out to the wall — viable, not
+     easy;
+   - or a **corona with clearance at the cone's tip**: the output shaft runs
+     all the way in to the tip of the cone, and the ring gear is printed into the
+     cone itself instead of being a separate part on its own shaft.
+5. **Design the servo link for real.** It is still a placeholder bar; it has to
+   become an actual telescopic tube-in-tube with the two springs inside, with the
+   spring's free length, travel and retention worked out.
