@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="241mm" height="175mm" viewBox="0 0 574 337">
+<rect width="574" height="337" fill="#fff"/>
+<line x1="147.1" y1="300.5" x2="147.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="-2.4" y1="22.3" x2="147.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="-2.4" y1="300.5" x2="147.1" y2="300.5" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="8.0" y1="300.5" x2="8.0" y2="22.3" stroke="#bbb" stroke-width="0.5" stroke-dasharray="3,3"/>
+<line x1="17.6" y1="148.3" x2="80.4" y2="104.3" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="29.3" y1="146.5" x2="79.1" y2="111.6" stroke="#222" stroke-width="2.4"/>
+<line x1="17.6" y1="174.5" x2="80.4" y2="218.5" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="29.3" y1="176.3" x2="79.1" y2="211.2" stroke="#222" stroke-width="2.4"/>
+<polygon points="24.1,161.4 24.1,157.2 88.0,115.6 88.0,123.4 37.2,153.9 33.3,153.9 33.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="29.8" y1="147.2" x2="80.8" y2="114.1" stroke="#222" stroke-width="2.4"/>
+<polygon points="24.1,161.4 24.1,165.6 88.0,207.2 88.0,199.4 37.2,168.9 33.3,168.9 33.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="29.8" y1="175.6" x2="80.8" y2="208.7" stroke="#222" stroke-width="2.4"/>
+<polygon points="37.2,154.9 117.2,154.9 117.2,167.9 37.2,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<polygon points="62.6,141.9 106.8,141.9 106.8,180.9 62.6,180.9" fill="#e8e8ec" stroke="#555" stroke-width="0.6"/>
+<text x="65.2" y="138.0" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">rodamientos</text>
+<polygon points="108.1,154.9 117.2,154.9 117.2,138.0 108.1,138.0" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="108.1,109.9 121.1,109.9 121.1,94.8 108.1,94.8" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="108.1,167.9 117.2,167.9 117.2,184.8 108.1,184.8" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="108.1,212.9 121.1,212.9 121.1,228.0 108.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="121.1,94.8 131.5,94.8 131.5,228.0 121.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="131.5,154.9 162.7,154.9 162.7,167.9 131.5,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<line x1="8.0" y1="161.4" x2="110.7" y2="38.9" stroke="#b07ad0" stroke-width="0.5" stroke-dasharray="4,3"/>
+<line x1="104.9" y1="45.9" x2="88.6" y2="65.4" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="101.6" y1="141.9" x2="88.6" y2="65.4" stroke="#777" stroke-width="1.6"/>
+<circle cx="104.9" cy="45.9" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="88.6" cy="65.4" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="104.9" y1="276.9" x2="88.6" y2="257.4" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="101.6" y1="180.9" x2="88.6" y2="257.4" stroke="#777" stroke-width="1.6"/>
+<circle cx="104.9" cy="276.9" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="88.6" cy="257.4" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="101.6" y1="180.9" x2="101.6" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<line x1="101.6" y1="239.4" x2="138.0" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<circle cx="138.0" cy="239.4" r="2.6" fill="#d63c3c"/>
+<line x1="138.0" y1="239.4" x2="138.0" y2="161.4" stroke="#d63c3c" stroke-width="0.5" stroke-dasharray="2,2"/>
+<text x="135.4" y="252.4" font-family="sans-serif" font-size="3.0" text-anchor="middle" fill="#d63c3c">empuje  R=50</text>
+<text x="0.2" y="11.9" font-family="sans-serif" font-size="4.2" text-anchor="start" fill="#333">A — rayo 50°, biela 9.8</text>
+<text x="0.2" y="313.5" font-family="sans-serif" font-size="3.0" text-anchor="start" fill="#333">biela 9.8 mm   pivote carro en y=31.0   boca del cono y=30.8</text>
+<text x="0.2" y="326.5" font-family="sans-serif" font-size="3.4" text-anchor="start" fill="#b02020">deriva del vertice 0.424 mm   ->  1.24% de deslizamiento</text>
+<text x="0.2" y="339.5" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">(hoy: biela 16, deriva 0.226, 0.72%)</text>
+<line x1="335.1" y1="300.5" x2="335.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="185.6" y1="22.3" x2="335.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="185.6" y1="300.5" x2="335.1" y2="300.5" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="196.0" y1="300.5" x2="196.0" y2="22.3" stroke="#bbb" stroke-width="0.5" stroke-dasharray="3,3"/>
+<line x1="205.6" y1="148.3" x2="268.4" y2="104.3" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="217.3" y1="146.5" x2="267.1" y2="111.6" stroke="#222" stroke-width="2.4"/>
+<line x1="205.6" y1="174.5" x2="268.4" y2="218.5" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="217.3" y1="176.3" x2="267.1" y2="211.2" stroke="#222" stroke-width="2.4"/>
+<polygon points="212.1,161.4 212.1,157.2 276.0,115.6 276.0,123.4 225.2,153.9 221.3,153.9 221.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="217.8" y1="147.2" x2="268.8" y2="114.1" stroke="#222" stroke-width="2.4"/>
+<polygon points="212.1,161.4 212.1,165.6 276.0,207.2 276.0,199.4 225.2,168.9 221.3,168.9 221.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="217.8" y1="175.6" x2="268.8" y2="208.7" stroke="#222" stroke-width="2.4"/>
+<polygon points="225.2,154.9 305.2,154.9 305.2,167.9 225.2,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<polygon points="250.6,141.9 294.8,141.9 294.8,180.9 250.6,180.9" fill="#e8e8ec" stroke="#555" stroke-width="0.6"/>
+<text x="253.2" y="138.0" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">rodamientos</text>
+<polygon points="296.1,154.9 305.2,154.9 305.2,138.0 296.1,138.0" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="296.1,109.9 309.1,109.9 309.1,94.8 296.1,94.8" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="296.1,167.9 305.2,167.9 305.2,184.8 296.1,184.8" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="296.1,212.9 309.1,212.9 309.1,228.0 296.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="309.1,94.8 319.5,94.8 319.5,228.0 309.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="319.5,154.9 350.7,154.9 350.7,167.9 319.5,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<line x1="196.0" y1="161.4" x2="315.3" y2="61.3" stroke="#b07ad0" stroke-width="0.5" stroke-dasharray="4,3"/>
+<line x1="308.5" y1="67.0" x2="276.7" y2="93.7" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="289.6" y1="141.9" x2="276.7" y2="93.7" stroke="#777" stroke-width="1.6"/>
+<circle cx="308.5" cy="67.0" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="276.7" cy="93.7" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="308.5" y1="255.8" x2="276.7" y2="229.1" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="289.6" y1="180.9" x2="276.7" y2="229.1" stroke="#777" stroke-width="1.6"/>
+<circle cx="308.5" cy="255.8" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="276.7" cy="229.1" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="289.6" y1="180.9" x2="289.6" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<line x1="289.6" y1="239.4" x2="326.0" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<circle cx="326.0" cy="239.4" r="2.6" fill="#d63c3c"/>
+<line x1="326.0" y1="239.4" x2="326.0" y2="161.4" stroke="#d63c3c" stroke-width="0.5" stroke-dasharray="2,2"/>
+<text x="323.4" y="252.4" font-family="sans-serif" font-size="3.0" text-anchor="middle" fill="#d63c3c">empuje  R=50</text>
+<text x="188.2" y="11.9" font-family="sans-serif" font-size="4.2" text-anchor="start" fill="#333">B — rayo 40°, biela 16</text>
+<text x="188.2" y="313.5" font-family="sans-serif" font-size="3.0" text-anchor="start" fill="#333">biela 16.0 mm   pivote carro en y=31.0   boca del cono y=30.8</text>
+<text x="188.2" y="326.5" font-family="sans-serif" font-size="3.4" text-anchor="start" fill="#b02020">deriva del vertice 0.177 mm   ->  0.57% de deslizamiento</text>
+<text x="188.2" y="339.5" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">(hoy: biela 16, deriva 0.226, 0.72%)</text>
+<line x1="523.1" y1="300.5" x2="523.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="373.6" y1="22.3" x2="523.1" y2="22.3" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="373.6" y1="300.5" x2="523.1" y2="300.5" stroke="#8899bb" stroke-width="1.2"/>
+<line x1="384.0" y1="300.5" x2="384.0" y2="22.3" stroke="#bbb" stroke-width="0.5" stroke-dasharray="3,3"/>
+<line x1="393.6" y1="148.3" x2="456.4" y2="104.3" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="405.3" y1="146.5" x2="455.1" y2="111.6" stroke="#222" stroke-width="2.4"/>
+<line x1="393.6" y1="174.5" x2="456.4" y2="218.5" stroke="#c8860d" stroke-width="1.6"/>
+<line x1="405.3" y1="176.3" x2="455.1" y2="211.2" stroke="#222" stroke-width="2.4"/>
+<polygon points="400.1,161.4 400.1,157.2 464.0,115.6 464.0,123.4 413.2,153.9 409.3,153.9 409.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="405.8" y1="147.2" x2="456.8" y2="114.1" stroke="#222" stroke-width="2.4"/>
+<polygon points="400.1,161.4 400.1,165.6 464.0,207.2 464.0,199.4 413.2,168.9 409.3,168.9 409.3,161.4" fill="#cfe9dd" stroke="#2a7f62" stroke-width="0.6"/>
+<line x1="405.8" y1="175.6" x2="456.8" y2="208.7" stroke="#222" stroke-width="2.4"/>
+<polygon points="413.2,154.9 493.2,154.9 493.2,167.9 413.2,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<polygon points="438.6,141.9 482.8,141.9 482.8,180.9 438.6,180.9" fill="#e8e8ec" stroke="#555" stroke-width="0.6"/>
+<text x="441.2" y="138.0" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">rodamientos</text>
+<polygon points="484.1,154.9 493.2,154.9 493.2,138.0 484.1,138.0" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="484.1,109.9 497.1,109.9 497.1,94.8 484.1,94.8" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="484.1,167.9 493.2,167.9 493.2,184.8 484.1,184.8" fill="#f2d478" stroke="#a8860d" stroke-width="0.4"/>
+<polygon points="484.1,212.9 497.1,212.9 497.1,228.0 484.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="497.1,94.8 507.5,94.8 507.5,228.0 497.1,228.0" fill="#c9c6ee" stroke="#5a56a8" stroke-width="0.4"/>
+<polygon points="507.5,154.9 538.7,154.9 538.7,167.9 507.5,167.9" fill="#bbb" stroke="#777" stroke-width="0.4"/>
+<line x1="384.0" y1="161.4" x2="514.9" y2="51.6" stroke="#b07ad0" stroke-width="0.5" stroke-dasharray="4,3"/>
+<line x1="507.5" y1="57.8" x2="464.7" y2="93.7" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="477.6" y1="141.9" x2="464.7" y2="93.7" stroke="#777" stroke-width="1.6"/>
+<circle cx="507.5" cy="57.8" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="464.7" cy="93.7" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="507.5" y1="265.0" x2="464.7" y2="229.1" stroke="#e2761b" stroke-width="2.2"/>
+<line x1="477.6" y1="180.9" x2="464.7" y2="229.1" stroke="#777" stroke-width="1.6"/>
+<circle cx="507.5" cy="265.0" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<circle cx="464.7" cy="229.1" r="1.7" fill="#fff" stroke="#444" stroke-width="0.7"/>
+<line x1="477.6" y1="180.9" x2="477.6" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<line x1="477.6" y1="239.4" x2="514.0" y2="239.4" stroke="#777" stroke-width="1.8"/>
+<circle cx="514.0" cy="239.4" r="2.6" fill="#d63c3c"/>
+<line x1="514.0" y1="239.4" x2="514.0" y2="161.4" stroke="#d63c3c" stroke-width="0.5" stroke-dasharray="2,2"/>
+<text x="511.4" y="252.4" font-family="sans-serif" font-size="3.0" text-anchor="middle" fill="#d63c3c">empuje  R=50</text>
+<text x="376.2" y="11.9" font-family="sans-serif" font-size="4.2" text-anchor="start" fill="#333">B' — rayo 40°, biela 21.5</text>
+<text x="376.2" y="313.5" font-family="sans-serif" font-size="3.0" text-anchor="start" fill="#333">biela 21.5 mm   pivote carro en y=31.0   boca del cono y=30.8</text>
+<text x="376.2" y="326.5" font-family="sans-serif" font-size="3.4" text-anchor="start" fill="#b02020">deriva del vertice 0.145 mm   ->  0.48% de deslizamiento</text>
+<text x="376.2" y="339.5" font-family="sans-serif" font-size="2.8" text-anchor="start" fill="#333">(hoy: biela 16, deriva 0.226, 0.72%)</text>
+</svg>
