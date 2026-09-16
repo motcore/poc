@@ -154,14 +154,28 @@ link_x     = 9.0      # mm — X of the link plane (two sets, at +-link_x, for
                        #      out-of-plane stiffness). Just outboard of the
                        #      carriage's own arms.
 link_t     = 5.0      # mm — link thickness (along X)
-link_w     = 10.0     # mm — link width
+link_w     = 8.0      # mm — link width. Was 10, and the inner edge of the arms
+                       #      then passed 0.64 mm from the motor cone's rim —
+                       #      which only became visible once the knuckle moved
+                       #      off B and stopped being the closest thing. The
+                       #      link is a two-force member, so width buys it
+                       #      almost nothing: 8 x 5 in compression is ample, and
+                       #      the millimetre off each edge goes straight into
+                       #      the clearance, 0.64 -> 1.63 mm.
 link_knuckle = 5.0    # mm — radius of the knuckle joining the pair into one
-                       #      part. It sits ON the carriage pivot, which is the
-                       #      one place with room: the span between the pivots
-                       #      is taken by the frame lug hanging down the centre,
-                       #      and a tail out past the pivot reaches down into
-                       #      the motor cone once the bar's own half-width is
-                       #      counted.
+                       #      part.
+link_knuckle_d = 17.5 # mm — where that knuckle sits, measured along the link
+                       #      from the FRAME pivot A. It used to sit on the
+                       #      carriage pivot B (d = link_len), and that is the
+                       #      one place it must not: the knuckle is the only
+                       #      part of the link crossing x = 0, so it is the part
+                       #      nearest the motor cone's rim, and there it cleared
+                       #      it by 0.077 mm — under a printed wall's roughness,
+                       #      i.e. touching. Sliding it 4 mm inboard costs
+                       #      nothing and the two constraints then balance:
+                       #      the frame post creeps up from A, the motor cone
+                       #      down from B, and they cross here at 4.0 mm each.
+                       #      Swept in the checks below, not assumed.
 pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 
 # ── Actuation: servo → crank → telescopic spring link → carriage trunnion ────
@@ -434,8 +448,10 @@ fp_post_y     = 6.0    # mm — half-depth in Y of that foot. Its two screws are
                         #      clear.
 fp_screw_x    = 14.5   # mm — |X| of its two screws into the floor. Out past the
                         #      LINKS, not merely past the post's own column: the
-                        #      heads stand 3 mm proud of the foot and the link's
-                        #      knuckle swings 0.9 mm into that at the pivot. The
+                        #      heads stand 3 mm proud of the foot and the link
+                        #      arms pass over them. (The knuckle used to swing
+                        #      0.9 mm into that too; it no longer comes near —
+                        #      see link_knuckle_d — but the arms still do.) The
                         #      wider stance also suits the load, which arrives
                         #      along the link at 40 deg and tips the post.
 deck_t        = 4.0    # mm — floor / ceiling plate thickness
@@ -1078,22 +1094,38 @@ def make_carriage_bearing(y_face, sd):
                          v(0, y_start - 1, 0), Y_AXIS))
 
 
+def make_link_knuckle(A, B):
+    """The web that joins the link's two arms, as its own shape.
+
+    Separate from make_link because the checks need it alone: the ARMS are
+    allowed to run within half a millimetre of the frame post — that is the
+    pivot's own sliding fit, and a hinge wants it tight. The knuckle has no
+    such licence. It is the one piece of the link crossing x = 0, so it is the
+    piece that meets the motor cone's rim, and it must simply clear."""
+    # Overlaps each arm by 1 mm rather than meeting it on a coincident face,
+    # which fuses far more reliably.
+    web_x = link_x - link_t / 2.0 + 1.0
+    # Its place is a distance FROM A, not a fraction of the span: A is fixed
+    # and B swings, and a fraction would let the knuckle drift down the link
+    # as the carriage tilts.
+    f = link_knuckle_d / math.dist(A, B)
+    K = (A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f)
+    return disc_yz(K, link_knuckle, -web_x, 2 * web_x)
+
+
 def make_link(A, B):
     """One four-bar link — ONE part carrying both arms, not two loose plates.
 
     The two arms at +-link_x are the same rigid body (they move identically, by
     construction), so joining them costs nothing, makes the pair self-squaring,
     and actually delivers the out-of-plane stiffness that having two of them was
-    for. They meet at a knuckle on the carriage pivot — see link_knuckle for why
-    that is the only place it fits."""
+    for. They meet at a knuckle part-way along the span — see link_knuckle_d for
+    why it is there and not on either pivot."""
     body = None
     for xs in (1, -1):
         arm = bar_yz(A, B, link_w, xs * link_x - link_t / 2.0, link_t)
         body = arm if body is None else body.fuse(arm)
-    # Overlaps each arm by 1 mm rather than meeting it on a coincident face,
-    # which fuses far more reliably.
-    web_x = link_x - link_t / 2.0 + 1.0
-    body = body.fuse(disc_yz(B, link_knuckle, -web_x, 2 * web_x))
+    body = body.fuse(make_link_knuckle(A, B))
 
     reach = link_x + link_t / 2.0 + 2.0
     for q in (A, B):
@@ -1924,6 +1956,40 @@ for _tag, _phi_t in (("free", 0.0), ("up", phi_preload), ("dn", -phi_preload)):
                     _carr_mot_ov, _carr_mot_who = _ov, f"{_na} x {_shn}"
 
 
+# The link, swept, as a DISTANCE. Everything above is "do they overlap", at
+# three stops. Both of those hid the same fault, and it took the two of them:
+#
+#   - the minimum is INTERIOR to the stroke. The four-bar's drift carries the
+#     carriage outward while the tilt carries the link inward, the two nearly
+#     cancel, and what is left is a shallow bowl with its floor at about half
+#     travel. The three stops sample the rim of that bowl, never its floor.
+#   - and at the floor the parts still did not overlap. They cleared by
+#     0.077 mm, which "== 0 mm3" passes and a printer does not: it is finer
+#     than the wall roughness on either face.
+#
+# So this one sweeps, and it reports millimetres. The link is the part worth
+# the cost — it is the only thing that swings through the gap between the
+# motor cone's rim and the frame post, and its knuckle crosses x = 0, where
+# the cone is widest.
+_LINK_CONES = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up)]
+_LINK_POSTS = [(_n, _s) for _n, _s, _c, _t in FIXED_PARTS
+               if _n.startswith("FramePost")]
+_link_gap, _link_who = 1e9, "-"
+for _k in range(-4, 5):
+    _phi_k = phi_preload * _k / 4.0
+    _st_k = pose_state(_phi_k)
+    for _A_k, _Bk in ((A1, "B1"), (A2, "B2")):
+        # Whole link against the cones; knuckle only against the posts, since
+        # the arms are meant to run close there — see make_link_knuckle.
+        for _sub, _against in ((make_link(_A_k, _st_k[_Bk]), _LINK_CONES),
+                               (make_link_knuckle(_A_k, _st_k[_Bk]), _LINK_POSTS)):
+            for _n, _s in _against:
+                _d = _sub.distToShape(_s)[0]
+                if _d < _link_gap:
+                    _link_gap = _d
+                    _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
+
+
 # Gear mesh, checked at FREE where the phasing is exact. Under tilt the pinion
 # simply rolls to whatever phase the mesh needs, so an overlap measured there
 # would be an artefact, not a collision — what tilt really costs is centre
@@ -2098,6 +2164,10 @@ checks = [
      _pair_ov, "== 0", _pair_ov < 1e-6),
     (f"nothing on the axis touches the shared parts [{_carr_mot_who}]  (mm3)",
      _carr_mot_ov, "== 0", _carr_mot_ov < 1e-6),
+    # A printed clearance, not a mathematical one: 1 mm is about two perimeters
+    # plus the pin's slop. Anything under that is touching once it is a part.
+    (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
+     _link_gap, "> 1.0", _link_gap > 1.0),
     ("pinion concentric inside the corona, no mesh  (mm)",
      _pin_corona_gap, "> 1.0", _pin_corona_gap > 1.0),
     ("pinion/idler mesh at FREE, no jam  (mm3)",
