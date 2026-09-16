@@ -86,23 +86,27 @@ rubber_lip = 2.0   # mm  — bare plastic left past the rubber's outer edge, to
 s0        = 10.0   # mm  — apex → start of the contact line, ON THE RUBBER
                     #       surface (which is the one whose apex is the origin)
 
-# ── Drive out of the cone: cardan + Oldham ───────────────────────────────────
+# ── Drive out of the cone: one Oldham ────────────────────────────────────────
 # The carriage shaft TILTS about the apex and the output shaft does not. At a
-# distance y from the apex their axes are therefore apart by y*sin(phi) — 2 mm
-# at 48 mm — as well as at an angle. That is offset AND angle, and no rigid
-# coaxial joint takes offset: a spline's side teeth would have to slide 2 mm
-# round the circle while its top teeth stay put. Crowning does not change it.
-# (A crowned spline was modelled on another branch and rubbed 68 mm3.)
+# distance y from the apex their axes are apart by y*sin(phi) — ~2 mm here —
+# AND at an angle of phi. No rigid coaxial joint takes the offset: a spline's
+# side teeth would have to slide round the circle while its top teeth stay put
+# (a crowned spline was modelled on another branch and rubbed 68 mm3).
 #
-# So the job is split, one element per kind of misalignment:
-#   - a CARDAN on the carriage shaft takes the ANGLE. Its centre is on the
-#     carriage's own axis, so it only ever bends by the carriage's tilt,
-#     2.4 deg, which is nothing to a cardan (output error ~0.025 deg).
-#   - past it the shaft is parallel to the output axis again, but OFFSET. An
-#     OLDHAM takes that, and only that: offset is what an Oldham is for, and
-#     the angle it is bad at never reaches it.
-# Everything sits on the axis, symmetric, and the drive is 1:1. The reduction
-# the tree needs lives between hubs.
+# An Oldham takes offset by construction, and it takes the angle too, cheaply,
+# because 2.4 deg is small. With the tilt axis sweeping round the tongue once a
+# revolution, a tongue of height h and length L needs:
+#   - across its flanks, h*tan(phi) of room (0.08 mm) — better as a slight
+#     barrel on the flanks than as play, since play there is backlash;
+#   - at its ends, (L/2)*sin(phi) of axial room (0.46 mm): the disc NODS once
+#     a revolution. That is the price, and it is wear and noise, not a jam.
+# The output angle error it adds is Hooke-like, ~0.025 deg. Commercial Oldhams
+# are rated ~0.5 deg because they are precision servo couplings built for life
+# at speed, not because the geometry forbids more.
+#
+# A cardan ahead of it, to keep the angle off the Oldham, was modelled on
+# another branch and works; this drops it, its ~1 deg of play, and ~45 mm of
+# cube. Everything on the axis, symmetric, 1:1.
 
 # ── Four-bar virtual pivot (y, z), apex at the origin ────────────────────────
 # Both link axes must pass through the origin — that is what makes the
@@ -346,21 +350,15 @@ bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see i
 trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
                         #      the project already buys, NOT a printed boss)
 
-# ── Cardan, Oldham and output bushings ────────────────────────────────────
-# First prototype: cube size is explicitly NOT a goal. Positions are derived.
-cardan_d      = 11.0   # mm — PURCHASED hobby cardan, Ø11 x 23, Ø5 bore both ends,
-cardan_len    = 23.0   # mm   grub screws. ~1 deg of rotational play measured by
-                        #      hand — upstream of the tree's reduction, so the
-                        #      leg sees it divided by that ratio.
-cardan_bore_depth = 7.0 # mm — how far a shaft enters each hub. MEASURE IT.
-cardan_max_deg = 20.0  # deg— what we let it bend; hobby joints go past 30
+# ── Oldham and output bushings ────────────────────────────────────────────
+# First prototype: cube size is not a goal. Positions are derived.
 oldham_d      = 22.0   # mm — hubs and disc, printed
-oldham_grip   = 6.0    # mm — hub A clamps ROUND the cardan's outboard hub, so no
-                        #      stub shaft and no extra length between them
-oldham_hub_t  = 4.0    # mm — hub body beyond the cardan / on the output shaft
+oldham_hub_t  = 4.0    # mm — hub body, on the carriage shaft / on the output shaft
 oldham_disc_t = 6.0    # mm — disc: a 2 mm slot in each face, 2 mm web
-oldham_float  = 0.5    # mm — axial float each side of the disc. The cardan's
-                        #      centre moves ~0.04 mm axially over the stroke.
+tongue_h      = 2.0    # mm — tongue height = depth of the slot it works in
+oldham_float  = 0.7    # mm — axial float each side of the disc. It has to hold
+                        #      the NOD, (oldham_d/2)*sin(phi), as if all the tilt
+                        #      lands on one face, which nothing forbids.
 oldham_travel = 3.0    # mm — free slot length past the tongue = the offset it
                         #      takes. Commercial Oldhams this size are rated
                         #      for 0.1–0.2 mm; this one is printed for ~2.
@@ -472,19 +470,17 @@ apex_off_motor  = t_rubber / math.sin(alpha)
 apex_off_output = t_rubber / math.sin(beta)
 
 ratio_fric  = math.sin(alpha) / math.sin(beta)
-ratio_gear  = 1.0                     # cardan + Oldham are both 1:1
+ratio_gear  = 1.0                     # an Oldham is 1:1
 ratio_total = ratio_fric * ratio_gear
 
 # The drive, chained outward from the carriage housing. Rest pose, on +Y.
-cardan_y0   = hous_y1 + run_clr
-cardan_cy   = cardan_y0 + cardan_len / 2.0     # the joint's centre
-cardan_y1   = cardan_y0 + cardan_len
-oldham_a_y0 = cardan_y1 - oldham_grip
-oldham_a_y1 = cardan_y1 + oldham_hub_t
+oldham_a_y0 = hous_y1 + run_clr
+oldham_a_y1 = oldham_a_y0 + oldham_hub_t
 disc_y0     = oldham_a_y1 + oldham_float
 disc_y1     = disc_y0 + oldham_disc_t
 oldham_b_y0 = disc_y1 + oldham_float
 oldham_b_y1 = oldham_b_y0 + oldham_hub_t
+disc_mid_y  = (disc_y0 + disc_y1) / 2.0
 
 # Cone extents. s is measured along the generatrix from the cone's OWN plastic
 # apex; the rubber band is specified from the COMMON apex instead, and the two
@@ -909,51 +905,31 @@ def d_bore(y0, length, extra=0.0):
 
 def make_carriage_shaft():
     """Ø5 steel shaft on the carriage: cone clamped at one end, two bearings
-    between, and the cardan's inboard hub on the far end. It used to stop at
-    the pinion's back face; it now stops as deep as it goes into the cardan."""
-    y_end = cardan_y0 + cardan_bore_depth
+    between, and the Oldham's input hub keyed on the far end."""
+    y_end = oldham_a_y1
     shaft = cyl(shaft_d / 2.0, y_end - out_bore_end_y,
                 v(0, out_bore_end_y, 0), Y_AXIS)
     # The filed flat, the whole length: one pass of the file keys the cone and
-    # gives the cardan's grub screw its seat.
+    # the Oldham's input hub.
     return shaft.cut(Part.makeBox(shaft_d + 2, y_end - out_bore_end_y, shaft_d,
                                   v(-(shaft_d / 2.0 + 1), out_bore_end_y,
                                     shaft_flat_d / 2.0)))
 
 
 def drive_offset(st):
-    """(dy, dz) of the cardan's centre from where it sits at rest. Everything
-    past the cardan — its outboard half and the Oldham's input hub — stays
-    PARALLEL to the output axis and simply moves by this: that is the offset
-    the Oldham exists to take."""
-    c = st["T"]((cardan_cy, 0.0))
-    return c[0] - cardan_cy, c[1]
-
-
-def make_cardan_in():
-    """The cardan's inboard half, on the carriage shaft. Modelled as its
-    envelope — a purchased part, Ø11 — split at the cross so each half can move
-    with what it is fixed to."""
-    half = cyl(cardan_d / 2.0, cardan_cy - cardan_y0, v(0, cardan_y0, 0), Y_AXIS)
-    return half.cut(cyl(shaft_d / 2.0 + 0.01, cardan_bore_depth + 1.0,
-                        v(0, cardan_y0 - 1.0, 0), Y_AXIS))
-
-
-def make_cardan_out():
-    """The cardan's outboard half, at rest; moved by drive_offset."""
-    return cyl(cardan_d / 2.0, cardan_y1 - cardan_cy, v(0, cardan_cy, 0), Y_AXIS)
+    """(dy, dz) of the carriage axis at the Oldham disc's plane, from where it
+    sits at rest. The output axis does not move, so dz IS the offset the disc
+    slides through."""
+    c = st["T"]((disc_mid_y, 0.0))
+    return c[0] - disc_mid_y, c[1]
 
 
 def make_oldham_hub_a():
-    """Oldham input hub. It clamps ROUND the cardan's outboard hub instead of
-    on a stub shaft, which saves the stub and its length. Tongue not modelled:
-    it lives in the axial float, so the envelope is what can collide."""
-    grip = cyl(oldham_d / 2.0, cardan_y1 + 0.5 - oldham_a_y0,
-               v(0, oldham_a_y0, 0), Y_AXIS)
-    grip = grip.cut(cyl(cardan_d / 2.0 + 0.01, cardan_y1 - oldham_a_y0 + 1.0,
-                        v(0, oldham_a_y0 - 1.0, 0), Y_AXIS))
-    body = cyl(oldham_d / 2.0, oldham_a_y1 - cardan_y1, v(0, cardan_y1, 0), Y_AXIS)
-    return grip.fuse(body)
+    """Oldham input hub, keyed on the carriage shaft. It tilts with the
+    carriage; the disc and the output hub do not. Tongue not modelled — it
+    lives inside the axial float, so the envelope is what can collide."""
+    hub = cyl(oldham_d / 2.0, oldham_hub_t, v(0, oldham_a_y0, 0), Y_AXIS)
+    return hub.cut(d_bore(oldham_a_y0 - 1.0, oldham_hub_t + 2.0))
 
 
 def make_oldham_disc(extra_r=0.0):
@@ -1486,7 +1462,7 @@ CARRIAGE_REST = [
     ("PushPin",       make_trunnion(),                        (0.60, 0.60, 0.60), 0),
 ] + [
     ("CarriageShaft", make_carriage_shaft(),                  (0.60, 0.60, 0.60), 0),
-    ("CardanIn",      make_cardan_in(),                       (0.80, 0.80, 0.82), 0),
+    ("OldhamHubA",    make_oldham_hub_a(),                    (0.85, 0.65, 0.10), 0),
     ("BearingCone",   make_carriage_bearing(hous_y0 + brg_seat_lip, 1),
                                                               (0.30, 0.30, 0.32), 0),
     ("BearingPinion", make_carriage_bearing(hous_y1, -1),     (0.30, 0.30, 0.32), 0),
@@ -1555,16 +1531,13 @@ def moving_parts(st):
         out.append((f"PinB{tag}",
                     pin_x(B, pin_d, -pin_reach_b, 2 * pin_reach_b),
                     _PIN_COL, 0))
-    # Past the cardan's cross everything stays parallel to the output axis and
-    # moves by the cross's offset; the Oldham disc goes halfway, and wanders on
-    # a circle that size, so its envelope grows by half the offset.
+    # The disc sits between a TILTED hub (A, on the carriage) and a flat one (B,
+    # on the output). Put it halfway in both senses — half the offset, half the
+    # tilt — and grow its envelope by half the offset for the circle it wanders
+    # on. The all-on-one-face case is covered by a numeric check instead.
     dy, dz = drive_offset(st)
-    for name, shape in (("CardanOut", make_cardan_out()),
-                        ("OldhamHubA", make_oldham_hub_a())):
-        moved = shape.copy()
-        moved.translate(v(0, dy, dz))
-        out.append((name, moved, (0.85, 0.65, 0.10), 0))
     disc = make_oldham_disc(abs(dz) / 2.0)
+    disc.rotate(v(0, disc_mid_y, 0), X_AXIS, math.degrees(st["phi"]) / 2.0)
     disc.translate(v(0, dy / 2.0, dz / 2.0))
     out.append(("OldhamDisc", disc, (0.95, 0.85, 0.30), 0))
     out.append(("Crank", make_crank(st), _ACT_COL, 0))
@@ -1708,10 +1681,9 @@ else:
 # whatever phase the mesh needs, so a solid overlap there is an artefact of
 # drawing it at its free-pose phase. The mesh itself is checked at free, where
 # the phasing is exact.
-# One purchased cardan, modelled as two halves meeting at its cross: at a
-# tilt their envelopes overlap in a thin wedge there, which is the joint
-# working, not a collision.
-_MESH_PAIRS = {("CardanIn", "CardanOut")}
+# Nothing is meant to share volume: the Oldham's tongues live inside the
+# disc's axial float, which the sweep checks like any other clearance.
+_MESH_PAIRS = set()
 
 
 def _exempt(na, nb):
@@ -1799,19 +1771,19 @@ for _k in range(-4, 5):
                     _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
 
 
-# The drive, swept over the whole stroke. Three numbers, each the limit of one
-# element doing the one job it was chosen for:
-#   - the Oldham's OFFSET: how far the cardan's centre leaves the output axis,
-#     against the slot travel it was printed with.
-#   - the cardan's BEND: the angle between the carriage shaft and the output
-#     axis, which past the cross is the carriage's own tilt and nothing more.
-#   - the AXIAL shift of the cross, against the disc's float.
+# The Oldham, swept over the whole stroke:
+#   - OFFSET at the disc's plane, against the slot travel it was printed with;
+#   - the NOD, (oldham_d/2)*sin(phi), against the float — taken as if all the
+#     tilt lands on one face, since nothing stops it doing so;
+#   - the flank room a tongue needs to roll by the tilt, h*tan(phi). Reported,
+#     not checked: it becomes a barrel on the flanks, not a number here.
 _drv_off = _drv_ax = 0.0
 for _k in range(-8, 9):
     _dy, _dz = drive_offset(pose_state(phi_preload * _k / 8.0))
     _drv_off = max(_drv_off, abs(_dz))
     _drv_ax = max(_drv_ax, abs(_dy))
-_cardan_bend = math.degrees(phi_preload)
+_nod = (oldham_d / 2.0) * math.sin(phi_preload)
+_flank = tongue_h * math.tan(phi_preload)
 
 # What the actuator actually pulls against. R_push is the moment arm of a
 # VERTICAL push, and the link is not vertical: it comes up off the floor at
@@ -1945,10 +1917,8 @@ checks = [
      _link_gap, "> 1.0", _link_gap > 1.0),
     ("Oldham offset over the stroke, within its slot travel  (mm)",
      _drv_off, f"< {oldham_travel:.1f}", _drv_off < oldham_travel),
-    ("cardan bend over the stroke  (deg)",
-     _cardan_bend, f"< {cardan_max_deg:.0f}", _cardan_bend < cardan_max_deg),
-    ("cardan cross axial shift, within the disc's float  (mm)",
-     _drv_ax, f"< {oldham_float:.1f}", _drv_ax < oldham_float),
+    ("Oldham disc nod, all tilt on one face, within its float  (mm)",
+     _nod + _drv_ax, f"< {oldham_float:.1f}", _nod + _drv_ax < oldham_float),
     (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
      len(_invalid), "== 0", not _invalid),
     (f"every part is ONE connected solid  {_loose if _loose else ''}",
@@ -2062,13 +2032,13 @@ else:
           f" {math.degrees(phi_preload - phi_c):.3f} deg the pure-rotation"
           f" model gives")
 print("-" * 72)
-print("  DRIVE OUT: cardan (angle) + Oldham (offset), 1:1")
-print(f"    cardan Ø{cardan_d:.0f}x{cardan_len:.0f} (purchased), y {cardan_y0:.1f}..{cardan_y1:.1f},"
-      f" cross at {cardan_cy:.1f}; bends {_cardan_bend:.2f} deg at most")
-print(f"    Oldham Ø{oldham_d:.0f}: hub A y {oldham_a_y0:.1f}..{oldham_a_y1:.1f},"
+print("  DRIVE OUT: one Oldham, taking offset AND the tilt, 1:1")
+print(f"    Oldham \u00d8{oldham_d:.0f}: hub A y {oldham_a_y0:.1f}..{oldham_a_y1:.1f} (tilts),"
       f" disc {disc_y0:.1f}..{disc_y1:.1f}, hub B {oldham_b_y0:.1f}..{oldham_b_y1:.1f}")
-print(f"    offset it takes: {_drv_off:.2f} mm of {oldham_travel:.1f} travel;"
-      f" cross moves {_drv_ax:.3f} mm axially")
+print(f"    offset {_drv_off:.2f} mm of {oldham_travel:.1f} travel; axial {_drv_ax:.3f} mm;"
+      f" nod {_nod:.2f} mm of {oldham_float:.1f} float")
+print(f"    tongue flanks need {_flank:.3f} mm to roll {math.degrees(phi_preload):.1f} deg"
+      f" \u2014 print it as a barrel, not as play (play there is backlash)")
 print(f"    output shaft in 2 polymer bushings Ø{shaft_d:.0f}xØ{bush_od:.0f}x{bush_len:.0f},"
       f" boss {bush_boss_len:.0f} mm OUTSIDE the wall")
 print("-" * 72)
@@ -2150,8 +2120,8 @@ print("            lie against the other deck. Two neighbours both wanting the s
 print("            corner of the same floor is the one thing this box cannot fit.")
 print(f"  The cone and the Oldham's output hub are keyed by a D on a filed flat"
       f" ({shaft_flat_d:.1f} mm across);")
-print("  the cardan's grub screws bear on the same flats. Filing is the one manual step.")
-print("  PURCHASED, per axis: 2x MR105ZZ, 1x cardan Ø11x23 bore 5, 2x polymer bushing")
+print("  Filing the flats is the one manual step here.")
+print("  PURCHASED, per axis: 2x MR105ZZ, 2x polymer bushing")
 print("             Ø5xØ7x6, Ø5 rod (carriage shaft, output shaft, push pin),")
 print("             Ø4 pin stock (4 pivot pins),")
 print(f"             {len(frame_deck_screws()) * 2}x M3x10 up through the decks"
