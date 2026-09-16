@@ -386,19 +386,28 @@ shaft_flat_clr = 0.25  # mm — how much the printed D is relieved off the flat
 # ── Frame ────────────────────────────────────────────────────────────────────
 fp_lug_x      = 6.0    # mm — frame-pivot lug half-width in X (the links sit
                         #      just outboard of it)
-fp_post_x     = 19.0   # mm — half-width in X of the post's foot on the floor
-fp_post_y     = 6.0    # mm — half-depth in Y of that foot. Its two screws are
-                        #      spread in X, so Y only needs edge margin — and
-                        #      this foot is one of the things the wall has to
-                        #      clear.
-fp_screw_x    = 14.5   # mm — |X| of its two screws into the floor. Out past the
-                        #      LINKS, not merely past the post's own column: the
-                        #      heads stand 3 mm proud of the foot and the link
-                        #      arms pass over them. (The knuckle used to swing
-                        #      0.9 mm into that too; it no longer comes near —
-                        #      see link_knuckle_d — but the arms still do.) The
-                        #      wider stance also suits the load, which arrives
-                        #      along the link at 40 deg and tips the post.
+fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
+                        #      foot_edge margin, so the screws don't sit at the
+                        #      block's own free edge
+fp_post_y     = 6.0    # mm — half-height (Z) the block adds above and below
+                        #      the screw spread and the pivot lug
+fp_screw_x    = 17.0   # mm — |X| of its two wall screws. Was 14.5 (out past
+                        #      the LINKS' own arms, which reach 11.5) until the
+                        #      pin itself turned out to reach further, to 12.5,
+                        #      and the screw's own head — 5.5 wide — needs to
+                        #      clear THAT with margin, not just the arms.
+fw_screw_z    = 0.0    # mm — |Z| the wall screws sit off the pivot's own
+                        #      height. Wanted to be 8, spreading them to brace
+                        #      against tipping the way the old (removed) idler
+                        #      bracket did on this same wall — but the bottom
+                        #      post shares this stretch of wall with the
+                        #      HORN (push_z = -30, R_push = 40), which sweeps
+                        #      to within 2.1 mm of the pivot's own height under
+                        #      full tilt and closes to under 1 mm by 4 mm of
+                        #      spread. Bracing against tipping loses to a
+                        #      swept part actually being there: two screws,
+                        #      X-spread only, same count and pattern the deck
+                        #      version used.
 deck_t        = 4.0    # mm — floor / ceiling plate thickness
 deck_boss_h   = 5.0    # mm — how far their screw bosses stand proud, inward
 
@@ -859,10 +868,10 @@ def _screw_seat_y(sx):
 
 
 def wall_screws():
-    """(x, z) of every screw through this axis's wall. EMPTY: the idler bracket
-    was the only thing bolted to the wall. The list stays so the wall and the
-    brackets still cannot disagree."""
-    return []
+    """(x, z) of every screw through this axis's wall — the four-bar's two
+    frame pivots now, two screws each (X-spread only — see fw_screw_z for why
+    not four). The list stays so the wall and the brackets cannot disagree."""
+    return [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
 
 
 def place_carriage(shape, st):
@@ -1159,33 +1168,75 @@ def make_link(A, B):
     return body
 
 
+def _link_swept_envelope(A, Bkey):
+    """UNION of the link's two arms across the whole tilt stroke, each grown
+    by run_clr up front (built oversize, not offset after — makeOffsetShape
+    chokes on a compound this shape). A is fixed, so this is what the link
+    actually sweeps near its frame pivot — a disc centred on A undercounts
+    it, because a point on the bar's STRAIGHT edge, even close to A, sits
+    further than link_w/2 from A in a straight line (its own along-the-bar
+    offset adds in quadrature). Real geometry, not a hand-fitted
+    approximation — the same lesson as the link-vs-cone gap earlier: routing
+    an edge around a diagonal member by eye undercounts it."""
+    env = None
+    w = link_w + 2.0 * run_clr
+    for k in range(-4, 5):
+        st = pose_state(phi_preload * k / 4.0)
+        B = st[Bkey]
+        for xs in (1, -1):
+            arm = bar_yz(A, B, w, xs * link_x - link_t / 2.0, link_t)
+            env = arm if env is None else env.fuse(arm)
+    return env
+
+
 def make_frame_bracket(zs):
-    """The four-bar's frame pivot, now a post standing on the deck rather than a
-    plate reaching in from the wall.
+    """The four-bar's frame pivot, on the WALL — a foot pressed against the
+    wall's own boss face, and a post reaching from it in to the pivot.
 
-    The link reaction at this pivot runs along the link, 50 deg from Y, so it is
-    mostly Z — straight down the post into the deck, in compression. Off the
-    wall it was 35 mm of cantilever taking the same load as bending. It also
-    gives the wall back, which is what lets the servo lie under the corona."""
+    Moved back off the deck, at the user's request, so every support for this
+    axis lives on the one part that comes off the machine: pull the wall and
+    the whole mechanism is loose. The link reaction at this pivot runs along
+    the link, 50 deg from Y, so on the deck it was compression, straight down
+    a post; here it is bending, across a short arm. That arm is short, though:
+    wall_face_y - fb_A[0] is under 4 mm today, because the cube has grown
+    since a wall mount was last tried (the old design put this reach at
+    35 mm, when the corona's own clearance drove the cube, not the Oldham's).
+    At today's span the reach does not need engineering to survive it. What
+    it does need is to fit: the bottom post shares this wall with the horn's
+    swept path (see fw_screw_z), which is the real reason this stayed at two
+    screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
-    z_deck = zs * (cube_half - deck_boss_h)
-    lug_far = z_pin - zs * (link_w / 2.0 + 1.0)
+    hz = fp_post_y
+    y_foot_in = wall_face_y - foot_t
+    y_far = fb_A[0] - fp_lug_x
 
-    z_lo, z_hi = sorted((z_deck, z_deck - zs * foot_t))
-    foot = Part.makeBox(2 * fp_post_x, 2 * fp_post_y, z_hi - z_lo,
-                        v(-fp_post_x, fb_A[0] - fp_post_y, z_lo))
-    z_lo, z_hi = sorted((z_deck, lug_far))
-    post = Part.makeBox(2 * fp_lug_x, 2 * fp_post_y, z_hi - z_lo,
-                        v(-fp_lug_x, fb_A[0] - fp_post_y, z_lo))
+    foot = Part.makeBox(2 * fp_post_x, foot_t, 2 * hz,
+                        v(-fp_post_x, y_foot_in, z_pin - hz))
+    post = Part.makeBox(2 * fp_lug_x, y_foot_in - y_far, 2 * fp_post_y,
+                        v(-fp_lug_x, y_far, z_pin - fp_post_y))
     part = foot.fuse(post)
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
     part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_hole_d,
                           -fp_lug_x - 1, 2 * fp_lug_x + 2))
-    for sx, sy in frame_deck_screws():
-            part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
-                                v(sx, sy, z_deck - zs * (foot_t + 1)),
-                                v(0, 0, zs)))
+    # The pin ITSELF (not just its hole) reaches to link_x+link_t/2+1 in X —
+    # the same steel length that also passes through both link arms — and
+    # the foot now shares that pin's own (Y, Z) neighbourhood, which the deck
+    # foot never did. Clear the pin's full reach, not just the lug's width.
+    _pin_reach = link_x + link_t / 2.0 + 1.0
+    part = part.cut(pin_x((fb_A[0], z_pin), pin_d + 2.0 * run_clr,
+                          -_pin_reach, 2.0 * _pin_reach))
+    # The foot is wide enough (it has to be, for the screw spread) to reach
+    # past the lug's own safe width and into the link's own two arms, whose
+    # round ends at A sit right where the foot's material is, at |x| in
+    # [link_x-link_t/2, link_x+link_t/2]. A disc centred on A undercounts
+    # the swept clearance (see _link_swept_envelope), so cut the link's own
+    # swept, oversized envelope instead of trying to route round it by eye.
+    swept = _link_swept_envelope(A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
+    part = part.cut(swept)
+    for sx in (-fp_screw_x, fp_screw_x):
+        part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
+                            v(sx, y_foot_in - 1, z_pin + fw_screw_z), Y_AXIS))
     return part
 
 def make_crank(st):
@@ -1315,30 +1366,18 @@ def both_hands(pts):
     return out
 
 
-def frame_deck_screws():
-    """The deck screws that belong to a four-bar frame post, not to the servo."""
-    return [q for q in deck_screws() if abs(q[0] - servo_anchor_x) > 1e-6]
-
-
 def deck_screws():
     """(x, y) of the screws into one deck, for ONE axis, before the axis is
-    rotated into place. The deck carries the four-bar's frame pivot now — these
-    are what hold the machine's own reaction — and the servo stands on it too.
+    rotated into place. Only the servo's own two remain — the four-bar's
+    frame pivots moved to the wall (see wall_screws), which is what makes the
+    deck a plain cap now rather than something the mechanism is bolted to.
 
-    The servo's only exists on the bottom deck; putting it in both is harmless
-    (a spare boss) and keeps the two decks the same part."""
-    out = [(dx, fb_A[0]) for dx in (-fp_screw_x, fp_screw_x)]
-    # The servo bracket's two deck screws. They go straight up through its own
-    # plate, which is inboard of the tabs — the crank's swept circle is 10.3 mm
-    # in radius and is nowhere near it in X any more.
-    # Spread along the bracket, and kept OUT of the middle of the box: the
-    # four axes' decks are one part, and screws this close to the centre line
-    # land on each other once the pattern is rotated 90 deg. One pad is under
-    # the case (it is what the case rests on), the other under the plate's far
-    # leg.
-    out += [(servo_anchor_x, crank_hub_y - 4.0),
+    Spread along the bracket, and kept OUT of the middle of the box: the four
+    axes' decks are one part, and screws this close to the centre line land
+    on each other once the pattern is rotated 90 deg. One pad is under the
+    case (it is what the case rests on), the other under the plate's far leg."""
+    return [(servo_anchor_x, crank_hub_y - 4.0),
             (servo_anchor_x, crank_hub_y + 8.0)]
-    return out
 
 
 def make_deck(zs):
@@ -2199,7 +2238,7 @@ print("  Filing the flats is the one manual step here.")
 print("  PURCHASED, per axis: 3x MR105ZZ (2 carriage, 1 output shaft),")
 print("             Ø5 rod (carriage shaft, output shaft, push pin),")
 print("             Ø4 pin stock (4 pivot pins),")
-print(f"             {len(frame_deck_screws()) * 2}x M3x10 up through the decks"
+print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
       " into the frame posts,")
 print(f"             {len(servo_deck_screws())}x M3x10 into the servo bracket"
       " (ONE deck only),")
