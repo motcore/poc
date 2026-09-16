@@ -979,8 +979,10 @@ def make_output_shaft():
 
 
 def make_bushing(y0):
-    return (cyl(bush_od / 2.0, bush_len, v(0, y0, 0), Y_AXIS)
-            .cut(cyl(shaft_d / 2.0, bush_len + 2, v(0, y0 - 1, 0), Y_AXIS)))
+    # A hundredth off each fit face, so a press fit does not read as a
+    # collision in the checks.
+    return (cyl(bush_od / 2.0 - 0.01, bush_len, v(0, y0, 0), Y_AXIS)
+            .cut(cyl(shaft_d / 2.0 + 0.01, bush_len + 2, v(0, y0 - 1, 0), Y_AXIS)))
 
 
 def make_carriage():
@@ -1476,51 +1478,6 @@ if App.listDocuments().get(doc_name):
     App.closeDocument(doc_name)
 doc = App.newDocument(doc_name)
 
-# ── Gear stage ──────────────────────────────────────────────────────────────
-# Phasing, in one place because it is a chain: pinion tooth on the line of
-# centres → idler gap facing back at it → corona gap rolled by Zi/Zc from the
-# reference. Both idlers can share one phase only because 180 deg is a whole
-# number of tooth pitches on the pinion and on the corona (Zp, Zc even).
-gear_phase_ok = True
-if GEARS_AVAILABLE:
-    pinion_shape = _gear_shape(doc, "external", Zp, axle_hole=False,
-                               height=f"{pinion_face_w} mm")
-    idler_shape = _gear_shape(doc, "external", Zi, axle_hole=True,
-                              axle_holesize=f"{idler_axle_d + 0.6} mm",
-                              height=f"{pinion_face_w} mm")
-    corona_shape = _gear_shape(doc, "internal", Zc,
-                               thickness=f"{corona_rim_t} mm")
-    pinion_shape = _to_gear_plane(pinion_shape, 0.0, 0.0)
-    corona_shape = _to_gear_plane(corona_shape, 0.0, 0.0)
-    idlers = {sd: _to_gear_plane(idler_shape, sd * idler_x, 0.0)
-              for sd in IDLER_SIDES}
-
-    pinion_shape, _p = phase_gear(pinion_shape, 0.0, 0.0, r_pitch_p, Zp, 0.0)
-    # AFTER the phasing: that rotates the pinion about its own axis, and a D cut
-    # before it would have its flat swung off the shaft's. Physically this is
-    # the right order too — the flat is filed to suit, and the teeth land where
-    # the mesh needs them.
-    pinion_shape = pinion_shape.cut(d_bore(gear_y0 - 1, pinion_face_w + 2))
-    _ph = [_p]
-    for sd in IDLER_SIDES:
-        idlers[sd], _i = phase_gear(idlers[sd], sd * idler_x, 0.0, r_pitch_i, Zi,
-                                    180.0 + 180.0 / Zi)
-        _ph.append(_i)
-    corona_shape, _c = phase_gear(corona_shape, 0.0, 0.0, r_pitch_c, Zc, 0.0)
-    gear_phase_ok = None not in (_ph + [_c])
-else:
-    pinion_shape = cyl(r_tip_p, pinion_face_w, v(0, gear_y0, 0), Y_AXIS)
-    pinion_shape = pinion_shape.cut(d_bore(gear_y0 - 1, pinion_face_w + 2))
-    corona_shape = (cyl(r_corona_outer, gear_face_w, v(0, gear_y0, 0), Y_AXIS)
-                    .cut(cyl(r_tip_c, gear_face_w + 2, v(0, gear_y0 - 1, 0), Y_AXIS)))
-    idlers = {sd: cyl(r_tip_i, pinion_face_w, v(sd * idler_x, gear_y0, 0),
-                      Y_AXIS)
-              for sd in IDLER_SIDES}
-
-# Corona + back plate + output shaft: one part, as in v5 — a hub joint here
-# would only add a failure point on the torque path.
-coronashaft = corona_shape.fuse(make_corona_plate()).fuse(make_output_shaft_ref())
-
 # ── Carriage, built at rest then moved by the linkage ────────────────────────
 CARRIAGE_REST = [
     ("OutputCone",    make_output_cone(),                     (0.20, 0.80, 0.60), 0),
@@ -1529,7 +1486,7 @@ CARRIAGE_REST = [
     ("PushPin",       make_trunnion(),                        (0.60, 0.60, 0.60), 0),
 ] + [
     ("CarriageShaft", make_carriage_shaft(),                  (0.60, 0.60, 0.60), 0),
-    ("Pinion",        pinion_shape,                           (0.85, 0.65, 0.10), 0),
+    ("CardanIn",      make_cardan_in(),                       (0.80, 0.80, 0.82), 0),
     ("BearingCone",   make_carriage_bearing(hous_y0 + brg_seat_lip, 1),
                                                               (0.30, 0.30, 0.32), 0),
     ("BearingPinion", make_carriage_bearing(hous_y1, -1),     (0.30, 0.30, 0.32), 0),
@@ -1537,19 +1494,11 @@ CARRIAGE_REST = [
 
 # ── Fixed to the frame ──────────────────────────────────────────────────────
 FIXED_PARTS = [
-    ("CoronaShaft",   coronashaft,                            (0.55, 0.55, 0.85), 0),
-] + [
-    (f"Idler{'P' if sd > 0 else 'N'}", idlers[sd], (0.30, 0.55, 0.85), 0)
-    for sd in IDLER_SIDES
-] + [
-    (f"IdlerBracket{'P' if sd > 0 else 'N'}", make_idler_bracket(sd),
-     (0.65, 0.65, 0.68), 0)
-    for sd in IDLER_SIDES
-] + [
-    (f"IdlerPin{'P' if sd > 0 else 'N'}", make_idler_pin(sd),
-     (0.60, 0.60, 0.60), 0)
-    for sd in IDLER_SIDES
-] + [
+    ("OutputShaft",   make_output_shaft(),                    (0.60, 0.60, 0.60), 0),
+    ("OldhamHubB",    make_oldham_hub_b(),                    (0.85, 0.65, 0.10), 0),
+    ("BushingWall",   make_bushing(cube_half),                (0.20, 0.20, 0.20), 0),
+    ("BushingBoss",   make_bushing(cube_out + bush_boss_len - bush_len),
+                                                              (0.20, 0.20, 0.20), 0),
     ("FramePostT",    make_frame_bracket(1),                  (0.75, 0.75, 0.78), 0),
     ("FramePostB",    make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
@@ -1606,6 +1555,18 @@ def moving_parts(st):
         out.append((f"PinB{tag}",
                     pin_x(B, pin_d, -pin_reach_b, 2 * pin_reach_b),
                     _PIN_COL, 0))
+    # Past the cardan's cross everything stays parallel to the output axis and
+    # moves by the cross's offset; the Oldham disc goes halfway, and wanders on
+    # a circle that size, so its envelope grows by half the offset.
+    dy, dz = drive_offset(st)
+    for name, shape in (("CardanOut", make_cardan_out()),
+                        ("OldhamHubA", make_oldham_hub_a())):
+        moved = shape.copy()
+        moved.translate(v(0, dy, dz))
+        out.append((name, moved, (0.85, 0.65, 0.10), 0))
+    disc = make_oldham_disc(abs(dz) / 2.0)
+    disc.translate(v(0, dy / 2.0, dz / 2.0))
+    out.append(("OldhamDisc", disc, (0.95, 0.85, 0.30), 0))
     out.append(("Crank", make_crank(st), _ACT_COL, 0))
     out.append(("ActLink", make_act_link(st), _ACT_COL, 0))
     return out
@@ -1747,7 +1708,10 @@ else:
 # whatever phase the mesh needs, so a solid overlap there is an artefact of
 # drawing it at its free-pose phase. The mesh itself is checked at free, where
 # the phasing is exact.
-_MESH_PAIRS = {("Pinion", "IdlerP"), ("Pinion", "IdlerN")}
+# One purchased cardan, modelled as two halves meeting at its cross: at a
+# tilt their envelopes overlap in a thin wedge there, which is the joint
+# working, not a collision.
+_MESH_PAIRS = {("CardanIn", "CardanOut")}
 
 
 def _exempt(na, nb):
