@@ -432,6 +432,17 @@ cone_tip_wall  = 0.8   # mm — minimum wall at a cone's truncated tip where a
                         #      through bore exists (motor cones)
 cone_bore_wall = 2.0   # mm — wall left at the far end of the output cone's
                         #      BLIND bore, which is what sets its depth
+tip_fill_y     = hous_y0  # DERIVED — the cone is SOLID (no shell cavity) from
+                        #      its tip out to the carriage housing's own face,
+                        #      so the fill stops exactly where the housing
+                        #      begins and neither part gives up ground to the
+                        #      other. Without this, the shell's own hollow
+                        #      cavity outgrows the shaft bore just ~1.5 mm past
+                        #      the bore's inner end — the cone LOOKED like it
+                        #      clamped 19.6 mm of shaft, but past that 1.5 mm
+                        #      the "bore" was already open shell, touching
+                        #      nothing. Filling the tip turns the real grip
+                        #      length into the full hous_y0 - 11.2 = 9.8 mm.
 cone_wall     = 2.5    # mm — wall of the output cone, which is a SHELL. This is
                         #      what the whole outboard layout turns on: the cone
                         #      was a solid lump of plastic sitting between the
@@ -886,13 +897,25 @@ def make_output_cone():
     y = apex_off_output, flaring toward the wall. Bored BLIND from the base —
     a through bore would leave a 0.9 mm wall where the rubber band starts,
     and the tip points at the motor shaft anyway, so nothing needs to come out
-    that end."""
+    that end.
+
+    SOLID from the tip to tip_fill_y, shell beyond it. The shell cavity is cut
+    only where y > tip_fill_y — restricted with a half-space box rather than
+    by trimming the cone_frustum's own s-range, so the taper math stays
+    untouched and only the CUT changes. This is what gives the carriage shaft
+    a real length of grip instead of a nominal one: the shell's own cavity
+    outgrows the bore radius well before the bore itself runs out, so without
+    the fill the last ~18 mm of the "bore" was cutting into air that the shell
+    cut had already opened up."""
     cone = cone_frustum(v(0, out_apex_y, 0), Y_AXIS, beta,
                         s_output_lo, s_out_hi)
     # The cavity: the same cone offset inward by the wall, open at the base.
     # Its apex sits cone_wall/sin(beta) further out than the plastic one.
-    cone = cone.cut(cone_frustum(v(0, out_apex_y + cone_wall / math.sin(beta), 0),
-                                 Y_AXIS, beta, 0.0, s_out_hi + 5.0))
+    cavity = cone_frustum(v(0, out_apex_y + cone_wall / math.sin(beta), 0),
+                          Y_AXIS, beta, 0.0, s_out_hi + 5.0)
+    cavity = cavity.common(Part.makeBox(200.0, out_base_y + 10.0 - tip_fill_y,
+                                        200.0, v(-100.0, tip_fill_y, -100.0)))
+    cone = cone.cut(cavity)
     cone = cone.cut(d_bore(out_bore_end_y, out_bore_depth + 1.0))
     return cone
 
