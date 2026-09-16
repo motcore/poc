@@ -200,23 +200,21 @@ spring_ratio_R = 50.0  # mm — where that ratio was invented. It is not a free
                         #      to 40 quietly raised the preload by half — the
                         #      squeeze went from 4.0 to 7.4 mm3 — on a design
                         #      change that was supposed to be about packaging.
-crank_hub_y   = 24.0   # mm — Y of the servo output shaft. On the floor,
-                        #      under the corona, with the case pointing inward:
-                        #      the deck exists now, and it is the one surface
-                        #      with room to spare. The link simply gets longer;
-                        #      the push point stays where it was.
-                        #      Y is what sets the LEVER, so it wants to be as
-                        #      far out as it will go: the link's line of action
-                        #      passes 39 mm from the apex with the shaft at 21
-                        #      and 43.5 mm with it at 29, which is 11% of output
-                        #      torque for nothing. (It used to be the far tab
-                        #      against the wall that set this; the wall is no
-                        #      longer the binding side.)
-                        #      What stops it going further is the four-bar's
+crank_hub_y   = 14.0   # mm — Y of the servo output shaft. The push point
+                        #      stays where it was; the link's own length and
+                        #      angle absorb wherever the shaft ends up, and the
+                        #      lever barely moves either way (39.7 mm here vs
+                        #      ~40 further out — the link's Y and Z components
+                        #      trade off almost exactly, doc §7).
+                        #      Y is bounded on BOTH sides now, not free to run
+                        #      out as far as it likes: the case runs OUTWARD
+                        #      toward the wall (see servo_box), so past ~15 its
+                        #      far corner starts sweeping into the four-bar's
                         #      lower link, which runs from (31, -26) down to
-                        #      (47, -40): past y = 36 it has dropped to the top
-                        #      of the servo's own case.
-                        #      Its Z is DERIVED — it follows the deck.
+                        #      (47, -40) — the same link that used to cap this
+                        #      from the OTHER direction, when the case ran
+                        #      inward instead. 14 clears it with margin.
+                        #      Its Z is DERIVED — see servo_lift.
 servo_lift    = 6.5    # mm — how far the bracket's foot lifts the case off the
                         #      deck. Not cosmetic: the crank's radius is 6.3 and
                         #      the shaft sits only 6.1 above a case lying flat,
@@ -719,11 +717,12 @@ def actuator(phi_r):
 
 # ── Cube ──────────────────────────────────────────────────────────────────────
 # Short face: the running clearance to the Oldham's output hub.
-# Y of the servo's far end, which is the other thing that has to fit inside the
-# wall — and, at the moment, the thing that actually sets the cube.
-servo_y_end = crank_hub_y + 0.25 * servo_body[1] + servo_tab_out
-# The cube is as small as the FURTHEST thing that must fit, not as the corona
-# alone. Printing which one binds is the point: at the defaults it is the servo,
+# Y of the servo's far end. 0.75, not 0.25: the case runs OUTWARD from the
+# crank now (see servo_box), so the far edge is three quarters of its length
+# past crank_hub_y, not one quarter.
+servo_y_end = crank_hub_y + 0.75 * servo_body[1] + servo_tab_out
+# The cube is as small as the FURTHEST thing that must fit. Printing which one
+# binds is the point: at the defaults it is the servo,
 # whose case runs outboard from its shaft, so shaving the corona's clearance
 # buys nothing until the servo moves.
 # The tabs span the same Y as the case, so they are not a separate entry — they
@@ -770,10 +769,6 @@ sw_foot_cx = 34.0   # mm — X of the servo bracket's wall foot. The bottom
                      # crank_hub[1] are only 3.95 mm apart in Z), so the
                      # reach jogs out past its edge instead of landing on
                      # top of it — sw_foot_cx - sw_foot_x clears 22 by 1.5.
-sw_jog_len = 4.0    # mm — how much Y the jog itself takes, done close to the
-                     # servo rather than out at the wall: it has to finish
-                     # (narrow back to the foot's own width) before Y reaches
-                     # the frame post's own territory, fb_A[0] - fp_lug_x.
 cube_out  = cube_half + wall_thick
 # Brackets seat on the bosses, not on the wall itself.
 wall_face_y = cube_half - wall_boss_h
@@ -1300,12 +1295,19 @@ def make_act_link(st):
 
 def servo_box():
     """(x0, y0, z0, bx, by, bz) of the servo body. Its top face — the one the
-    shaft comes out of — is the HIGH-x face, at servo_face_x, and the case runs
-    inboard from there. The shaft sits on the centre line of the case's
-    thickness and a quarter of the way along its length, as it does on an MG90;
-    the case therefore runs INWARD in Y from the crank too, under the corona."""
+    shaft comes out of — is the HIGH-x face, at servo_face_x. The shaft sits
+    on the centre line of the case's thickness and a quarter of the way along
+    its length, as it does on an MG90.
+
+    The case runs OUTWARD in Y from the crank, toward the wall — rotated
+    180 deg about the shaft from where it used to sit. It used to run inward,
+    "under the corona": that corona is gone in this design (the drive is a
+    single Oldham now), and inward was ALSO where the four-bar's lower link
+    swept closest, which is what capped crank_hub_y at barely above where it
+    already sat. Outward, the case's own bulk is what's now closest to the
+    wall — see servo_wall_gap — not a bracket reaching a long way to it."""
     bx, by, bz = servo_body
-    return (servo_face_x - bx, crank_hub[0] - 0.75 * by,
+    return (servo_face_x - bx, crank_hub[0] - 0.25 * by,
             crank_hub[1] - bz / 2.0, bx, by, bz)
 
 
@@ -1337,11 +1339,11 @@ def make_servo_bracket():
     """What the servo hangs from: a plate across its two mounting tabs, on the
     SHAFT side of them, reaching out to the wall.
 
-    Moved off the deck, at the user's request. The far tab already sits closer
-    to the wall than anything else on this axis except the frame pivots
-    (servo_y_end is ~16 mm short of it, against the pivots' ~4), so this is
-    the SECOND-shortest reach available for a wall mount, not an arbitrary
-    long one.
+    Moved off the deck, at the user's request. The case itself was rotated
+    180 deg about its own shaft first (see servo_box) — it used to run
+    inboard, which is why a bracket alone once had to close a ~16 mm gap; now
+    the case's own bulk runs out toward the wall, and the far tab is only a
+    few mm short of it, same order as the frame pivots' own reach.
 
     Shaft side, not case side, because the case side is where the four-bar's
     lower link comes down. The crank's boss passes through the plate, so it
@@ -1352,47 +1354,50 @@ def make_servo_bracket():
     The reach to the wall keeps the plate's FULL height rather than tapering
     to a thin foot: something has to carry the servo's own weight and
     reaction torque across that span. It also JOGS in X, off to sw_foot_cx —
-    the bottom frame post's own foot already owns the wall directly out from
-    the servo (its |x| <= fp_post_x, and fb_A[1] and crank_hub[1] are only
-    3.95 mm apart in Z), so reaching straight out landed the two feet on top
-    of each other. Past the frame post's edge is clear."""
+    the bottom frame post's own foot already owns |x| <= fp_post_x over the
+    LAST stretch of wall (y_foot_in to wall_face_y), so the jog runs from the
+    far tab out to that boundary, at whatever X it needs, and only has to be
+    down to the foot's own narrow width by the time it gets there. Before
+    y_foot_in the frame post is only fp_lug_x wide (its own pivot post, not
+    its foot), which this plate already clears without jogging at all."""
     x0, y0, z0, bx, by, bz = servo_box()
     sy0, sy1 = servo_screw_ys()
     y_plate0 = sy0 - foot_edge
-    y_plate1 = sy1 + foot_edge
-    y_wall_in = wall_face_y - foot_t
+    y_foot_in = wall_face_y - foot_t   # same boundary the frame post's foot uses
     rx0 = min(servo_face_x, sw_foot_cx - sw_foot_x)
     rx1 = max(servo_face_x + servo_plate_t, sw_foot_cx + sw_foot_x)
-    # The jog happens HERE, close to the servo, not out at the wall: past
-    # y_far (fb_A[0] - fp_lug_x) the frame post's own foot owns every x in
-    # its own +-fp_post_x, so the wide part of this bend has to be done and
-    # narrowed back down before that Y is reached.
-    y_jog1 = y_plate1 + sw_jog_len
 
-    part = Part.makeBox(servo_plate_t, y_plate1 - y_plate0, bz,
+    part = Part.makeBox(servo_plate_t, sy1 - y_plate0, bz,
                         v(servo_face_x, y_plate0, z0))
     part = part.cut(cyl(crank_hub_r + 0.75, servo_plate_t + 2,
                         v(servo_face_x - 1, crank_hub[0], crank_hub[1]),
                         X_AXIS))
-    # The jog: full case height, wide (plate's X to the foot's X), but SHORT.
-    part = part.fuse(Part.makeBox(rx1 - rx0, y_jog1 - y_plate1, bz,
-                                  v(rx0, y_plate1, z0)))
-    # The reach proper: full case height, but only the foot's own width now
-    # — this is the part that runs alongside the frame post, so it has to
-    # already be clear of it.
-    part = part.fuse(Part.makeBox(2 * sw_foot_x, wall_face_y - y_jog1, bz,
-                                  v(sw_foot_cx - sw_foot_x, y_jog1, z0)))
-    # The foot: same X band as the reach, just the last foot_t of it,
-    # pressed against the wall same as the frame post's.
-    part = part.fuse(Part.makeBox(2 * sw_foot_x, foot_t, bz,
-                                  v(sw_foot_cx - sw_foot_x, y_wall_in, z0)))
-    # Head clearance the whole reach, not just the foot: the head extends
-    # bolt_head_h inward past the seat, and unlike the frame post's narrow
-    # lug, this bracket's reach is SOLID at the screw's own x the entire way
+    # The jog: full case height, widening from the plate's own X to the
+    # foot's, over whatever Y is left before the frame post's foot starts.
+    part = part.fuse(Part.makeBox(rx1 - rx0, y_foot_in - sy1, bz,
+                                  v(rx0, sy1, z0)))
+    # The foot: the jog's own width, from where the frame post's foot starts
+    # out to the wall — same band, offset in X, same as the frame post's own
+    # foot+screw convention.
+    part = part.fuse(Part.makeBox(2 * sw_foot_x, wall_face_y - y_foot_in, bz,
+                                  v(sw_foot_cx - sw_foot_x, y_foot_in, z0)))
+    # The bottom frame post's OWN screw reaches well past its post's narrow
+    # |x| <= fp_lug_x — its head is centred at fp_screw_x, and that x = 17
+    # sits inside this bracket's jog, which is wide there (rx0..rx1) exactly
+    # because that is what the jog is FOR. Clear its head's real reach,
+    # not just the post's own material.
+    part = part.cut(cyl((bolt_head_d + 0.6) / 2.0, foot_t + bolt_head_h + 2,
+                        v(fp_screw_x, wall_face_y - foot_t - bolt_head_h - 1,
+                          -fb_A[1]), Y_AXIS))
+    # Head clearance the whole foot band, not just foot_t of it: the head
+    # extends bolt_head_h inward past the seat, and unlike the frame post's
+    # narrow lug, this bracket is SOLID at the screw's own x the whole way
     # in from the wall — nothing here is narrow enough to duck under it.
     for sx in (sw_foot_cx - sw_screw_x, sw_foot_cx + sw_screw_x):
-        part = part.cut(cyl((bolt_head_d + 0.6) / 2.0, wall_face_y - y_jog1 + 2,
-                            v(sx, y_jog1 - 1, crank_hub[1]), Y_AXIS))
+        part = part.cut(cyl((bolt_head_d + 0.6) / 2.0,
+                            wall_face_y - y_foot_in + bolt_head_h + 2,
+                            v(sx, y_foot_in - bolt_head_h - 1, crank_hub[1]),
+                            Y_AXIS))
     for sy in servo_screw_ys():
         part = part.cut(cyl(servo_screw_d / 2.0 + 0.4, servo_plate_t + 2,
                             v(servo_face_x - 1, sy, crank_hub[1]), X_AXIS))
