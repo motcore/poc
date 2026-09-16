@@ -359,7 +359,7 @@ bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see i
 trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
                         #      the project already buys, NOT a printed boss)
 
-# ── Oldham and output bushings ────────────────────────────────────────────
+# ── Oldham and output shaft support ───────────────────────────────────────
 # First prototype: cube size is not a goal. Positions are derived.
 oldham_d      = 22.0   # mm — hubs and disc, printed
 oldham_hub_t  = 4.0    # mm — hub body, on the carriage shaft / on the output shaft
@@ -372,10 +372,11 @@ oldham_travel = 3.0    # mm — free slot length past the tongue = the offset it
                         #      takes. Commercial Oldhams this size are rated
                         #      for 0.1–0.2 mm; this one is printed for ~2.
 run_clr       = 1.0    # mm — running gap between parts moving against each other
-bush_od       = 7.0    # mm ┐ polymer bushings for the output shaft, Ø5 x Ø7 x 6,
-bush_len      = 6.0    # mm ┘ two of them: a floating shaft needs no ball bearing
-bush_boss_len = 14.0   # mm — boss on the OUTSIDE of the wall that carries both
-bush_boss_wall = 3.0   # mm
+out_brg_wall  = 3.0    # mm — material wall around the output shaft's bearing
+                        #      seat in the wall. out_brg_len (the seat's total
+                        #      length) is derived below, by the carriage
+                        #      bearing block — it needs brg_w and brg_seat_lip,
+                        #      not known yet here.
 shaft_flat_d  = 4.0    # mm — the Ø5 shafts are filed to a flat, leaving this
                         #      across it; printed parts carry the matching D and
                         #      the cardan's grub screws bear on it. Filing it is
@@ -463,6 +464,20 @@ brg_seat_lip  = 1.5    # mm — lip at the cone end of the seat bore. Both beari
                         #      far one stops against.
 brg_fit_press = 0.15   # mm — radial add for a press fit (→ Ø10.3), FDM
                         #      calibrated on the Creality Hi, see build-log
+out_brg_len   = brg_w + brg_seat_lip   # DERIVED — the output shaft's own
+                        # bearing seat, total length: the bearing's own width
+                        # plus the shoulder that stops it. The same MR105ZZ as
+                        # the carriage's pair — its 4 mm width already matches
+                        # the wall's own 4 mm thickness, so the boss barely
+                        # has to stand proud of the wall at all: 1.5 mm of
+                        # shoulder, not the 14 mm the two bushings needed. Was
+                        # two polymer bushings, a floating mount — but nothing
+                        # past the Oldham actually needs the output shaft to
+                        # float; the coupling's own local clearance
+                        # (oldham_float) already absorbs its nod, right at the
+                        # disc. One ball bearing, press-fit both races, pins
+                        # the shaft radially AND axially — "bien fijo", and
+                        # better for whatever reads position off it downstream.
 
 # ── FDM print calibration (Creality Hi / PLA) — see docs/build-log.md ────────
 # This printer runs small holes ~0.5 mm UNDERSIZE, so every hole that receives
@@ -981,20 +996,14 @@ def make_oldham_hub_b():
 
 
 def make_output_shaft():
-    """Ø5 output shaft: from the Oldham's output hub out through the wall's two
-    bushings, a little past the boss. It floats axially in them."""
+    """Ø5 output shaft: from the Oldham's output hub out through the wall's
+    one bearing, a little past its seat. Fixed there, both ways — see
+    out_brg_len for why it no longer needs to float."""
     y0 = oldham_b_y0
-    y1 = cube_out + bush_boss_len + 5.0
+    y1 = cube_half + out_brg_len + 5.0
     shaft = cyl(shaft_d / 2.0, y1 - y0, v(0, y0, 0), Y_AXIS)
     return shaft.cut(Part.makeBox(shaft_d + 2, y1 - y0, shaft_d,
                                   v(-(shaft_d / 2.0 + 1), y0, shaft_flat_d / 2.0)))
-
-
-def make_bushing(y0):
-    # A hundredth off each fit face, so a press fit does not read as a
-    # collision in the checks.
-    return (cyl(bush_od / 2.0 - 0.01, bush_len, v(0, y0, 0), Y_AXIS)
-            .cut(cyl(shaft_d / 2.0 + 0.01, bush_len + 2, v(0, y0 - 1, 0), Y_AXIS)))
 
 
 def make_carriage():
@@ -1371,12 +1380,15 @@ def make_wall():
     # of two parts in the same place.
     wall = Part.makeBox(cube_out + cube_half, wall_thick, 2 * cube_half,
                         v(-cube_out, cube_half, -cube_half))
-    # The output shaft's two bushings: one in the wall's own thickness, one at
-    # the far end of a boss standing OUTSIDE. Outside costs the cube nothing;
-    # whatever the next hub is has to leave room for it instead.
-    wall = wall.fuse(cyl(bush_od / 2.0 + bush_boss_wall, bush_boss_len,
-                         v(0, cube_out, 0), Y_AXIS))
-    wall = wall.cut(cyl(bush_od / 2.0, wall_thick + bush_boss_len + 2,
+    # The output shaft's one bearing: mostly INSIDE the wall's own 4 mm
+    # thickness (it is a 4 mm wide MR105ZZ), with just enough boss standing
+    # proud outside it to fit the shoulder. Pressed in from outside, stops
+    # against that shoulder — same convention as the carriage's own pair.
+    wall = wall.fuse(cyl(brg_od / 2.0 + out_brg_wall, out_brg_len,
+                         v(0, cube_half, 0), Y_AXIS))
+    wall = wall.cut(cyl(brg_od / 2.0 + brg_fit_press, out_brg_len - brg_seat_lip + 1.0,
+                        v(0, cube_half + brg_seat_lip, 0), Y_AXIS))
+    wall = wall.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, out_brg_len + 2,
                         v(0, cube_half - 1, 0), Y_AXIS))
     # Bosses on the INNER face, blind. Nothing passes through, so the outside
     # of the cube stays a clean surface.
@@ -1535,9 +1547,8 @@ CARRIAGE_REST = [
 FIXED_PARTS = [
     ("OutputShaft",   make_output_shaft(),                    (0.60, 0.60, 0.60), 0),
     ("OldhamHubB",    make_oldham_hub_b(),                    (0.85, 0.65, 0.10), 0),
-    ("BushingWall",   make_bushing(cube_half),                (0.20, 0.20, 0.20), 0),
-    ("BushingBoss",   make_bushing(cube_out + bush_boss_len - bush_len),
-                                                              (0.20, 0.20, 0.20), 0),
+    ("BearingOutput", make_carriage_bearing(cube_half + out_brg_len, -1),
+                                                              (0.30, 0.30, 0.32), 0),
     ("FramePostT",    make_frame_bracket(1),                  (0.75, 0.75, 0.78), 0),
     ("FramePostB",    make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
@@ -2102,8 +2113,9 @@ print(f"    offset {_drv_off:.2f} mm of {oldham_travel:.1f} travel; axial {_drv_
       f" nod {_nod:.2f} mm of {oldham_float:.1f} float")
 print(f"    tongue flanks need {_flank:.3f} mm to roll {math.degrees(phi_preload):.1f} deg"
       f" \u2014 print it as a barrel, not as play (play there is backlash)")
-print(f"    output shaft in 2 polymer bushings Ø{shaft_d:.0f}xØ{bush_od:.0f}x{bush_len:.0f},"
-      f" boss {bush_boss_len:.0f} mm OUTSIDE the wall")
+print(f"    output shaft in ONE MR105ZZ in the wall, fixed both ways: seat"
+      f" {out_brg_len:.1f} mm ({brg_seat_lip:.1f} shoulder + {brg_w:.0f} bearing),"
+      f" {out_brg_len - wall_thick:.1f} mm of it proud of the wall")
 print("-" * 72)
 print("  ACTUATION (placeholder until the rubber stiffness is measured)")
 print(f"    push point at R = {R_push:.1f} mm; crank r {crank_r:.2f} at"
@@ -2184,8 +2196,8 @@ print("            corner of the same floor is the one thing this box cannot fit
 print(f"  The cone and the Oldham's output hub are keyed by a D on a filed flat"
       f" ({shaft_flat_d:.1f} mm across);")
 print("  Filing the flats is the one manual step here.")
-print("  PURCHASED, per axis: 2x MR105ZZ, 2x polymer bushing")
-print("             Ø5xØ7x6, Ø5 rod (carriage shaft, output shaft, push pin),")
+print("  PURCHASED, per axis: 3x MR105ZZ (2 carriage, 1 output shaft),")
+print("             Ø5 rod (carriage shaft, output shaft, push pin),")
 print("             Ø4 pin stock (4 pivot pins),")
 print(f"             {len(frame_deck_screws()) * 2}x M3x10 up through the decks"
       " into the frame posts,")
