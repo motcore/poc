@@ -143,17 +143,21 @@ link_w     = 8.0      # mm — link width. Was 10, and the inner edge of the arm
                        #      the clearance, 0.64 -> 1.63 mm.
 link_knuckle = 5.0    # mm — radius of the knuckle joining the pair into one
                        #      part.
-link_knuckle_d = 17.5 # mm — where that knuckle sits, measured along the link
+link_knuckle_d = 15.0 # mm — where that knuckle sits, measured along the link
                        #      from the FRAME pivot A. It used to sit on the
                        #      carriage pivot B (d = link_len), and that is the
                        #      one place it must not: the knuckle is the only
                        #      part of the link crossing x = 0, so it is the part
                        #      nearest the motor cone's rim, and there it cleared
                        #      it by 0.077 mm — under a printed wall's roughness,
-                       #      i.e. touching. Sliding it 4 mm inboard costs
-                       #      nothing and the two constraints then balance:
-                       #      the frame post creeps up from A, the motor cone
-                       #      down from B, and they cross here at 4.0 mm each.
+                       #      i.e. touching. Sliding it inboard clears that, but
+                       #      17.5 (4 mm off B, the first value tried) put the
+                       #      knuckle's own 5 mm radius PAST B — visually fused
+                       #      into the arm's own end boss there, even though the
+                       #      two are one part and it costs nothing structurally.
+                       #      15.0 clears B by 6.5 mm (radius 5, so genuinely
+                       #      apart) and still keeps 2.2 mm off the frame post —
+                       #      the tighter of the two constraints from here in.
                        #      Swept in the checks below, not assumed.
 pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 
