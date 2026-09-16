@@ -353,7 +353,7 @@ cardan_len    = 23.0   # mm   grub screws. ~1 deg of rotational play measured by
                         #      hand — upstream of the tree's reduction, so the
                         #      leg sees it divided by that ratio.
 cardan_bore_depth = 7.0 # mm — how far a shaft enters each hub. MEASURE IT.
-cardan_max_deg = 20.0  # mm — what we let it bend; hobby joints go past 30
+cardan_max_deg = 20.0  # deg— what we let it bend; hobby joints go past 30
 oldham_d      = 22.0   # mm — hubs and disc, printed
 oldham_grip   = 6.0    # mm — hub A clamps ROUND the cardan's outboard hub, so no
                         #      stub shaft and no extra length between them
@@ -818,24 +818,16 @@ def _deck_seat_t(sx):
 
 
 def _screw_seat_y(sx):
-    """Y of the face a wall screw's head bears on. The idler's D is thickened
-    all the way back, so its two screws start at the front of the plate; every
-    other bracket presents a 5 mm foot against the bosses."""
-    if abs(abs(sx) - idler_anchor_x) < 1e-6:
-        return idler_arm_y1 - idler_arm_t
+    """Y of the face a wall screw's head bears on: a 5 mm foot against the
+    bosses. The idler's thickened D was the one exception, and it is gone."""
     return wall_face_y - foot_t
 
 
 def wall_screws():
-    """(x, z) of every screw that passes through this axis's wall. One list, so
-    the wall and the brackets cannot disagree about where the holes are."""
-    out = []
-    # Two, spread in Z: the idler's tooth force is mostly along Z, so the pair
-    # takes it as a shear couple.
-    for sd in IDLER_SIDES:
-        for zs in (1, -1):
-            out.append((sd * idler_anchor_x, zs * idler_pad_z))
-    return out
+    """(x, z) of every screw through this axis's wall. EMPTY: the idler bracket
+    was the only thing bolted to the wall. The list stays so the wall and the
+    brackets still cannot disagree."""
+    return []
 
 
 def place_carriage(shape, st):
@@ -916,17 +908,79 @@ def d_bore(y0, length, extra=0.0):
 
 
 def make_carriage_shaft():
-    """Ø5 steel output shaft on the carriage: cone clamped at one end, pinion
-    at the other, two bearings between (set screws on a filed flat, the joint
-    pattern the project already uses)."""
-    y_end = gear_y0 + pinion_face_w      # flush with the pinion's back face
+    """Ø5 steel shaft on the carriage: cone clamped at one end, two bearings
+    between, and the cardan's inboard hub on the far end. It used to stop at
+    the pinion's back face; it now stops as deep as it goes into the cardan."""
+    y_end = cardan_y0 + cardan_bore_depth
     shaft = cyl(shaft_d / 2.0, y_end - out_bore_end_y,
                 v(0, out_bore_end_y, 0), Y_AXIS)
-    # The filed flat, running the whole length so one pass of the file keys
-    # both the cone and the pinion.
+    # The filed flat, the whole length: one pass of the file keys the cone and
+    # gives the cardan's grub screw its seat.
     return shaft.cut(Part.makeBox(shaft_d + 2, y_end - out_bore_end_y, shaft_d,
                                   v(-(shaft_d / 2.0 + 1), out_bore_end_y,
                                     shaft_flat_d / 2.0)))
+
+
+def drive_offset(st):
+    """(dy, dz) of the cardan's centre from where it sits at rest. Everything
+    past the cardan — its outboard half and the Oldham's input hub — stays
+    PARALLEL to the output axis and simply moves by this: that is the offset
+    the Oldham exists to take."""
+    c = st["T"]((cardan_cy, 0.0))
+    return c[0] - cardan_cy, c[1]
+
+
+def make_cardan_in():
+    """The cardan's inboard half, on the carriage shaft. Modelled as its
+    envelope — a purchased part, Ø11 — split at the cross so each half can move
+    with what it is fixed to."""
+    half = cyl(cardan_d / 2.0, cardan_cy - cardan_y0, v(0, cardan_y0, 0), Y_AXIS)
+    return half.cut(cyl(shaft_d / 2.0 + 0.01, cardan_bore_depth + 1.0,
+                        v(0, cardan_y0 - 1.0, 0), Y_AXIS))
+
+
+def make_cardan_out():
+    """The cardan's outboard half, at rest; moved by drive_offset."""
+    return cyl(cardan_d / 2.0, cardan_y1 - cardan_cy, v(0, cardan_cy, 0), Y_AXIS)
+
+
+def make_oldham_hub_a():
+    """Oldham input hub. It clamps ROUND the cardan's outboard hub instead of
+    on a stub shaft, which saves the stub and its length. Tongue not modelled:
+    it lives in the axial float, so the envelope is what can collide."""
+    grip = cyl(oldham_d / 2.0, cardan_y1 + 0.5 - oldham_a_y0,
+               v(0, oldham_a_y0, 0), Y_AXIS)
+    grip = grip.cut(cyl(cardan_d / 2.0 + 0.01, cardan_y1 - oldham_a_y0 + 1.0,
+                        v(0, oldham_a_y0 - 1.0, 0), Y_AXIS))
+    body = cyl(oldham_d / 2.0, oldham_a_y1 - cardan_y1, v(0, cardan_y1, 0), Y_AXIS)
+    return grip.fuse(body)
+
+
+def make_oldham_disc(extra_r=0.0):
+    """Oldham disc envelope. It wanders on a circle of the offset's size, so
+    the checks grow it by half the offset at each pose."""
+    return cyl(oldham_d / 2.0 + extra_r, oldham_disc_t, v(0, disc_y0, 0), Y_AXIS)
+
+
+def make_oldham_hub_b():
+    """Oldham output hub, keyed on the output shaft by the D."""
+    hub = cyl(oldham_d / 2.0, oldham_hub_t, v(0, oldham_b_y0, 0), Y_AXIS)
+    return hub.cut(d_bore(oldham_b_y0 - 1.0, oldham_hub_t + 2.0))
+
+
+def make_output_shaft():
+    """Ø5 output shaft: from the Oldham's output hub out through the wall's two
+    bushings, a little past the boss. It floats axially in them."""
+    y0 = oldham_b_y0
+    y1 = cube_out + bush_boss_len + 5.0
+    shaft = cyl(shaft_d / 2.0, y1 - y0, v(0, y0, 0), Y_AXIS)
+    return shaft.cut(Part.makeBox(shaft_d + 2, y1 - y0, shaft_d,
+                                  v(-(shaft_d / 2.0 + 1), y0, shaft_flat_d / 2.0)))
+
+
+def make_bushing(y0):
+    return (cyl(bush_od / 2.0, bush_len, v(0, y0, 0), Y_AXIS)
+            .cut(cyl(shaft_d / 2.0, bush_len + 2, v(0, y0 - 1, 0), Y_AXIS)))
 
 
 def make_carriage():
@@ -1083,68 +1137,6 @@ def make_frame_bracket(zs):
                                 v(sx, sy, z_deck - zs * (foot_t + 1)),
                                 v(0, 0, zs)))
     return part
-
-def make_idler_bracket(sd):
-    """Fixed support for the idler: a D — round end over the gear with the axle
-    at its centre, flat end thickened back to the wall, two holes through it.
-
-    Everything happens in the Y in FRONT of the gear plane. That is forced:
-    behind it, at any radius under the corona's 25.6 mm rim, the space belongs
-    to the corona's back plate, which rotates. But being in front also means the
-    corona's radius constrains nothing here, so the plate can be as generous as
-    it likes — hence the lobe, which roots the axle in a boss rather than
-    leaving it hanging off the end of a strip.
-
-    The screws pass straight through the thickened end, heads bearing on its
-    front face, and tap into the wall bosses beyond. No step, no neck, no holes
-    to dodge the heads: one flat part with two holes and a pin, which prints on
-    its back with every hole vertical."""
-    xa = sd * idler_anchor_x
-    x_ax = sd * idler_x
-    y0 = idler_arm_y1 - idler_arm_t
-    half_w = idler_pad_z + foot_edge
-    x_lo, x_hi = sorted((x_ax, xa + sd * (foot_edge + 0.5)))
-
-    body = Part.makeBox(x_hi - x_lo, idler_arm_t, 2 * half_w,
-                        v(x_lo, y0, -half_w))
-    body = body.fuse(cyl(idler_lobe_r, idler_arm_t, v(x_ax, y0, 0), Y_AXIS))
-    # The flat of the D: thickened all the way back to the wall bosses, so the
-    # screws run through material instead of across a gap.
-    body = body.fuse(Part.makeBox(2 * (foot_edge + 0.5), wall_face_y - y0,
-                                  2 * half_w,
-                                  v(xa - foot_edge - 0.5, y0, -half_w)))
-    body = body.cut(cyl(fdm_axle_press_d / 2.0, idler_arm_t + 2,
-                        v(x_ax, y0 - 1, 0), Y_AXIS))
-    for sx, sz in wall_screws():
-        if abs(abs(sx) - idler_anchor_x) < 1e-6:
-            body = body.cut(cyl(foot_hole_d / 2.0, wall_face_y - y0 + 2,
-                                v(sx, y0 - 1, sz), Y_AXIS))
-    return body
-
-
-def make_idler_pin(sd):
-    """The idler's axle: Ø4 dowel from the same stock as the four-bar pins,
-    pressed through the plate and cantilevered out to carry the gear.
-
-    Printed as a boss it would be a vertical pillar taking the tooth force
-    across the layers — ~111 N at the doc's upper-bound torque, which is over
-    100 MPa in bending on Ø4. In steel it is comfortable: the load sits 4.0 mm
-    from the middle of a 3.5 mm root, so the root takes about 1.7x the tooth
-    force as a couple, ~27 MPa of bearing on the PLA around it against a
-    compressive strength near 50. (An earlier note here said 2.8x and called it
-    marginal. That was computed before the idler's face was narrowed to clear
-    the corona plate, which halved the overhang.)"""
-    y0 = idler_arm_y1 - idler_arm_t
-    return cyl(idler_axle_d / 2.0, gear_y0 + pinion_face_w + 0.5 - y0,
-               v(sd * idler_x, y0, 0), Y_AXIS)
-
-def make_corona_plate():
-    return cyl(r_corona_outer, corona_plate_t, v(0, corona_plate_y, 0), Y_AXIS)
-
-
-def make_output_shaft_ref():
-    return cyl(shaft_d / 2.0, 40.0, v(0, corona_back_y, 0), Y_AXIS)
-
 
 def make_crank(st):
     """Servo crank, dog-legged out to the actuation plane."""
@@ -1338,7 +1330,12 @@ def make_wall():
     # of two parts in the same place.
     wall = Part.makeBox(cube_out + cube_half, wall_thick, 2 * cube_half,
                         v(-cube_out, cube_half, -cube_half))
-    wall = wall.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, wall_thick + 2,
+    # The output shaft's two bushings: one in the wall's own thickness, one at
+    # the far end of a boss standing OUTSIDE. Outside costs the cube nothing;
+    # whatever the next hub is has to leave room for it instead.
+    wall = wall.fuse(cyl(bush_od / 2.0 + bush_boss_wall, bush_boss_len,
+                         v(0, cube_out, 0), Y_AXIS))
+    wall = wall.cut(cyl(bush_od / 2.0, wall_thick + bush_boss_len + 2,
                         v(0, cube_half - 1, 0), Y_AXIS))
     # Bosses on the INNER face, blind. Nothing passes through, so the outside
     # of the cube stays a clean surface.
