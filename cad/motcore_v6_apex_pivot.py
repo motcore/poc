@@ -741,8 +741,10 @@ cube_half_by = {
 }
 cube_half_driver = max(cube_half_by, key=cube_half_by.get)
 cube_half = cube_half_by[cube_half_driver]
-# The servo lies on the deck, so its shaft height follows from the deck, not the
-# other way round.
+# Z kept in terms of servo_lift, even though the bracket no longer stands on
+# the deck to get it: the number still works (crank clears the case, see
+# servo_lift), and re-deriving it from scratch would only rename the same
+# value, not change it.
 crank_hub = (crank_hub_y,
              -cube_half + servo_lift + servo_body[2] / 2.0)
 act_link_len = math.dist(crank_hub, (R_push, push_z))  # free length = hub to
@@ -754,9 +756,24 @@ act_link_len = math.dist(crank_hub, (R_push, push_z))  # free length = hub to
 # pocket 40 mm deep with nothing in it. That flip is what lets the cube close.
 crank_web_x  = act_x - link_t / 2.0 - 0.5 - crank_web_t
 servo_face_x = crank_web_x - crank_boss_h
-# The bracket's deck screws go up through its own plate, which is on the shaft
+# The bracket's wall screws go through its own plate, which is on the shaft
 # side of the tabs.
 servo_anchor_x = servo_face_x + servo_plate_t / 2.0
+sw_screw_x = 6.0    # mm — |X| the bracket's two wall screws sit off the
+                     # foot's own centre line (sw_foot_cx), NOT off the servo
+                     # — see sw_foot_cx for why the foot is not straight out
+                     # from the servo at all.
+sw_foot_x = sw_screw_x + foot_edge   # DERIVED — half-width of that foot
+sw_foot_cx = 34.0   # mm — X of the servo bracket's wall foot. The bottom
+                     # frame post's own foot already owns |x| <= fp_post_x
+                     # (22) directly out from the servo (fb_A[1] and
+                     # crank_hub[1] are only 3.95 mm apart in Z), so the
+                     # reach jogs out past its edge instead of landing on
+                     # top of it — sw_foot_cx - sw_foot_x clears 22 by 1.5.
+sw_jog_len = 4.0    # mm — how much Y the jog itself takes, done close to the
+                     # servo rather than out at the wall: it has to finish
+                     # (narrow back to the foot's own width) before Y reaches
+                     # the frame post's own territory, fb_A[0] - fp_lug_x.
 cube_out  = cube_half + wall_thick
 # Brackets seat on the bosses, not on the wall itself.
 wall_face_y = cube_half - wall_boss_h
@@ -869,9 +886,18 @@ def _screw_seat_y(sx):
 
 def wall_screws():
     """(x, z) of every screw through this axis's wall — the four-bar's two
-    frame pivots now, two screws each (X-spread only — see fw_screw_z for why
-    not four). The list stays so the wall and the brackets cannot disagree."""
-    return [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
+    frame pivots (X-spread only — see fw_screw_z for why not four) and the
+    servo bracket's two. The list stays so the wall and the brackets cannot
+    disagree.
+
+    The servo's spare boss lands on the OTHER Z sign, same harmless-spare
+    precedent the deck version had ("the servo's only exists on the bottom
+    deck; putting it in both is harmless") — both_hands() cannot tell this
+    pair apart from the frame pivots' genuinely symmetric ones."""
+    out = [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
+    out += [(sw_foot_cx - sw_screw_x, crank_hub[1]),
+            (sw_foot_cx + sw_screw_x, crank_hub[1])]
+    return out
 
 
 def place_carriage(shape, st):
@@ -1309,48 +1335,72 @@ def servo_screw_ys():
 
 def make_servo_bracket():
     """What the servo hangs from: a plate across its two mounting tabs, on the
-    SHAFT side of them, standing on the deck.
+    SHAFT side of them, reaching out to the wall.
+
+    Moved off the deck, at the user's request. The far tab already sits closer
+    to the wall than anything else on this axis except the frame pivots
+    (servo_y_end is ~16 mm short of it, against the pivots' ~4), so this is
+    the SECOND-shortest reach available for a wall mount, not an arbitrary
+    long one.
 
     Shaft side, not case side, because the case side is where the four-bar's
-    lower link comes down: the plate reaches 6.8 mm past the case at each end,
-    and at the far end that lands under the link. On the shaft side it sits in
-    the X band between the links and the carriage's arms, and everything there
-    is 10 mm higher up.
+    lower link comes down. The crank's boss passes through the plate, so it
+    has a clearance hole — which is what limits the boss to Ø10: the servo's
+    own near tab screw is only 8.15 mm from the shaft, and the plate has to
+    keep some material between the two.
 
-    The crank's boss passes through it, so it has a clearance hole — which is
-    what limits the boss to Ø10: the servo's own near tab screw is only 8.15 mm
-    from the shaft, and the plate has to keep some material between the two."""
+    The reach to the wall keeps the plate's FULL height rather than tapering
+    to a thin foot: something has to carry the servo's own weight and
+    reaction torque across that span. It also JOGS in X, off to sw_foot_cx —
+    the bottom frame post's own foot already owns the wall directly out from
+    the servo (its |x| <= fp_post_x, and fb_A[1] and crank_hub[1] are only
+    3.95 mm apart in Z), so reaching straight out landed the two feet on top
+    of each other. Past the frame post's edge is clear."""
     x0, y0, z0, bx, by, bz = servo_box()
     sy0, sy1 = servo_screw_ys()
-    z_deck = -(cube_half - deck_boss_h)
+    y_plate0 = sy0 - foot_edge
+    y_plate1 = sy1 + foot_edge
+    y_wall_in = wall_face_y - foot_t
+    rx0 = min(servo_face_x, sw_foot_cx - sw_foot_x)
+    rx1 = max(servo_face_x + servo_plate_t, sw_foot_cx + sw_foot_x)
+    # The jog happens HERE, close to the servo, not out at the wall: past
+    # y_far (fb_A[0] - fp_lug_x) the frame post's own foot owns every x in
+    # its own +-fp_post_x, so the wide part of this bend has to be done and
+    # narrowed back down before that Y is reached.
+    y_jog1 = y_plate1 + sw_jog_len
 
-    part = Part.makeBox(servo_plate_t, (sy1 + foot_edge) - (sy0 - foot_edge),
-                        z0 + bz - z_deck,
-                        v(servo_face_x, sy0 - foot_edge, z_deck))
+    part = Part.makeBox(servo_plate_t, y_plate1 - y_plate0, bz,
+                        v(servo_face_x, y_plate0, z0))
     part = part.cut(cyl(crank_hub_r + 0.75, servo_plate_t + 2,
                         v(servo_face_x - 1, crank_hub[0], crank_hub[1]),
                         X_AXIS))
-    for sx, sy in servo_deck_screws():
-        part = part.fuse(Part.makeBox(servo_plate_t + 8.0, 2 * foot_edge,
-                                      servo_lift - deck_boss_h,
-                                      v(servo_face_x - 4.0, sy - foot_edge,
-                                        z_deck)))
-    for sx, sy in servo_deck_screws():
-        part = part.cut(cyl(foot_hole_d / 2.0, servo_lift + 2,
-                            v(sx, sy, z_deck - 1), Z_AXIS))
-        # Counterbore: the case sits just above this pad.
-        part = part.cut(cyl((bolt_head_d + 0.6) / 2.0, bolt_head_h + 0.5,
-                            v(sx, sy,
-                              z_deck + servo_lift - deck_boss_h
-                              - (bolt_head_h + 0.5)), Z_AXIS))
+    # The jog: full case height, wide (plate's X to the foot's X), but SHORT.
+    part = part.fuse(Part.makeBox(rx1 - rx0, y_jog1 - y_plate1, bz,
+                                  v(rx0, y_plate1, z0)))
+    # The reach proper: full case height, but only the foot's own width now
+    # — this is the part that runs alongside the frame post, so it has to
+    # already be clear of it.
+    part = part.fuse(Part.makeBox(2 * sw_foot_x, wall_face_y - y_jog1, bz,
+                                  v(sw_foot_cx - sw_foot_x, y_jog1, z0)))
+    # The foot: same X band as the reach, just the last foot_t of it,
+    # pressed against the wall same as the frame post's.
+    part = part.fuse(Part.makeBox(2 * sw_foot_x, foot_t, bz,
+                                  v(sw_foot_cx - sw_foot_x, y_wall_in, z0)))
+    # Head clearance the whole reach, not just the foot: the head extends
+    # bolt_head_h inward past the seat, and unlike the frame post's narrow
+    # lug, this bracket's reach is SOLID at the screw's own x the entire way
+    # in from the wall — nothing here is narrow enough to duck under it.
+    for sx in (sw_foot_cx - sw_screw_x, sw_foot_cx + sw_screw_x):
+        part = part.cut(cyl((bolt_head_d + 0.6) / 2.0, wall_face_y - y_jog1 + 2,
+                            v(sx, y_jog1 - 1, crank_hub[1]), Y_AXIS))
     for sy in servo_screw_ys():
         part = part.cut(cyl(servo_screw_d / 2.0 + 0.4, servo_plate_t + 2,
                             v(servo_face_x - 1, sy, crank_hub[1]), X_AXIS))
     return part
 
-def servo_deck_screws():
-    """The subset of deck_screws() that belongs to the servo bracket."""
-    return [q for q in deck_screws() if abs(q[0] - servo_anchor_x) < 1e-6]
+def servo_wall_screws():
+    """The subset of wall_screws() that belongs to the servo bracket."""
+    return [q for q in wall_screws() if abs(q[1] - crank_hub[1]) < 1e-6]
 
 def both_hands(pts):
     """A screw pattern and its X mirror, without duplicates.
@@ -1367,28 +1417,23 @@ def both_hands(pts):
 
 
 def deck_screws():
-    """(x, y) of the screws into one deck, for ONE axis, before the axis is
-    rotated into place. Only the servo's own two remain — the four-bar's
-    frame pivots moved to the wall (see wall_screws), which is what makes the
-    deck a plain cap now rather than something the mechanism is bolted to.
-
-    Spread along the bracket, and kept OUT of the middle of the box: the four
-    axes' decks are one part, and screws this close to the centre line land
-    on each other once the pattern is rotated 90 deg. One pad is under the
-    case (it is what the case rests on), the other under the plate's far leg."""
-    return [(servo_anchor_x, crank_hub_y - 4.0),
-            (servo_anchor_x, crank_hub_y + 8.0)]
+    """(x, y) of the screws into one deck, for ONE axis. EMPTY: the frame
+    pivots and the servo both moved to the wall (see wall_screws), so the
+    deck is a plain cap now, nothing is bolted to it. The list stays so the
+    deck's own boss loop and anything that used to read this cannot drift."""
+    return []
 
 
 def make_deck(zs):
-    """Floor or ceiling. They did not exist: the cube was four walls and open
-    top and bottom, which was fine while nothing needed them — but the four-bar
-    brackets do. Its pivot takes the link reaction, which at 50 deg is mostly Z,
-    and a post standing on a deck carries that in compression instead of as
-    bending along 35 mm of plate cantilevered off a wall.
+    """Floor or ceiling. Nothing is bolted to it any more — the frame pivots
+    and the servo both moved to the wall (deck_screws() is empty) — so it is
+    a plain structural cap now, not something the mechanism hangs off. Kept
+    as its own part rather than folded away: it still closes the cube's top
+    and bottom, and both_hands()' screw pattern lives on here for when
+    something needs it again.
 
-    Bosses inward, blind holes, same as the walls: nothing goes through, so the
-    outside stays clean."""
+    Bosses inward, blind holes, same as the walls: nothing goes through, so
+    the outside stays clean."""
     z_in = zs * cube_half
     z_out = zs * (cube_half + deck_t)
     deck = Part.makeBox(2 * cube_out, 2 * cube_out, deck_t,
@@ -2238,10 +2283,11 @@ print("  Filing the flats is the one manual step here.")
 print("  PURCHASED, per axis: 3x MR105ZZ (2 carriage, 1 output shaft),")
 print("             Ø5 rod (carriage shaft, output shaft, push pin),")
 print("             Ø4 pin stock (4 pivot pins),")
-print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
+_fp_wall_screws = [q for q in wall_screws() if abs(q[1] - crank_hub[1]) > 1e-6]
+print(f"             {len(_fp_wall_screws) * 2}x M3x10 into the wall,"
       " into the frame posts,")
-print(f"             {len(servo_deck_screws())}x M3x10 into the servo bracket"
-      " (ONE deck only),")
+print(f"             {len(servo_wall_screws())}x M3x10 into the wall,"
+      " into the servo bracket,")
 print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo.")
 print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
       f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
