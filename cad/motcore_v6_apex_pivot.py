@@ -1035,30 +1035,36 @@ def make_horn():
     return horn
 
 def make_carriage_arms(sd):
-    """The two arms on one side, from the block out to the four-bar pivots.
+    """One upright of the carriage's 'H', from the block out to BOTH four-bar
+    pivots on this side.
 
-    A true L, not the diagonal it used to be: a vertical rib straight up from
-    the block's face, at the block's own Y — well clear of the cone's rim —
-    THEN a short horizontal jog in Y, at the pivot's own height, to reach it.
-    The diagonal was lighter and stiffer (it was kept on purpose, see the old
-    note by arm_root), but it does not read as an L, and reading the shape is
-    what this pass is for. bar_yz's round ends meet at the corner as a
-    fillet, so the bend itself stays printable."""
+    Four short verticals collapsed into two long ones. Each side used to carry
+    its own top rib and bottom rib as separate pieces, with the block's height
+    as the only thing between them; now it is ONE prism running the full span
+    from the lower pivot's height to the upper one's, at the block's own Y —
+    still well clear of the cone's rim, same as the L version — with a short
+    horizontal jog at EACH end reaching its own pivot. With the block as the
+    crossbar and these two uprights either side of the axis, the whole
+    carriage reads as an H at a glance, which is the point of this pass over
+    the L: the L was already true to how force gets to each pivot, this is
+    true to how the four routes relate to each other.
+
+    bar_yz's round ends meet the elbow fillets as before, so the bends stay
+    printable, and the same numeric sweep that cleared the L clears this."""
     x0 = sd * side_x - side_t / 2.0
-    part = None
+    # ONE web, spanning the block's own height, connecting its flat face to
+    # the arm plane — the two short per-elbow webs collapse into this too.
+    wx0, wx1 = sorted((sd * (block_hw - 1.0), x0 + (side_t if sd > 0 else 0.0)))
+    part = Part.makeBox(wx1 - wx0, hous_y1 - block_y0, 2 * block_hw,
+                        v(wx0, block_y0, -block_hw))
+    # ONE vertical bar, lower pivot's height to the upper one's.
+    part = part.fuse(bar_yz((arm_root[0], -fb_B[1]), (arm_root[0], fb_B[1]),
+                            arm_w, x0, side_t))
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
         corner = (arm_root[0], zs * fb_B[1])
-        # Web out from the block's flat face to the arm's plane.
-        wx0, wx1 = sorted((sd * (block_hw - 1.0), x0 + (side_t if sd > 0 else 0.0)))
-        arm = Part.makeBox(wx1 - wx0, 4.0, arm_w,
-                           v(wx0, arm_root[0] - 4.0,
-                             zs * arm_root[1] - arm_w / 2.0))
-        arm = arm.fuse(bar_yz((arm_root[0], zs * arm_root[1]), corner, arm_w,
-                              x0, side_t))
-        arm = arm.fuse(bar_yz(corner, b, arm_w, x0, side_t))
-        arm = arm.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
-        part = arm if part is None else part.fuse(arm)
+        part = part.fuse(bar_yz(corner, b, arm_w, x0, side_t))
+        part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
     return part
 
 def make_trunnion():
