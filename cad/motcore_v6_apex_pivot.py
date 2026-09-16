@@ -310,6 +310,18 @@ hous_y1       = 38.0   # mm — housing, pinion-side face, past the cone's mouth
                         #      housing this shape prints with its bore straight
                         #      up. Both bearings go in from the pinion end,
                         #      against a lip at the far one.
+block_hw      = 8.5    # mm — half-width (X and Z) of the PRISMATIC block that
+                        #      the housing turns into past the cone's mouth. It
+                        #      cannot start any earlier: inside the cone the
+                        #      cavity is round and tight (8.27 mm of radius at
+                        #      y = 21), and a square corner at half-width 8.5
+                        #      reaches 12.0 mm from the axis — it would cut into
+                        #      the cone. Past the mouth there is no cavity at
+                        #      all, so the block is free, and it is what the
+                        #      arms and the horn now root on directly instead
+                        #      of a web tangent to a cylinder. block_y0, where
+                        #      it starts, is derived below (§ Cone extents) —
+                        #      it needs out_base_y, which is not known yet here.
 side_x        = 15.0   # mm — X of the carriage's two arms. OUTBOARD of the
                         #      four-bar links, because the knuckle that joins
                         #      each pair of links into one part runs across the
@@ -321,27 +333,20 @@ arm_w         = 7.0    # mm — carriage arm width. It has to pass through a gap
                         #      one side, the idler bracket's plate at 40.5 on
                         #      the other, and a round-ended bar reaches arm_w/2
                         #      past its own root at each end.
-arm_root      = (36.0, 5.0)   # mm (y, |z|) — where each arm leaves the housing.
-                        #      Y is set by the cone's own rim: the arms are
-                        #      round-ended bars, so each one reaches arm_w/2
-                        #      further in than its root, and the cone's mouth is
-                        #      at y = 30.8 with a 17.6 mm rim — which is exactly
-                        #      the radius the arms pass at.
+arm_root      = (36.0, 5.0)   # mm (y, |z|) — where each arm leaves the block.
+                        #      Y is set by the cone's own rim: the arm's first
+                        #      leg climbs straight up in Z at this Y, and it has
+                        #      to already be past the cone's mouth (30.8, 17.6 mm
+                        #      rim) before it turns — an L that turned too soon
+                        #      would cut into the cone on its way up. Was a
+                        #      single diagonal bar, which is lighter and stiffer
+                        #      for the same reason a strut beats a right angle;
+                        #      swapped for two straight legs so the shape reads
+                        #      at a glance and each face prints flat. Checked
+                        #      by the sweep below, not assumed.
 horn_w        = 10.0   # mm — width of the horn that carries the push point
 horn_t        = 6.0    # mm — its thickness (X). It is the whole actuation load
                         #      path, so it is the thickest plate on the part.
-                               #      on its way to a four-bar pivot. Diagonal,
-                               #      not an L: once the part is printed lying
-                               #      on its side the two are equally printable,
-                               #      and the diagonal is the lighter and
-                               #      stiffer load path. NOT free, though: the
-                               #      arm has to cross the output cone's base
-                               #      plane outside the cone, which is 18.2 mm
-                               #      in radius there against the plate at
-                               #      |x| = 12, so it must cross y = 32 above
-                               #      |z| = 13.9. From here it crosses at 15.7;
-                               #      from (40, 4) it crossed at 9.4 and cut
-                               #      into the cone.
 bolt_d        = 3.0    # mm ┐
 bolt_head_d   = 5.5    # mm │ M3 socket head and nut, as envelopes. Modelled as
 bolt_head_h   = 3.0    # mm │ solids and not just as holes, because a hole
@@ -514,6 +519,10 @@ out_tip_y   = out_apex_y + s_output_lo * math.cos(beta)
 out_bore_end_y = out_apex_y + (
     (fdm_shaft_hole_d / 2.0 + cone_bore_wall) / math.tan(beta))
 out_bore_depth = out_base_y - out_bore_end_y
+
+# The carriage's block starts one running clearance past the cone's own widest
+# point — the earliest it can be square, see block_hw.
+block_y0 = out_base_y + run_clr
 
 mot_apex_z = apex_off_motor
 mot_base_z = mot_apex_z + s_mot_hi * math.cos(alpha)
@@ -963,20 +972,30 @@ def make_bushing(y0):
 
 def make_carriage():
     """The carriage, in one piece: a bearing housing living inside the hollow
-    cone, two arms out to the four-bar, and a horn down and out to the push
-    point.
+    cone, two L-shaped arms out to the four-bar, and an L-shaped horn out to
+    the push point.
 
-    ONE piece again. It was split in two halves so its bearing seats would not
-    print as bridged horizontal holes; inside the cone it is a slim cylinder,
-    which prints with its bore straight up, so the split bought nothing and cost
-    four bolts. Both bearings now go in from the pinion end and stop against a
-    lip at the far one.
+    TWO cross-sections, not one. Inside the cone the housing has to stay round
+    and close to hous_r — the cavity is round and only 8.27 mm of radius at
+    y = 21 — but past the cone's mouth (block_y0) there is nothing left to be
+    round FOR, so it squares off into a prismatic block. That block is the one
+    thing the arms and the horn now attach to: a flat face to root an L on,
+    instead of a web tangent to a curved surface.
+
+    ONE piece again (housing+block together). It was split in two halves so
+    its bearing seats would not print as bridged horizontal holes; inside the
+    cone it is a slim cylinder, which prints with its bore straight up, so the
+    split bought nothing and cost four bolts. Both bearings still go in from
+    the pinion end and stop against a lip at the far one — the block does not
+    change that, it only changes what the OUTSIDE of that same bore looks like.
 
     The arms can only leave through the cone's mouth — a shell has no other way
-    out — so they start at the housing's outboard end and climb steeply. The
-    horn goes the other way: down clear of the corona's rim first, then forward,
+    out — so they start at the block's outboard end and climb steeply. The horn
+    goes the other way: down clear of the corona's rim first, then forward,
     because between those two it would cross the gear plane."""
-    body = cyl(hous_r, hous_y1 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
+    body = cyl(hous_r, block_y0 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
+    body = body.fuse(Part.makeBox(2 * block_hw, hous_y1 - block_y0, 2 * block_hw,
+                                  v(-block_hw, block_y0, -block_hw)))
     body = body.fuse(make_carriage_arms(1)).fuse(make_carriage_arms(-1))
     body = body.fuse(make_horn())
 
@@ -1005,28 +1024,39 @@ def make_carriage():
 def make_horn():
     """Down, then forward: the arm that carries the push point out past the
     gears. Straight across, it would cross the gear plane; below the corona's
-    rim there is nothing in the way at all."""
+    rim there is nothing in the way at all. Roots on the block's flat bottom
+    face now, not tangent to the old round housing."""
     # Out at the arms' own X, not on the centre line: down the middle is where
     # the lower link's knuckle lives.
     x0 = side_x - horn_t / 2.0
     corner = (hous_y1 - 2.0, push_z)
-    horn = bar_yz((hous_y1 - 2.0, -hous_r + 1.0), corner, horn_w, x0, horn_t)
+    horn = bar_yz((hous_y1 - 2.0, -block_hw + 1.0), corner, horn_w, x0, horn_t)
     horn = horn.fuse(bar_yz(corner, (R_push, push_z), horn_w, x0, horn_t))
     return horn
 
 def make_carriage_arms(sd):
-    """The two arms on one side, from the housing out to the four-bar pivots."""
+    """The two arms on one side, from the block out to the four-bar pivots.
+
+    A true L, not the diagonal it used to be: a vertical rib straight up from
+    the block's face, at the block's own Y — well clear of the cone's rim —
+    THEN a short horizontal jog in Y, at the pivot's own height, to reach it.
+    The diagonal was lighter and stiffer (it was kept on purpose, see the old
+    note by arm_root), but it does not read as an L, and reading the shape is
+    what this pass is for. bar_yz's round ends meet at the corner as a
+    fillet, so the bend itself stays printable."""
     x0 = sd * side_x - side_t / 2.0
     part = None
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
-        # Web out from the housing to the arm's plane.
-        wx0, wx1 = sorted((sd * 4.0, x0 + (side_t if sd > 0 else 0.0)))
+        corner = (arm_root[0], zs * fb_B[1])
+        # Web out from the block's flat face to the arm's plane.
+        wx0, wx1 = sorted((sd * (block_hw - 1.0), x0 + (side_t if sd > 0 else 0.0)))
         arm = Part.makeBox(wx1 - wx0, 4.0, arm_w,
                            v(wx0, arm_root[0] - 4.0,
                              zs * arm_root[1] - arm_w / 2.0))
-        arm = arm.fuse(bar_yz((arm_root[0], zs * arm_root[1]), b, arm_w, x0,
-                              side_t))
+        arm = arm.fuse(bar_yz((arm_root[0], zs * arm_root[1]), corner, arm_w,
+                              x0, side_t))
+        arm = arm.fuse(bar_yz(corner, b, arm_w, x0, side_t))
         arm = arm.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
         part = arm if part is None else part.fuse(arm)
     return part
