@@ -86,48 +86,23 @@ rubber_lip = 2.0   # mm  — bare plastic left past the rubber's outer edge, to
 s0        = 10.0   # mm  — apex → start of the contact line, ON THE RUBBER
                     #       surface (which is the one whose apex is the origin)
 
-# ── Gear stage — always meshed ───────────────────────────────────────────────
-# m = 1.0 IS NOT BUILDABLE and the doc's table is wrong about it. At Zp = 8 the
-# pinion root radius is m*(Zp/2 - 1.25) = 2.75 mm, and the FDM-compensated bore
-# for the Ø5 output shaft is r = 2.90 mm: the bore eats the whole hub and the
-# gear comes out as eight loose teeth. The floor for a 2 mm hub wall is
-#       m >= (fdm_shaft_hole_d/2 + wall) / (Zp/2 - 1.25) = 1.78
-# so the default here is 1.8 (which is also v5's module floor, for an unrelated
-# reason). The "pinion hub wall" check at the bottom prints the margin; set
-# m_mod = 1.0 and it fails loudly with the number. The alternatives, if 1.8 is
-# too big: more pinion teeth, a stepped Ø3 shaft end (but Ø3 steel is at its
-# torsional limit near 0.5 Nm), or a pinion printed integral with the shaft
-# (which then cannot be plastic — it carries the full output torque).
-# NOTE the module does NOT touch the clutch geometry in v6: the gears never
-# disengage, so there is no mesh travel and no root-clearance constraint. It is
-# purely a packaging cost, unlike v5 where m was on the critical path.
-m_mod = 1.8        # mm  — gear module
-Zp    = 8          # —   — pinion teeth (on the carriage, centred)
-Zi    = 8          # —   — idler teeth (fixed axis, on X: invariant 6)
-IDLER_SIDES = (-1,)  #    — which sides carry an idler. ONE, and that is not a
-                     #       preference: pinion + two idlers + corona is a closed
-                     #       loop, and the pinion MOVES — 2.42 mm at full preload,
-                     #       which is the mechanism working, not an error. Each
-                     #       idler then demands its own pinion phase, ~9 deg
-                     #       apart, and no single phase satisfies both: swept in
-                     #       the macro, the best compromise still leaves 4.1 mm3
-                     #       of tooth interference. The train jams. One idler
-                     #       leaves the loop open, and it still centres the
-                     #       output shaft, which is the whole job (Zc = Zp + 2*Zi
-                     #       makes both its centre distances equal). What is lost
-                     #       is the radial-load balancing the second one was
-                     #       for — the carriage bearings take it instead, ~111 N
-                     #       at 2.4 Nm out, against MR105ZZ's ~800 N rating.
-                     #       -X rather than +X for no deeper reason than that
-                     #       +X is where the actuation lives — link, crank,
-                     #       servo and its bracket. Either side satisfies
-                     #       invariant 6, which only forbids Z, so giving each
-                     #       its own side costs nothing and buys room.
-Zc    = 24         # —   — corona teeth (internal, on the output shaft)
-                    #       Zc = Zp + 2*Zi is NOT a free choice: it is what
-                    #       makes the idler centre distance the same on both
-                    #       meshes, i.e. what lets the corona stay concentric
-                    #       with the pinion. Checked below.
+# ── Drive out of the cone: cardan + Oldham ───────────────────────────────────
+# The carriage shaft TILTS about the apex and the output shaft does not. At a
+# distance y from the apex their axes are therefore apart by y*sin(phi) — 2 mm
+# at 48 mm — as well as at an angle. That is offset AND angle, and no rigid
+# coaxial joint takes offset: a spline's side teeth would have to slide 2 mm
+# round the circle while its top teeth stay put. Crowning does not change it.
+# (A crowned spline was modelled on another branch and rubbed 68 mm3.)
+#
+# So the job is split, one element per kind of misalignment:
+#   - a CARDAN on the carriage shaft takes the ANGLE. Its centre is on the
+#     carriage's own axis, so it only ever bends by the carriage's tilt,
+#     2.4 deg, which is nothing to a cardan (output error ~0.025 deg).
+#   - past it the shaft is parallel to the output axis again, but OFFSET. An
+#     OLDHAM takes that, and only that: offset is what an Oldham is for, and
+#     the angle it is bad at never reaches it.
+# Everything sits on the axis, symmetric, and the drive is 1:1. The reduction
+# the tree needs lives between hubs.
 
 # ── Four-bar virtual pivot (y, z), apex at the origin ────────────────────────
 # Both link axes must pass through the origin — that is what makes the
@@ -371,72 +346,34 @@ bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see i
 trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
                         #      the project already buys, NOT a printed boss)
 
-# ── Gear stage packaging ─────────────────────────────────────────────────────
-gear_face_w   = 5.0    # mm — pinion / idler / corona face width
-gear_y0       = 44.5   # mm — gear plane, front face (carriage side). It looked
-                        #      like it could come right up against the housing
-                        #      once that moved inside the cone, and it cannot:
-                        #      the carriage's arms sit at |x| = 15 and the idler
-                        #      at 14.4, so the bracket's plate needs its own Y to
-                        #      get past them. Costs no cube while the horn is
-                        #      what sets it. Pushed
-                        #      out from 51.5: the idler bracket's plate has to
-                        #      cross in front of it, and at 51.5 that arm ran
-                        #      into the push trunnion's Ø5 boss at y = 46.
-                        #      Then out again from 53.5, because those 3 mm of
-                        #      Y are ALL there is between the carriage and the
-                        #      gears, and the plate has to fit in them with a
-                        #      running clearance at one face and the idler's
-                        #      axle rooted in the other. Each mm here costs 2 mm
-                        #      of cube side.
-gear_back_gap = 1.5    # mm — axial clearance, pinion back face → corona
-                        #      plate, taken out of the PINION's face width.
-                        #      Not cosmetic: the pinion tilts with the carriage,
-                        #      so its rim sweeps ~0.4 mm in Y at full preload,
-                        #      and flush against the plate it jammed. Taking it
-                        #      out of the corona's Y position instead detached
-                        #      the ring from its own back plate — the part came
-                        #      out as two solids fused into one Shape.
-corona_rim_t  = 4.0    # mm — corona rim beyond the pitch circle (freecad.gears
-                        #      sizes the outer solid as pitch + 2*thickness)
-corona_plate_t = 4.0   # mm — plate closing the corona's back face, fused into
-                        #      the output shaft
-idler_axle_d  = 4.0    # mm — idler stub axle
-idler_arm_t   = 3.5    # mm — idler bracket plate thickness (along Y), which is
-                        #      also how deep the axle is rooted
-idler_neck_w  = 8.0    # mm — width (Z) of the neck between the plate and its
-                        #      seat. This one really does have to pass BETWEEN
-                        #      the two screw heads.
-idler_lobe_r  = 5.5    # mm — radius of the plate's rounded end around the axle.
-                        #      Small on purpose: it has to stop short of the
-                        #      bearing housing's 7.5 mm radius, because the
-                        #      plate no longer crosses in FRONT of the housing —
-                        #      it sits BESIDE it, which is what lets the gear
-                        #      plane come right up against the carriage. What
-                        #      roots the axle is the plate's thickness, not this.
-fdm_axle_press_d = 4.3  # mm — modelled Ø for the Ø4 idler axle, INTERFERENCE.
-                         #      Extrapolated from the Ø5 numbers, not measured.
-shaft_flat_d  = 4.0    # mm — the Ø5 output shaft is filed to a flat, leaving
-                        #      this across it, and the cone and the pinion carry
-                        #      the matching D. Form, not friction: a set screw
-                        #      does not fit anywhere on the pinion — its hub
-                        #      wall is 2.05 mm, and beyond the gear's faces
-                        #      there is 0.5 mm of Y to the idler plate on one
-                        #      side and 1.5 mm to the corona plate on the other.
-                        #      The joint carries 0.80 Nm at the doc's upper
-                        #      bound, 320 N at the shaft's surface: on a ~4.3 mm
-                        #      chord over the pinion's 3.5 mm face that is about
-                        #      24 MPa of bearing, against ~50 for PLA.
-                        #      FILING THAT FLAT IS THE ONE MANUAL STEP the macro
-                        #      cannot check for you.
+# ── Cardan, Oldham and output bushings ────────────────────────────────────
+# First prototype: cube size is explicitly NOT a goal. Positions are derived.
+cardan_d      = 11.0   # mm — PURCHASED hobby cardan, Ø11 x 23, Ø5 bore both ends,
+cardan_len    = 23.0   # mm   grub screws. ~1 deg of rotational play measured by
+                        #      hand — upstream of the tree's reduction, so the
+                        #      leg sees it divided by that ratio.
+cardan_bore_depth = 7.0 # mm — how far a shaft enters each hub. MEASURE IT.
+cardan_max_deg = 20.0  # mm — what we let it bend; hobby joints go past 30
+oldham_d      = 22.0   # mm — hubs and disc, printed
+oldham_grip   = 6.0    # mm — hub A clamps ROUND the cardan's outboard hub, so no
+                        #      stub shaft and no extra length between them
+oldham_hub_t  = 4.0    # mm — hub body beyond the cardan / on the output shaft
+oldham_disc_t = 6.0    # mm — disc: a 2 mm slot in each face, 2 mm web
+oldham_float  = 0.5    # mm — axial float each side of the disc. The cardan's
+                        #      centre moves ~0.04 mm axially over the stroke.
+oldham_travel = 3.0    # mm — free slot length past the tongue = the offset it
+                        #      takes. Commercial Oldhams this size are rated
+                        #      for 0.1–0.2 mm; this one is printed for ~2.
+run_clr       = 1.0    # mm — running gap between parts moving against each other
+bush_od       = 7.0    # mm ┐ polymer bushings for the output shaft, Ø5 x Ø7 x 6,
+bush_len      = 6.0    # mm ┘ two of them: a floating shaft needs no ball bearing
+bush_boss_len = 14.0   # mm — boss on the OUTSIDE of the wall that carries both
+bush_boss_wall = 3.0   # mm
+shaft_flat_d  = 4.0    # mm — the Ø5 shafts are filed to a flat, leaving this
+                        #      across it; printed parts carry the matching D and
+                        #      the cardan's grub screws bear on it. Filing it is
+                        #      the one manual step the macro cannot check.
 shaft_flat_clr = 0.25  # mm — how much the printed D is relieved off the flat
-idler_anchor_x = 32.0  # mm — |X| where the bracket anchors to the wall: clear
-                        #      of the corona's 25.6 mm rim, with room for a
-                        #      screw's edge margin inboard of it
-idler_pad_z   = 8.0    # mm — |Z| of its two screws. 16 apart, so the Ø11 bosses
-                        #      do not touch, and far enough out that the heads —
-                        #      which now stand proud INSIDE — clear the leg.
-
 
 # ── Frame ────────────────────────────────────────────────────────────────────
 fp_lug_x      = 6.0    # mm — frame-pivot lug half-width in X (the links sit
@@ -535,29 +472,19 @@ apex_off_motor  = t_rubber / math.sin(alpha)
 apex_off_output = t_rubber / math.sin(beta)
 
 ratio_fric  = math.sin(alpha) / math.sin(beta)
-ratio_gear  = Zp / Zc                 # the idlers do not change the ratio
+ratio_gear  = 1.0                     # cardan + Oldham are both 1:1
 ratio_total = ratio_fric * ratio_gear
 
-# Gear stage geometry
-r_pitch_p = m_mod * Zp / 2.0
-r_pitch_i = m_mod * Zi / 2.0
-r_pitch_c = m_mod * Zc / 2.0
-r_tip_p   = m_mod * (Zp / 2.0 + 1.0)
-r_tip_i   = m_mod * (Zi / 2.0 + 1.0)
-r_tip_c   = m_mod * (Zc / 2.0 - 1.0)          # internal: teeth point inward
-r_root_p  = m_mod * (Zp / 2.0 - 1.25)
-r_corona_outer = r_pitch_c + corona_rim_t
-e_ext     = m_mod * (Zp + Zi) / 2.0           # pinion → idler centre distance
-e_int     = m_mod * (Zc - Zi) / 2.0           # idler → corona centre distance
-idler_x   = e_ext                              # idlers on the X axis (inv. 6)
-idler_leg_z = r_corona_outer + 3.0             # bracket clears the corona rim
-idler_arm_y1 = gear_y0 - 0.5                   # plate's gear-side face: derived,
-                                                # so it cannot drift away from
-                                                # the gear plane it has to clear
-pinion_hub_wall = r_root_p - fdm_shaft_hole_d / 2.0
-
-gear_y1   = gear_y0 + gear_face_w
-gear_y_mid = gear_y0 + gear_face_w / 2.0
+# The drive, chained outward from the carriage housing. Rest pose, on +Y.
+cardan_y0   = hous_y1 + run_clr
+cardan_cy   = cardan_y0 + cardan_len / 2.0     # the joint's centre
+cardan_y1   = cardan_y0 + cardan_len
+oldham_a_y0 = cardan_y1 - oldham_grip
+oldham_a_y1 = cardan_y1 + oldham_hub_t
+disc_y0     = oldham_a_y1 + oldham_float
+disc_y1     = disc_y0 + oldham_disc_t
+oldham_b_y0 = disc_y1 + oldham_float
+oldham_b_y1 = oldham_b_y0 + oldham_hub_t
 
 # Cone extents. s is measured along the generatrix from the cone's OWN plastic
 # apex; the rubber band is specified from the COMMON apex instead, and the two
@@ -746,13 +673,8 @@ def actuator(phi_r):
 
 
 
-# ── Cube ────────────────────────────────────────────────────────────────────
-# Short face: the clearance to the corona's back plate, which rotates. Both
-# the pinion AND the idler need it — the idler's back face sat exactly on the
-# plate, which is a rub, not a fit.
-pinion_face_w = gear_face_w - gear_back_gap
-corona_plate_y = gear_y1                      # plate is CONTIGUOUS with the ring
-corona_back_y = corona_plate_y + corona_plate_t
+# ── Cube ──────────────────────────────────────────────────────────────────────
+# Short face: the running clearance to the Oldham's output hub.
 # Y of the servo's far end, which is the other thing that has to fit inside the
 # wall — and, at the moment, the thing that actually sets the cube.
 servo_y_end = crank_hub_y + 0.25 * servo_body[1] + servo_tab_out
@@ -768,7 +690,7 @@ servo_y_end = crank_hub_y + 0.25 * servo_body[1] + servo_tab_out
 # of them — the horn ends up as the furthest thing out now that the gears are
 # behind it, which is exactly the point of the layout.
 cube_half_by = {
-    "corona running clearance": corona_back_y + wall_gap,
+    "Oldham output hub running clearance": oldham_b_y1 + wall_gap,
     "servo's far mounting tab": servo_y_end + servo_wall_clr,
     "push point and its horn": R_push + horn_w / 2.0 + 2.0,
     "four-bar frame post": fb_A[0] + fp_post_y + 1.0,
@@ -1426,80 +1348,6 @@ def make_wall():
         wall = wall.cut(cyl(foot_tap_d / 2.0, wall_boss_h + 2.0,
                             v(sx, wall_face_y, sz), Y_AXIS))
     return wall
-
-
-# ── Gears ───────────────────────────────────────────────────────────────────
-def _attach_gear_view(obj):
-    """freecad.gears' own command code attaches ViewProviderGear BEFORE the
-    geometry proxy; skipping it leaves the object with no working ViewObject
-    proxy and FreeCAD silently draws nothing."""
-    if HAS_GUI and obj.ViewObject is not None:
-        ViewProviderGear(obj.ViewObject)
-
-
-def _gear_shape(doc, kind, teeth, **kw):
-    """Build a gear with identity placement, take its shape, drop the
-    parametric object (leaving it in the tree would read as a duplicate part,
-    and editing it there would not change the copies)."""
-    obj = doc.addObject("Part::FeaturePython", "TmpGear")
-    _attach_gear_view(obj)
-    (InternalInvoluteGear if kind == "internal" else InvoluteGear)(obj)
-    obj.num_teeth = teeth
-    obj.module = f"{m_mod} mm"
-    obj.height = f"{gear_face_w} mm"
-    for k, val in kw.items():       # a caller may override height (the pinion)
-        setattr(obj, k, val)
-    doc.recompute()
-    shape = obj.Shape.copy()
-    doc.removeObject(obj.Name)
-    return shape
-
-
-def _to_gear_plane(shape, cx, cz):
-    """Local +Z (the extrusion axis) onto global +Y, then to the gear plane."""
-    s = shape.copy()
-    s.rotate(ORIGIN, X_AXIS, -90.0)
-    s.translate(v(cx, gear_y0, cz))
-    return s
-
-
-def tooth_phase(shape, cx, cz, r_probe, n_teeth):
-    """Global polar angle (deg, from +X toward +Z) of a tooth centre, found by
-    probing the solid rather than trusting the addon's internal convention.
-    Returns None if the probe radius misses the teeth entirely."""
-    pitch = 360.0 / n_teeth
-    n = 240
-    step = 2.0 * pitch / n
-    y = gear_y_mid
-    hits = []
-    for i in range(n):
-        a = math.radians(i * step)
-        p = v(cx + r_probe * math.cos(a), y, cz + r_probe * math.sin(a))
-        hits.append(shape.isInside(p, 1e-7, True))
-    runs, start = [], None
-    for i, h in enumerate(hits):
-        if h and start is None:
-            start = i
-        elif not h and start is not None:
-            runs.append((start, i - 1))
-            start = None
-    if start is not None:
-        runs.append((start, n - 1))
-    for a, b in runs:
-        if a > 0 and b < n - 1:
-            return (a + b) / 2.0 * step
-    return None
-
-
-def phase_gear(shape, cx, cz, r_probe, n_teeth, target_deg):
-    """Rotate a gear about its own axis so a tooth centre lands on
-    target_deg. Rotating by +psi about +Y DECREASES the global polar angle."""
-    found = tooth_phase(shape, cx, cz, r_probe, n_teeth)
-    if found is None:
-        return shape, None
-    psi = found - target_deg
-    shape.rotate(v(cx, gear_y_mid, cz), Y_AXIS, psi)
-    return shape, found
 
 
 # ═══════════════════════════════════════════════════════════════════
