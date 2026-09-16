@@ -1799,48 +1799,19 @@ for _k in range(-4, 5):
                     _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
 
 
-# Gear mesh, checked at FREE where the phasing is exact. Under tilt the pinion
-# simply rolls to whatever phase the mesh needs, so an overlap measured there
-# would be an artefact, not a collision — what tilt really costs is centre
-# distance, reported separately below.
-_pin_free = pinion_shape
-_mesh_ext = sum(_pin_free.common(idlers[sd]).Volume for sd in IDLER_SIDES)
-_mesh_int = sum(corona_shape.common(idlers[sd]).Volume for sd in IDLER_SIDES)
-_pin_corona_gap = _pin_free.distToShape(corona_shape)[0]
-
-# "They do not overlap" is ALSO true of two gears too far apart to touch, which
-# is how a jammed train went unnoticed. Both meshes must actually touch.
-_mesh_touch = max([_pin_free.distToShape(idlers[sd])[0] for sd in IDLER_SIDES]
-                  + [corona_shape.distToShape(idlers[sd])[0]
-                     for sd in IDLER_SIDES])
-
-# And a phase has to EXIST that clears every idler at full tilt. With one idler
-# there always is one; with two the loop is closed, the pinion's 2.4 mm of
-# travel breaks it, and no rotation satisfies both.
-_st_tilt = pose_state(-phi_preload)
-_pc_tilt = _st_tilt["T"]((gear_y_mid, 0.0))
-def _jam_at(angle):
-    sh = place_carriage(pinion_shape, _st_tilt)
-    sh.rotate(v(0, _pc_tilt[0], _pc_tilt[1]), Y_AXIS, angle)
-    return max(sh.common(idlers[sd]).Volume for sd in IDLER_SIDES)
-
-
-# Coarse over one tooth pitch, then fine around the best: on a 5 deg grid even a
-# perfectly meshing single idler reads ~0.3 mm3, purely because no sample lands
-# on the exact phase.
-_best_a, _jam = min(((float(k), _jam_at(float(k))) for k in range(0, 45, 5)),
-                    key=lambda t: t[1])
-for _k in range(-9, 10):
-    _a = _best_a + _k * 0.5
-    _val = _jam_at(_a)
-    if _val < _jam:
-        _best_a, _jam = _a, _val
-
-# Pinion travel under tilt: the idlers are on X for a reason (invariant 6).
-_pin_c_max = carriage_transform(phi_preload)[0]((gear_y_mid, 0.0))
-_e_tilt = math.hypot(idler_x, _pin_c_max[1])
-_e_growth = _e_tilt - e_ext
-_e_if_z = abs(idler_x - _pin_c_max[1])     # what an idler ON Z would have seen
+# The drive, swept over the whole stroke. Three numbers, each the limit of one
+# element doing the one job it was chosen for:
+#   - the Oldham's OFFSET: how far the cardan's centre leaves the output axis,
+#     against the slot travel it was printed with.
+#   - the cardan's BEND: the angle between the carriage shaft and the output
+#     axis, which past the cross is the carriage's own tilt and nothing more.
+#   - the AXIAL shift of the cross, against the disc's float.
+_drv_off = _drv_ax = 0.0
+for _k in range(-8, 9):
+    _dy, _dz = drive_offset(pose_state(phi_preload * _k / 8.0))
+    _drv_off = max(_drv_off, abs(_dz))
+    _drv_ax = max(_drv_ax, abs(_dy))
+_cardan_bend = math.degrees(phi_preload)
 
 # What the actuator actually pulls against. R_push is the moment arm of a
 # VERTICAL push, and the link is not vertical: it comes up off the floor at
@@ -1935,24 +1906,19 @@ _loose += [n for n, sh in (("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up
            if len(sh.Solids) != 1]
 
 checks = [
-    ("ratio_total < 1  (reduction, never 1:1)",
-     ratio_total, "< 1", ratio_total < 1.0),
+    # Informational, and NOT below 1: at 1:1 the cube is an overdrive, the
+    # friction stage alone. The reduction invariant 1 demands lives between
+    # hubs now, and it has to beat THIS number, not 0.5.
+    ("cube ratio w_out/w_motor  (reduction moved between hubs)",
+     ratio_total, "info", True),
     ("free gap angle phi_c = 90 - alpha - beta  (deg)",
      math.degrees(phi_c), "> 0", phi_c > 0),
-    ("Zc = Zp + 2*Zi  (idlers can centre the output shaft)",
-     Zc - Zp - 2 * Zi, "== 0", Zc == Zp + 2 * Zi),
-    ("Zc - Zp >= 8  (internal mesh interference)",
-     Zc - Zp, ">= 8", (Zc - Zp) >= 8),
-    ("Zp, Zc even  (one idler phase serves both sides)",
-     (Zp % 2) + (Zc % 2), "== 0", Zp % 2 == 0 and Zc % 2 == 0),
     ("link axes converge on the apex  (deg between the two rays)",
      link_axis_err, "< 0.2", link_axis_err < 0.2),
     ("link axis outside the cone wedge  (beta..90-alpha = "
      f"{beta_deg:.0f}..{90-alpha_deg:.0f} deg)",
      link_axis_deg, f"not in {beta_deg:.0f}..{90-alpha_deg:.0f}",
      not (beta_deg <= link_axis_deg <= 90 - alpha_deg)),
-    ("pinion hub wall  (root radius - shaft bore radius, mm)",
-     pinion_hub_wall, ">= 1.5", pinion_hub_wall >= 1.5),
     ("output cone blind-bore depth  (mm)",
      out_bore_depth, ">= 15", out_bore_depth >= 15.0),
     ("output cone tip clears the motor shaft  (mm)",
@@ -1977,19 +1943,12 @@ checks = [
     # plus the pin's slop. Anything under that is touching once it is a part.
     (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
      _link_gap, "> 1.0", _link_gap > 1.0),
-    ("pinion concentric inside the corona, no mesh  (mm)",
-     _pin_corona_gap, "> 1.0", _pin_corona_gap > 1.0),
-    ("pinion/idler mesh at FREE, no jam  (mm3)",
-     _mesh_ext, "== 0", _mesh_ext < 1e-6),
-    ("every mesh actually TOUCHES, not merely misses  (mm)",
-     _mesh_touch, "< 0.05", _mesh_touch < 0.05),
-    # Tolerance, not zero: this is a swept minimum on a 0.5 deg grid, and the
-    # residual there is ~0.003. The failure it exists to catch is three orders
-    # bigger — two idlers leave 4.1 mm3 at the best compromise phase.
-    ("a pinion phase exists that clears every idler at full tilt  (mm3)",
-     _jam, "< 0.05", _jam < 0.05),
-    ("idler/corona mesh at FREE, no jam  (mm3)",
-     _mesh_int, "== 0", _mesh_int < 1e-6),
+    ("Oldham offset over the stroke, within its slot travel  (mm)",
+     _drv_off, f"< {oldham_travel:.1f}", _drv_off < oldham_travel),
+    ("cardan bend over the stroke  (deg)",
+     _cardan_bend, f"< {cardan_max_deg:.0f}", _cardan_bend < cardan_max_deg),
+    ("cardan cross axial shift, within the disc's float  (mm)",
+     _drv_ax, f"< {oldham_float:.1f}", _drv_ax < oldham_float),
     (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
      len(_invalid), "== 0", not _invalid),
     (f"every part is ONE connected solid  {_loose if _loose else ''}",
@@ -2103,23 +2062,15 @@ else:
           f" {math.degrees(phi_preload - phi_c):.3f} deg the pure-rotation"
           f" model gives")
 print("-" * 72)
-print("  GEAR STAGE (never disengages)")
-print(f"    m = {m_mod:.2f}  Zp {Zp} -> Zi {Zi} (x{len(IDLER_SIDES)}, on X)"
-      f" -> Zc {Zc}"
-      f"   centre distances {e_ext:.2f} / {e_int:.2f} mm")
-print(f"    corona pitch r {r_pitch_c:.2f}, outer r {r_corona_outer:.2f};"
-      f" pinion tip r {r_tip_p:.2f}; hub wall {pinion_hub_wall:.2f} mm")
-print(f"    faces: idler/corona {gear_face_w:.1f} mm, pinion"
-      f" {pinion_face_w:.1f} mm (the difference is its tilt clearance against"
-      f" the corona plate)")
-print(f"    pinion centre rises {_pin_c_max[1]:.3f} mm at full preload"
-      f"  ->  centre distance {e_ext:.2f} -> {_e_tilt:.2f} ({_e_growth:+.3f})")
-print(f"    an idler on Z instead would have seen {_e_if_z:.2f} mm"
-      f" ({_e_if_z - e_ext:+.2f}): jam on one side, disengage on the other"
-      f"  <- invariant 6")
-if GEARS_AVAILABLE and not gear_phase_ok:
-    print("    WARNING: tooth-phase probe found no material — mesh phase is"
-          " NOT set, the mesh volumes below are meaningless")
+print("  DRIVE OUT: cardan (angle) + Oldham (offset), 1:1")
+print(f"    cardan Ø{cardan_d:.0f}x{cardan_len:.0f} (purchased), y {cardan_y0:.1f}..{cardan_y1:.1f},"
+      f" cross at {cardan_cy:.1f}; bends {_cardan_bend:.2f} deg at most")
+print(f"    Oldham Ø{oldham_d:.0f}: hub A y {oldham_a_y0:.1f}..{oldham_a_y1:.1f},"
+      f" disc {disc_y0:.1f}..{disc_y1:.1f}, hub B {oldham_b_y0:.1f}..{oldham_b_y1:.1f}")
+print(f"    offset it takes: {_drv_off:.2f} mm of {oldham_travel:.1f} travel;"
+      f" cross moves {_drv_ax:.3f} mm axially")
+print(f"    output shaft in 2 polymer bushings Ø{shaft_d:.0f}xØ{bush_od:.0f}x{bush_len:.0f},"
+      f" boss {bush_boss_len:.0f} mm OUTSIDE the wall")
 print("-" * 72)
 print("  ACTUATION (placeholder until the rubber stiffness is measured)")
 print(f"    push point at R = {R_push:.1f} mm; crank r {crank_r:.2f} at"
@@ -2167,8 +2118,8 @@ print(f"    normal force per newton of actuator force: lever / s_bar ="
       f" {min(_lever) / _sq_sbar:.2f}"
       f"  (s_bar = {_sq_sbar:.1f} mm, the squeeze's own centroid, not the"
       f" band's midpoint)")
-print(f"    output torque per newton: mu*sin(beta)*lever*(Zc/Zp) ="
-      f" {_mu_ref * math.sin(beta) * min(_lever) / 1000.0 * (Zc / Zp):.4f} Nm/N"
+print(f"    output torque per newton: mu*sin(beta)*lever (1:1 now) ="
+      f" {_mu_ref * math.sin(beta) * min(_lever) / 1000.0:.4f} Nm/N"
       f" at mu = {_mu_ref}")
 print(f"    — and that does NOT depend on where along the generatrix the"
       f" contact sits: more radius buys")
@@ -2190,32 +2141,26 @@ print(f"  CUBE side {2 * cube_out:.1f} mm"
       f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
 print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
 print("           Carriage (one piece),")
-print(f"           Pinion, Idler x{len(IDLER_SIDES)}, CoronaShaft,"
-      f" IdlerBracket x{len(IDLER_SIDES)}, FramePost x2,")
+print("           OldhamHubA, OldhamDisc, OldhamHubB, FramePost x2,")
 print("           Link x2 (each carries both its arms), Crank, ActLink,"
       " ServoBracket")
 print("  ASSEMBLY: alternate axes go in TURNED OVER \u2014 the same parts, rotated")
 print("            180 deg about their own radius, so their servo, crank and horn")
 print("            lie against the other deck. Two neighbours both wanting the same")
 print("            corner of the same floor is the one thing this box cannot fit.")
-print(f"  Cone and pinion are keyed to the shaft by a D on a filed flat"
-      f" ({shaft_flat_d:.1f} mm across),")
-print("  because a set screw fits nowhere: 2.05 mm of pinion hub wall, and"
-      " 0.5/1.5 mm of Y")
-print("  beyond its faces. Filing the flat is the one manual step here.")
-print("  PURCHASED, per axis: 2x MR105ZZ, Ø5 rod (output shaft + the push pin),")
+print(f"  The cone and the Oldham's output hub are keyed by a D on a filed flat"
+      f" ({shaft_flat_d:.1f} mm across);")
+print("  the cardan's grub screws bear on the same flats. Filing is the one manual step.")
+print("  PURCHASED, per axis: 2x MR105ZZ, 1x cardan Ø11x23 bore 5, 2x polymer bushing")
+print("             Ø5xØ7x6, Ø5 rod (carriage shaft, output shaft, push pin),")
 print("             Ø4 pin stock (4 pivot pins),")
-print(f"             {len(wall_screws())}x M3x8 through the wall into the"
-      f" idler bracket,\n             {len(frame_deck_screws()) * 2}x M3x10 up"
-      f" through the decks into the frame posts,"
-      f"\n             {len(servo_deck_screws())}x M3x10 into the servo bracket"
-      f" (ONE deck only),")
-print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo")
+print(f"             {len(frame_deck_screws()) * 2}x M3x10 up through the decks"
+      " into the frame posts,")
+print(f"             {len(servo_deck_screws())}x M3x10 into the servo bracket"
+      " (ONE deck only),")
+print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo.")
 print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
       f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
 print("=" * 72)
-if not GEARS_AVAILABLE:
-    print("NOTE: freecad.gears not found — pinion/idlers/corona are reference")
-    print("cylinders with no teeth. Install the 'Gear' addon for real involutes.")
-print("Packaging (carriage arms, idler bracket, frame brackets, servo mount) is")
+print("Packaging (carriage arms, frame brackets, servo mount, Oldham) is")
 print("a first pass: the geometry above is derived, the brackets are not.")
