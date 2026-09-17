@@ -145,7 +145,9 @@ link_w     = 8.0      # mm — link width. Was 10, and the inner edge of the arm
                        #      almost nothing: 8 x 5 in compression is ample, and
                        #      the millimetre off each edge goes straight into
                        #      the clearance, 0.64 -> 1.63 mm.
-link_knuckle = 4.5    # mm — radius of the knuckle joining the pair into one
+link_knuckle = 4.0    # mm — radius of the knuckle joining the pair into one
+                       #      part: the arms' own end radius, so it reads as one
+                       #      cylinder, flush with them.
                        #      part.
 link_knuckle_d = 14.5 # mm — (v7-cardan-zigzag: ON B. The 14.5 link is too
                        #      short for the frame post's 6 mm lug and a knuckle
@@ -260,7 +262,10 @@ arm_w         = 7.0    # mm — carriage arm width. It has to pass through a gap
                         #      one side, the idler bracket's plate at 40.5 on
                         #      the other, and a round-ended bar reaches arm_w/2
                         #      past its own root at each end.
-arm_root      = (36.0, 5.0)   # mm (y, |z|) — where each arm leaves the block.
+arm_up_w      = hous_y1 - hous_y0          # DERIVED — upright width
+arm_root      = ((hous_y0 + hous_y1) / 2.0, 5.0)   # DERIVED (v7-cardan-zigzag):
+                        #      the upright is centred on the housing ring and
+                        #      exactly as wide (arm_up_w), flush with both faces.
                         #      Y is set by the cone's own rim: the arm's first
                         #      leg climbs straight up in Z at this Y, and it has
                         #      to already be past the cone's mouth (30.8, 17.6 mm
@@ -1052,7 +1057,7 @@ def make_carriage_arms(sd):
     # down-and-out until it meets the upright.
     z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
     part = bar_yz((arm_root[0], -z_corner), (arm_root[0], z_corner),
-                  arm_w, x0, side_t)
+                  arm_up_w, x0, side_t)
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
         corner = (arm_root[0], zs * z_corner)
@@ -1081,9 +1086,9 @@ def make_link_knuckle(A, B):
     pivot's own sliding fit, and a hinge wants it tight. The knuckle has no
     such licence. It is the one piece of the link crossing x = 0, so it is the
     piece that meets the motor cone's rim, and it must simply clear."""
-    # Overlaps each arm by 1 mm rather than meeting it on a coincident face,
-    # which fuses far more reliably.
-    web_x = link_x - link_t / 2.0 + 1.0
+    # Right across both arms to their outer faces, so the knuckle and the arm
+    # ends read as one cylinder instead of a smaller drum set between them.
+    web_x = link_x + link_t / 2.0
     # Its place is a distance FROM A, not a fraction of the span: A is fixed
     # and B swings, and a fraction would let the knuckle drift down the link
     # as the carriage tilts.
