@@ -3,7 +3,7 @@
 Status: **active design**, settled 2026-09-12, repacked 2026-09-15, drive and
 actuation rebuilt 2026-09-17 (branch `v7-cardan-zigzag`). Supersedes v5
 (vertical carriage). The macro is `cad/motcore_v6_apex_pivot.py`; it builds the
-assembly and self-checks it (22 numeric checks), and every number quoted below
+assembly and self-checks it (24 numeric checks), and every number quoted below
 that says "measured" comes from its own output.
 
 What changed on 2026-09-17, in one paragraph: the gear stage (pinion, idlers,
@@ -212,12 +212,21 @@ cone (outer yoke) → ring cross → intermediate tube → solid cross → fork 
   neck carries **one 6805 (25×37×7)** on its outside, held by the carriage ring —
   there is no carriage shaft any more — and the ring cross's X pins through its
   wall, under the bearing, which keeps them in.
-- **Ring cross at y = 40, on the cone axis.** Ø9.8 bore: the output shaft passes
-  through it.
-- **Intermediate: a tube** Ø13.5/16.5 running back toward the apex, 14.0 mm
-  between pin planes. Windows let the ring's X pins out to the neck.
-- **Solid cross at y = 26, on the output axis**, on a fork keyed to the output
-  shaft by a D.
+- **Ring cross at y = 40, on the cone axis.** Ø10.2 bore / Ø14.6 × 5 mm: the
+  output shaft passes through it. Its wall was 1.35 mm, which gave its pins
+  nowhere to sit (~30 MPa on the plastic at 1 Nm, 0.5 mm beside each hole); now
+  2.2 mm (~18 MPa) and 1.5 mm beside each hole. The neck's bore is Ø21 round it,
+  leaving 2.0 mm of neck wall for the X pins — the limit with a 6805.
+- **Intermediate: a stepped tube** running back toward the apex, 14.0 mm
+  between pin planes: Ø13.5/16.5 at its tail, where it sits in the cone's
+  conical cavity and cannot grow, and Ø15.6/19.6 only round the ring. The step
+  sits just behind the ring because the tube rocks ~4° inside the cone, which
+  moves it sideways by tenths near the ring and by more further back. Windows in
+  the head let the ring's X pins out to the neck.
+- **Solid cross at y = 26, on the output axis**: a **prism** 4.6 × 4 × 10 mm,
+  narrow in X, long in Z. One through pin in X to both arms of a fork keyed to
+  the output shaft by a D; two short pins from its long ends to the tube, each
+  3.5 mm deep in it. A cube could not take two pins crossing at its centre.
 - **Output shaft** in two MR105ZZ: one in a boss on the wall's inner face, one in
   the wall seat. It reaches ~16 mm in from the inner bearing to the fork.
 
@@ -237,8 +246,50 @@ axes *at the ring*, which only depends on how far out the ring is.
 intermediate's span changes by **0.25 mm** over the stroke. Its ring-end pin
 holes are slotted 0.4 mm instead of making the tube telescopic.
 
-Swept clearances (macro, 9 tilts): tightest running gap **0.56 mm**, ring bore
-against the output shaft.
+Swept clearances (macro, 9 tilts): tightest running gap **0.51 mm**, tube head
+against the cone's bore. The model draws one phase of the turn only, so two
+checks are analytic: the ring rocking inside the tube's head (0.34 mm) and the
+prism rocking inside the tube (0.89 mm).
+
+### Building it
+
+**Not print-in-place.** A printed-in-place joint needs 0.3–0.4 mm of clearance
+per pin, which at these radii is ~3° of backlash at the output; supports inside
+the closed cone could never be removed; and Ø2 PLA pins at ~70–125 N would
+creep.
+
+**Five printed parts and eight steel Ø2 dowel pins** (ISO 8734): cone, tube,
+ring, prism, fork. Each pin is **pressed into the cross** (prism or ring) and
+**turns free in the part round it**:
+
+| Pin | Pressed into | Turns in | Kept in by |
+|---|---|---|---|
+| through, prism ↔ fork (X) | — (free in both) | prism and fork arms | its length: sliding to the tube, it is still in both arms |
+| prism ↔ tube (Z) ×2 | prism, 3.5 mm | tube tail wall | press fit; the cone's bore 1.75 mm out |
+| ring ↔ tube (Z) ×2 | ring, 2.2 mm | slot in the tube head | press fit |
+| ring ↔ cone (X) ×2 | ring, 2.2 mm | neck wall | press fit; the 6805 over it |
+
+Holes: this printer runs small holes ~0.5 mm under, so print them at Ø1.5–1.8
+and drill — **Ø1.9 for a press, Ø2.1 to turn**. Try both on a coupon first. A
+press that comes out loose takes a drop of cyanoacrylate (super glue — not a
+Loctite threadlocker, which is anaerobic and does not cure on plastic), on the
+pressed side only, before the joint is assembled.
+
+Print the ring solid (100% infill), bore vertical, so its pin holes come out
+horizontal and round. PETG takes the oscillation better than PLA.
+
+**Assembly order**, every pin reachable: prism into fork (through pin) → tube
+over the prism (its two pins, from outside the tube) → ring into the tube's head
+(two pins, through the slots) → the whole thing into the cone through the neck
+→ ring's X pins from outside through the neck wall and the tube's windows →
+6805 over the neck, trapping them → output shaft in through the wall, the ring's
+bore and into the fork's D.
+
+**Plan B for the ring**, if the printed one ovalises: a standard 10 × 14 mm
+sintered-bronze bushing (or steel spacer) cut to 5 mm, four radial Ø2 holes
+drilled through a printed jig. Its 10.0 bore is 0.2 under the design's, so the
+model would need adjusting. For the prism, the steel cross out of a bought mini
+cardan, if its size fits the fork and the tube.
 
 ---
 
@@ -427,9 +478,9 @@ with a ~4–7 mm horn.
 4. **Sizing, not layout.** Every pair of parts is checked at every stop, the
    links, the cardan and the actuation chain are swept as distances, and each
    axis is checked against its three neighbours. Nothing has been loaded, FEA'd
-   or printed. Weakest-looking: the cross pins (Ø2, bending, at 4–7° all the
-   time), the output shaft's ~16 mm reach to the fork, the lever post from the
-   ceiling.
+   or printed. Weakest-looking: the printed ring (pins at ~18 MPa, oscillating
+   all the time), the output shaft's ~16 mm reach to the fork, the lever post
+   from the ceiling.
 5. **Central motor sizing.** Depends on (1) and on how many axes are engaged at
    once. Demands add, they do not divide.
 6. **Where the reduction lives.** Each cube is now 1.5:1 overdrive; the chain
