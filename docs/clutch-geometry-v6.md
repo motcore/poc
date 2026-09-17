@@ -530,3 +530,31 @@ with a ~4–7 mm horn.
 4. **Get rid of the corona.** Done — replaced by the folded cardan (§6).
 5. **Design the servo link for real.** Superseded — the telescopic link is gone
    (§7).
+
+---
+
+## 13. Next session — raised 2026-09-17, not yet worked
+
+Notes as raised, not designs. Nothing here has been checked against the macro.
+
+1. **Stop the carriage sliding sideways (in X).** The four-bar only constrains
+   the Y-Z plane; if the carriage can shift along the pivot pins, the cone's
+   apex leaves the motor apex, and that is fatal to the whole geometry. Needs
+   real axial location at the pins (shoulders, spacers, clips), not just
+   clearance fits.
+2. **Brackets: screwed to the wall, or printed as part of it?** Frame posts,
+   servo bracket, lever post. Printing them on the wall saves screws and play;
+   screwing them keeps the wall simple to print and the parts replaceable.
+3. **Accumulated play in the actuation chain.** Horn → link1 → lever → link2 →
+   ear is five pinned joints in series; their slop adds up and blurs how
+   precisely servo angle sets the squeeze (torque control). Quantify it, and
+   decide which joints need tight fits or preload.
+4. **How the chain's pins stay in without dragging.** Retention (clips, heads,
+   press on one side, captive between plates) that does not add friction to
+   the joint.
+5. **The torsion spring coupling at the servo: design it, or buy it?** Look for
+   an existing part (servo saver without preload, spring hub) before designing
+   one; if designing, size the spring as a real part (wire, coils, legs, how
+   it is anchored to spline and horn).
+6. **Inventory of materials and tools** needed to build one axis: purchased
+   parts, pin stock, springs, screws, rubber, filament, drills, jigs.
