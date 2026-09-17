@@ -201,15 +201,23 @@ sv_z_clr      = 0.5    # mm — case top to the ceiling
 servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
 servo_tab_out = 4.7    # mm — how far each tab reaches past the body
 servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
-horn_t        = 2.0    # mm ┐ X stack, from the servo face outward: spring,
-act_gap       = 0.5    # mm │ horn, link1, lever (with its deck post on the
-lk_t          = 2.0    # mm │ servo side), link2, and the ear inboard of the
-lever_t       = 3.0    # mm ┘ lever
-spring_len    = 1.5    # mm — torsion spring envelope along X
+horn_t        = 2.0    # mm ┐ X stack: spring and horn outboard of the servo's
+act_gap       = 0.5    # mm │ face; link1 (and the lever's post), lever, link2
+lk_t          = 2.0    # mm │ and the ear stacked back INBOARD under the face —
+lever_t       = 3.0    # mm ┘ see x_l1 below
+spring_len    = 3.0    # mm — torsion spring envelope along X (also what keeps link1,
+                        #      inboard of the horn, off the case's corner)
 spring_r      = 5.5    # mm — its outer radius
 lever_in      = 8.0    # mm — lever arm to link1
-lever_out     = 4.0    # mm — lever arm to link2 → 2:1
-lever_z       = 37.0   # mm — Z of the lever's pivot and arms at rest
+lever_out     = 3.8    # mm — lever arm to link2 → 2.1:1. The horn's radius
+                        #      comes out of the ratio, and the lever's I boss
+                        #      clears the servo case's end by horn_r - 8.2: at
+                        #      2:1 that was 0.32 mm (found by the sweep). Much
+                        #      past 2.1 the lever swings so far (±35 deg) that
+                        #      link1 lies over and transmission drops to ~31.
+lever_z       = 35.0   # mm — Z of the lever's pivot and arms at rest. Lower
+                        #      than the horn by more than link1's own tilt
+                        #      needs; 37 left link1 5.6 mm long and too steep.
 ear_z         = 27.5   # mm — Z of the ear pin at rest (carriage frame)
 ear_w         = 5.0    # mm — ear bridge width
 ear_h         = 6.0    # mm — ear bridge height
@@ -618,9 +626,18 @@ link2_len = math.dist(O0, E0)
 # X stack, from the servo's face outward.
 x_spring = (sv_face_x, sv_face_x + spring_len)
 x_horn = (x_spring[1] + act_gap, x_spring[1] + act_gap + horn_t)
-x_l1 = (x_horn[1] + act_gap, x_horn[1] + act_gap + lk_t)
-x_lev = (x_l1[1] + act_gap, x_l1[1] + act_gap + lever_t)
-x_l2 = (x_lev[1] + act_gap, x_lev[1] + act_gap + lk_t)
+# Everything past the horn is stacked INBOARD of it, under the servo's face:
+# the case ends at y = sv_y0 + length, and the whole chain lives further out in
+# Y than that, so its X band is free all the way in to the tabs and the
+# bracket. link1 (and the lever's post, at a different Y) next to the horn,
+# then the lever, link2, and the ear — which ends up right beside the
+# carriage's own arm, so its bridge is a stub.
+x_l1 = (x_horn[0] - act_gap - lk_t, x_horn[0] - act_gap)
+x_post = x_l1
+x_lev = (x_l1[0] - act_gap - lever_t, x_l1[0] - act_gap)
+x_l2 = (x_lev[0] - act_gap - lk_t, x_lev[0] - act_gap)
+ear_t = 3.0            # mm — ear plate thickness
+x_ear = (x_l2[0] - act_gap - ear_t, x_l2[0] - act_gap)
 
 
 def _rot_about(p, c, a):
@@ -987,39 +1004,58 @@ def make_carriage():
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
                               2 * (side_x + side_t / 2.0 + 2.0)))
-    body = body.cut(pin_x(E0, act_pin_d + 0.2, x_lev[0] - 1.0, lever_t + 2.0))
+    body = body.cut(pin_x(E0, act_pin_d + 0.2, x_ear[1] - 12.0, 13.0))
     return body
 
 
 def make_ear():
-    """The ear the actuation pulls on: a bridge from the top of the +X arm's
-    upright, out over the corner in X and toward the wall in Y, to a plate in
-    the lever's own X band carrying the ear pin E. It sits below the lever and
-    link1, which pass over it."""
+    """The ear the actuation pulls on: a bridge from the +X arm, out in X and
+    toward the wall in Y, to a plate carrying the ear pin E.
+
+    It roots where the arm's centreline passes through the ear's own height:
+    on the 45 deg jog up to B if that is where the jog is at ear_z, otherwise
+    on the upright. Rooting it on the old square corner left it hanging off a
+    corner the arm no longer has."""
     z0 = ear_z - ear_h / 2.0
-    p0 = (side_x, arm_root[0])
-    p1 = ((x_lev[0] + x_lev[1]) / 2.0, E0[0])
+    z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
+    if ear_z >= z_corner:
+        p0 = (side_x, fb_B[0] + (fb_B[1] - ear_z))
+    else:
+        p0 = (side_x, arm_root[0])
+    # The pin end is a BLOCK, not a thin plate: wide enough in X to swallow the
+    # whole of the bridge's end over the block's own Y span, and the bridge is
+    # cut flush with the block's faces. A diagonal bar meeting a thin plate
+    # always leaves a corner of its end standing proud of one face or the other.
+    p1 = ((x_ear[0] + x_ear[1]) / 2.0, E0[0])
     dx, dy = p1[0] - p0[0], p1[1] - p0[1]
     ln = math.hypot(dx, dy)
     nx, ny = -dy / ln * ear_w / 2.0, dx / ln * ear_w / 2.0
+    hy = act_boss_r + 0.5                       # block half-span in Y
+    y_in = E0[0] - hy                           # the face the bridge enters
+    x_centre_in = p0[0] + dx * (y_in - p0[1]) / dy
+    blk_x0 = min(x_ear[0], x_centre_in - abs(ear_w / 2.0 * ln / dy))
     quad = [v(p0[0] + nx, p0[1] + ny, z0), v(p1[0] + nx, p1[1] + ny, z0),
             v(p1[0] - nx, p1[1] - ny, z0), v(p0[0] - nx, p0[1] - ny, z0)]
     bridge = Part.Face(Part.makePolygon(quad + [quad[0]])).extrude(v(0, 0, ear_h))
-    plate = disc_yz(E0, act_boss_r + 0.5, x_lev[0], lever_t)
-    plate = plate.fuse(Part.makeBox(lever_t, 2 * (act_boss_r + 0.5), ear_h,
-                                    v(x_lev[0], E0[0] - act_boss_r - 0.5, z0)))
-    return bridge.fuse(plate)
+    blk = Part.makeBox(x_ear[1] - blk_x0, 2 * hy, ear_h,
+                       v(blk_x0, E0[0] - hy, z0))
+    bridge = bridge.cut(Part.makeBox(40.0, 40.0, ear_h + 2.0,
+                                     v(blk_x0 - 20.0, y_in, z0 - 1.0)))
+    return bridge.fuse(blk)
 
 def make_carriage_arms(sd):
     """One upright of the carriage's 'H': a vertical bar at arm_root's Y, from
     the lower pivot's height to the upper one's, crossing the housing ring it
     roots on, with a short jog at each end out to its pivot."""
     x0 = sd * side_x - side_t / 2.0
-    part = bar_yz((arm_root[0], -fb_B[1]), (arm_root[0], fb_B[1]),
+    # The jog out to each pivot runs at 45 deg, not square: from B straight
+    # down-and-out until it meets the upright.
+    z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
+    part = bar_yz((arm_root[0], -z_corner), (arm_root[0], z_corner),
                   arm_w, x0, side_t)
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
-        corner = (arm_root[0], zs * fb_B[1])
+        corner = (arm_root[0], zs * z_corner)
         part = part.fuse(bar_yz(corner, b, arm_w, x0, side_t))
         part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
     return part
@@ -1231,13 +1267,12 @@ def make_act_horn(st):
 
 
 def make_lever_post():
-    """Post down from the ceiling to the lever pivot, in link1's X band (link1
-    is well inboard of it in Y)."""
+    """Post down from the ceiling to the lever pivot, OUTBOARD of the lever."""
     w = 2 * act_boss_r + 1.0
     post = Part.makeBox(lk_t, w, cube_half - lever_z,
-                        v(x_l1[0], P_act[0] - w / 2.0, lever_z))
-    post = post.fuse(disc_yz(P_act, act_boss_r + 0.5, x_l1[0], lk_t))
-    return post.cut(pin_x(P_act, act_pin_d + 0.2, x_l1[0] - 1, lk_t + 2))
+                        v(x_post[0], P_act[0] - w / 2.0, lever_z))
+    post = post.fuse(disc_yz(P_act, act_boss_r + 0.5, x_post[0], lk_t))
+    return post.cut(pin_x(P_act, act_pin_d + 0.2, x_post[0] - 1, lk_t + 2))
 
 
 def act_moving_parts(st):
@@ -1252,11 +1287,11 @@ def act_moving_parts(st):
            ("Lever", _plate_bar([I, P_act, O], x_lev, w), col, 0),
            ("Link2", _plate_bar([O, E], x_l2, w), col, 0)]
     r = act_pin_d / 2.0
-    for name, p, xa, xb in (("PinH", H, x_horn[0], x_l1[1]),
-                            ("PinI", I, x_l1[0], x_lev[1]),
-                            ("PinP", P_act, x_l1[0], x_lev[1]),
-                            ("PinO", O, x_lev[0], x_l2[1]),
-                            ("PinE", E, x_lev[0], x_l2[1])):
+    for name, p, xa, xb in (("PinH", H, x_l1[0], x_horn[1]),
+                            ("PinI", I, x_lev[0], x_l1[1]),
+                            ("PinP", P_act, x_lev[0], x_post[1]),
+                            ("PinO", O, x_l2[0], x_lev[1]),
+                            ("PinE", E, x_ear[0], x_l2[1])):
         out.append((name, pin_x(p, act_pin_d, xa, xb - xa), pc, 0))
     return out
 
@@ -1826,6 +1861,46 @@ _st_p = pose_state(phi_preload)
 _horn_preload = (abs(math.degrees(_st_p["horn_a"]))
                  if _st_p["horn_a"] is not None else float("nan"))
 
+# The chain, swept as DISTANCES over the stroke, same lesson as the links and
+# the cardan: its stack is 0.5 mm plate to plate and it runs past the servo's
+# case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
+# not enough. Pairs joined by a pin are left out — their 0.5 mm is the
+# designed gap between neighbouring plates, not a running clearance.
+_ACT_PINNED = {frozenset(p) for p in (("Horn", "Link1"), ("Link1", "Lever"),
+                                      ("Lever", "Link2"), ("Link2", "Carriage"),
+                                      ("Lever", "LeverPost"),
+                                      ("Horn", "HornSpring"),
+                                      ("Horn", "ServoBody"))}  # on its spline
+_ACT_AGAINST = ("ServoBody", "ServoBracket", "HornSpring", "LeverPost",
+                "FramePostT", "FramePostB", "Wall")
+_act_gap, _act_who = 1e9, "-"
+_act_tight = {}
+_fixed_act = {n: s for n, s, c, t in FIXED_PARTS if n in _ACT_AGAINST}
+for _k in range(-4, 5):
+    _st_k = pose_state(phi_preload * _k / 4.0)
+    _mov = {n: s for n, s, c, t in act_moving_parts(_st_k)
+            if not n.startswith("Pin")}
+    _mov["Carriage"] = place_carriage(make_carriage(), _st_k)
+    _pairs = [(a, b) for a in _mov for b in _fixed_act]
+    _names = list(_mov)
+    _pairs += [(_names[i], _names[j]) for i in range(len(_names))
+               for j in range(i + 1, len(_names))]
+    for _a, _b in _pairs:
+        if frozenset((_a, _b)) in _ACT_PINNED:
+            continue
+        # The carriage against the wall and the posts is the four-bar's own
+        # business, already swept above; here it only meets the chain.
+        if _a == "Carriage" and _b in ("Wall", "FramePostT", "FramePostB"):
+            continue
+        _sa = _mov[_a]
+        _sb = _mov[_b] if _b in _mov else _fixed_act[_b]
+        _d = _sa.distToShape(_sb)[0]
+        if _d < 1.5:
+            _act_tight[(_a, _b)] = min(_d, _act_tight.get((_a, _b), 9.0))
+        if _d < _act_gap:
+            _act_gap = _d
+            _act_who = f"{_a} x {_b} at {math.degrees(_st_k['phi']):+.1f} deg"
+
 
 # Every other axis, not just the next one. The four of them share one box.
 _mech = None
@@ -1912,6 +1987,8 @@ checks = [
      _link_gap, "> 1.0", _link_gap > 1.0),
     (f"cardan running clearance, SWEPT [{_uj_who}]  (mm)",
      _uj_gap, "> 0.5", _uj_gap > 0.5),
+    (f"actuation chain running clearance, SWEPT [{_act_who}]  (mm)",
+     _act_gap, "> 0.5", _act_gap > 0.5),
     ("cardan intermediate length change, within its slotted holes  (mm)",
      uj_L_range[1] - uj_L_range[0], f"< {uj_slide:.1f}",
      uj_L_range[1] - uj_L_range[0] < uj_slide),
@@ -2049,11 +2126,11 @@ print("-" * 72)
 print("  ACTUATION: servo -> torsion spring -> horn -> lever 2:1 -> link -> ear")
 print("  (spring and forces are placeholders until the rubber stiffness is measured)")
 print(f"    servo shaft at (y {S_act[0]:.1f}, z {S_act[1]:.1f}), horn r {horn_r:.2f}"
-      f" (derived), lever {lever_in:.0f}/{lever_out:.0f} about"
+      f" (derived), lever {lever_in:.1f}/{lever_out:.1f} about"
       f" (y {P_act[0]:.1f}, z {P_act[1]:.1f}), ear at (y {E0[0]:.1f}, z {E0[1]:.1f})")
 print(f"    links: link1 {link1_len:.1f} mm, link2 {link2_len:.1f} mm;"
-      f" X stack horn {x_horn[0]:.1f}..{x_horn[1]:.1f}, link1 {x_l1[0]:.1f}..,"
-      f" lever {x_lev[0]:.1f}.., link2 {x_l2[0]:.1f}..{x_l2[1]:.1f}")
+      f" X stack ear {x_ear[0]:.1f}.., link2 {x_l2[0]:.1f}.., lever {x_lev[0]:.1f}..,"
+      f" link1/post {x_l1[0]:.1f}.., horn {x_horn[0]:.1f}..{x_horn[1]:.1f}")
 print(f"    horn swing: {_horn_contact:.1f} deg to contact, {_horn_preload:.1f} deg"
       f" at full preload; servo spline {sv_theta_max:.0f} deg — the difference"
       f" winds the spring")
@@ -2069,6 +2146,8 @@ print(f"    at full preload: {_F_ear:.0f} N on the ear, {_M:.2f} Nm about the ap
       f" normal force {_M*1000/_sq_sbar:.0f} N (s_bar {_sq_sbar:.1f} mm)")
 print(f"    output torque ceiling: mu*sin(beta)*M = {_mu_ref*math.sin(beta)*_M:.2f} Nm"
       f" at mu = {_mu_ref} — IF the rubber takes that force within its squeeze")
+for (_a, _b), _d in sorted(_act_tight.items(), key=lambda kv: kv[1]):
+    print(f"    chain clearance under 1.5 mm, worst over the stroke: {_a} x {_b}  {_d:.2f} mm")
 print("-" * 72)
 for label, value, target, ok in checks:
     print(f"  [{'OK ' if ok else 'FAIL'}] {label}:  {value:.3f}  ({target})")
