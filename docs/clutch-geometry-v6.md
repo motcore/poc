@@ -1,9 +1,18 @@
 # Clutch geometry — v6 "Apex Pivot"
 
-Status: **active design**, settled 2026-09-12, repacked 2026-09-15. Supersedes
-v5 (vertical carriage). The macro is `cad/motcore_v6_apex_pivot.py`; it builds
-the assembly and self-checks it (26 numeric checks), and every number quoted
-below that says "measured" comes from its own output.
+Status: **active design**, settled 2026-09-12, repacked 2026-09-15, drive and
+actuation rebuilt 2026-09-17 (branch `v7-cardan-zigzag`). Supersedes v5
+(vertical carriage). The macro is `cad/motcore_v6_apex_pivot.py`; it builds the
+assembly and self-checks it (22 numeric checks), and every number quoted below
+that says "measured" comes from its own output.
+
+What changed on 2026-09-17, in one paragraph: the gear stage (pinion, idlers,
+corona) and the Oldham that briefly replaced it are gone. The drive out of the
+cone is a **folded double cardan living inside the hollow cone**, 1:1. The cone
+runs on one thin-section bearing on its neck. The four-bar moved to a 45° ray
+with shorter links. The actuation is a **servo under the ceiling → torsion
+spring → horn → 2.1:1 lever → link → ear on the carriage**, and all four axes are
+identical rotated copies. Cube **106.4 mm**.
 
 ---
 
@@ -31,14 +40,13 @@ the whole carriage swings on. It never moves, in any position.
   (at ±(e+g)); in v6 their rubber surfaces converge on a single point, so the
   hourglass waist closes and the cube gets shorter.
 - **The carriage is a lever.** The push arrives further from the apex than the
-  rubber does, so a newton of actuator force becomes **×1.53** of total normal
-  force (macro, measuring s̄ at the squeeze's own centroid). Read that as force,
-  not as torque: see §8 — where the contact sits cancels out of the output
-  torque exactly.
-- **The box got shorter.** Hollowing the output cone and putting the bearing
-  housing inside it moved the whole gear stack behind the push point: 145 mm
-  cube → **119 mm**, with the corona's running clearance now the thing that
-  sets it.
+  rubber does, so a newton on the ear becomes **×1.46** of total normal force
+  (ear at y = 42.9 mm, squeeze centroid s̄ = 29.4 mm, both measured). Read that
+  as force, not as torque: see §8 — where the contact sits cancels out of the
+  output torque exactly.
+- **The box.** 145 mm (first v6) → 119 (hollow cone, gears behind the push
+  point) → 120.8 (Oldham) → **106.4 mm** now, set by the servo case under the
+  ceiling.
 
 ---
 
@@ -85,6 +93,9 @@ which is the condition for matched surface speeds. **Micro-slip ≈ 0**, against
 This is the thing interleaved O-rings could not do: their offset came out of the
 interdigitation geometry and was not freely correctable.
 
+The band runs s = 10.0…33.4 mm from the apex on the rubber surface (L = 23.4 mm,
+derived: it fills the cone and stops 2 mm short of the rim for a bonding lip).
+
 ---
 
 ## 4. Continuous rubber layer (replaces the O-rings)
@@ -96,13 +107,15 @@ rubber layer** on both cones.
 Why:
 
 - **Contact area.** Two crossed rings touch at a point; two coated cones touch
-  along the whole 18 mm generatrix. Far more grip for the same squeeze.
+  along the whole generatrix. Far more grip for the same squeeze.
 - **Zero micro-slip**, via the compensation above.
 - **No pitch matching** between the two ring sets, and no `q < d` constraint.
 
 How to make it: a cone is a developable surface, so it unrolls into a flat
-circular sector. A rubber sheet cut to that sector can be wrapped on. **Not yet
-tested** — see open questions.
+annular sector (295° for the motor cone, 196° for the output). The macro writes a
+1:1 cutting template, `cad/motcore_v6_flat_pattern.svg`, with a spiral seam that
+crosses the contact line at a single sweeping point. **Not yet tested** — see
+open questions.
 
 Rubber on rubber stays the rule: the plastic surfaces never touch.
 
@@ -145,214 +158,191 @@ Current geometry (Y-Z plane, apex at origin):
 
 | | |
 |---|---|
-| Link axis angles | ±40° from the Y axis, both through the origin |
-| Frame pivots | radius 62 mm |
-| Carriage pivots | radius 40.5 mm |
-| Link length | 21.5 mm |
-| Sets | two, one at each side in X, joined at the carriage pivot into one part |
+| Link axis angles | ±45° from the Y axis, both through the origin |
+| Frame pivots | radius 55 mm, on posts screwed to the wall |
+| Carriage pivots (B) | radius 40.5 mm |
+| Link length | 14.5 mm |
+| Sets | two, one at each side in X, joined by a knuckle **on B** into one part |
 
-The ray came down from 50° and the carriage pivot moved out from 42 mm when the
-output cone became a shell: the carriage's arms now start *inside* the cone and
-can only leave through its mouth at y = 30.8, so their pivot has to be beyond
-that. Tilting the ray is what keeps the link long while doing it — and a long
-link is what keeps the drift small.
+Why 45°/55: with the Oldham gone the frame post was what set the cube (54.5).
+Sweeping the linkage, ray 45° with the frame pivot at r = 55 brings the post
+under the next constraint for 0.61% slip; ray 40° at r = 52 gets the same cube at
+0.65%. The carriage pivot cannot come in below r = 40.5 without landing on the
+motor cone's rim. The knuckle sits on B because a 14.5 mm link is too short for
+the frame post's lug and a mid-span knuckle to share; at B the 45° ray keeps it
+1.4 mm off the motor cone (swept check).
 
-**Measured by the macro** (`apex_drift`, on the linkage's own solved pose, not on
-an ideal rotation): at full preload the point that started at the apex moves
-**0.133 mm**, and 0.093 mm at contact — against 0.226 mm for the ±50°/16 mm
-layout this replaces. Residual slip **0.44%** of the contact line, against v5's
-7.4%. Not zero: do not quote "≈ 0".
+**Measured by the macro** (`apex_drift`, on the linkage's own solved pose): at
+full preload the point that started at the apex moves **0.187 mm** (0.132 at
+contact), **+0.140 along** the shared generatrix (slip) and **−0.124 normal** to
+it (preload error, 6% of the rubber thickness). Residual slip **0.60%** of the
+contact line, against v5's 7.4%. Not zero: do not quote "≈ 0".
 
-The drift decomposes into a component **along** the shared generatrix (the part
-that slips, +0.103 mm) and one **normal** to it (−0.085 mm), which is a preload
-error worth 4% of the rubber's thickness — enough that contact arrives at the rim
-first and spreads inward rather than landing along the whole line at once. The
-macro prints both.
+Because the drift is outward along +Y it OPENS the contact: contact really
+happens at **2.18°**, not 2.00°, first at the band's outer end, and spreads
+inward as the preload grows. The usable preload travel is +0.20° past real
+contact.
 
-The **instant centre** itself wanders much further, ~10 mm at full stroke. That is
-normal four-bar behaviour and is not a fault: what matters is how far the apex
-*point* travels, which is the 0.133 mm above.
+The **instant centre** itself wanders much further. That is normal four-bar
+behaviour and not a fault: what matters is how far the apex *point* travels.
 
 Links must not be at ±35°: that is exactly the shared generatrix direction, i.e.
 the cone surfaces. Anything between 33° and 35° is inside the clearance wedge.
 
-A flexure version (crossed or converging blades, monolithic, zero backlash) was
-considered and **deferred to v7** — PLA creeps under sustained load, and the
-project already abandoned a compliant blade in v4.
+A flexure version was considered and **deferred to v7** — PLA creeps under
+sustained load, and the project already abandoned a compliant blade in v4.
+
+The carriage itself is now a **ring round the cone's neck** (§6) holding the
+bearing, with two arms at x = ±15 that rise at y = 36 and run to B at 45°.
 
 ---
 
-## 6. Gear stage — always meshed, output centred
+## 6. Drive out of the cone — folded double cardan, 1:1
 
-**The pinion never disengages.** Free rotation comes from the rubber separating,
-not from the gears letting go. With the gears permanently meshed the joint still
-drags only the cone's inertia reflected through the ratio, about 2% of a typical
-leg's inertia — no torque threshold, which was the real requirement.
-
-That removes, in one stroke: the mesh-before-contact ladder, the tooth clash on
-re-mesh (an open question since v5), the root clearance constraint `g+δ ≤ 0.25m`
-and the module floor it imposed.
-
-**Centring.** A meshed internal pair has its centres offset by `e`, so either the
-pinion or the output shaft ends up off the wall centre. Idler gears solve it:
+The cone tilts about the apex and the output shaft does not. At distance y from
+the apex their axes are apart by y·sin φ **and** at an angle φ. Whatever couples
+them must take both.
 
 ```
-pinion (on the carriage, centred)  →  idler(s) on fixed axes  →  corona (output, centred)
+cone (outer yoke) → ring cross → intermediate tube → solid cross → fork → output shaft
 ```
 
-| | Teeth | Module | Pitch radius |
-|---|---|---|---|
-| Pinion (carriage) | 8 | 1.8 | 7.2 mm |
-| Idlers | 8 | 1.8 | 7.2 mm |
-| Corona (output) | 24 | 1.8 | 21.6 mm |
+- **The cone is the outer yoke.** It is a hollow shell, solid only to y = 18,
+  with a Ø20 bore from where its cavity is that wide out through a **neck**. The
+  neck carries **one 6805 (25×37×7)** on its outside, held by the carriage ring —
+  there is no carriage shaft any more — and the ring cross's X pins through its
+  wall, under the bearing, which keeps them in.
+- **Ring cross at y = 40, on the cone axis.** Ø9.8 bore: the output shaft passes
+  through it.
+- **Intermediate: a tube** Ø13.5/16.5 running back toward the apex, 14.0 mm
+  between pin planes. Windows let the ring's X pins out to the neck.
+- **Solid cross at y = 26, on the output axis**, on a fork keyed to the output
+  shaft by a D.
+- **Output shaft** in two MR105ZZ: one in a boss on the wall's inner face, one in
+  the wall seat. It reaches ~16 mm in from the inner bearing to the fork.
 
-**The module was 1.0 here and 1.0 is not buildable.** At `Zp = 8` the pinion's
-root radius is `m·(Zp/2 − 1.25)` = 2.75 mm, and the bore for the Ø5 output shaft
-is 2.90 mm once the printer's undersize is compensated: the bore eats the hub and
-the gear comes out as eight loose teeth. The floor for a 2 mm hub wall is
+**Why folded, and why it is not constant-velocity.** Both crosses sit in front of
+the apex (the motor shaft is behind it). For a double cardan to cancel its own
+velocity error the two joints must bend equally, and with the output axis flat
+and the ring above it that needs one cross behind the apex. So one joint always
+bends φ more than the other. Measured at full preload: **solid cross 6.6°, ring
+4.2°**, residual angle error ~ (a₁² − a₂²)/4 = **0.11°** (one Hooke joint at the
+tilt would be 0.025°). What the fold buys is a flat intermediate in little
+length: its angle is ≈ ring_y·sin φ / (ring_y − cross_y), so moving the solid
+cross back toward the apex — into the cone — is what keeps the crosses nearly
+straight and the ring bore small. The bore has to swallow the offset between the
+axes *at the ring*, which only depends on how far out the ring is.
 
-```
-m  ≥  (bore radius + wall) / (Zp/2 − 1.25)  =  1.78
-```
+**Length change.** The ring moves with the cone, the solid cross does not, so the
+intermediate's span changes by **0.25 mm** over the stroke. Its ring-end pin
+holes are slotted 0.4 mm instead of making the tube telescopic.
 
-hence 1.8, which is also where v5's module floor landed for an unrelated reason.
-The alternatives, if 1.8 is too big: more pinion teeth, a stepped Ø3 shaft end
-(but Ø3 steel is at its torsional limit near 0.5 Nm), or a pinion integral with
-the shaft — which then cannot be plastic, since it carries the full output
-torque. Note the module does **not** touch the clutch geometry in v6: the gears
-never disengage, so there is no mesh travel and no root-clearance constraint.
-It is purely a packaging cost, unlike v5 where `m` was on the critical path.
-
-Ratio 1/3, same as the offset single pair would have given, with the output shaft
-on the wall centre. Two idlers, **placed left and right in X, never above and
-below**: the pinion moves vertically when the carriage tilts, so idlers on the X
-axis see the centre distance change only to second order (+0.20 mm worst case
-at m = 1.8, measured in the macro,
-i.e. slightly more backlash), while idlers on the Z axis would have one jam and
-the other disengage. One idler is enough functionally; two balance the radial
-load on the pinion.
-
-Consequences: the corona turns opposite to the pinion (irrelevant — the axis is
-bidirectional, it is a sign in firmware), there is one more mesh (a little more
-lost motion and loss), and the idlers need a support bracket entering from the
-carriage side, because the corona's output face is closed by its plate.
-
-The pinion tilts ±2° inside the mesh, which modest crowning handles.
+Swept clearances (macro, 9 tilts): tightest running gap **0.56 mm**, ring bore
+against the output shaft.
 
 ---
 
 ## 7. Actuation
 
 ```
-servo  →  crank  →  telescopic link with two springs inside  →  pin on the carriage's horn
+servo → torsion spring → horn → lever 2.1:1 → link → ear on the carriage
 ```
 
-- **Push point: a horn on the carriage**, at y = 40 mm, z = −30 mm — not on the
-  centre line. The centre line is where the output shaft is, and straight out
-  from the housing is where the gear plane is, so the horn drops below the
-  corona's 25.6 mm rim first and then runs forward. It carries a Ø5 steel pin
-  pressed through it, not a printed boss: the load bends that pin across the
-  layers, which is the one direction FDM has none.
-- **R_push is not the lever.** The force arrives along the link, and the link
-  comes up off the floor at a shallow angle, so the moment arm about the apex is
-  the perpendicular distance from the apex to the link's *line of action* —
-  **42.3–43.2 mm** over the stroke, measured by the macro (`push_lever`). Swept
-  over R_push = 32…50 mm that distance barely moves: pushing from further out
-  costs as much angle as it gains radius. So R_push is chosen for packaging,
-  and the horn is as short as the corona's rim allows.
-- Because the push point sits 30 mm below the axis, the link's large **Y**
-  component earns a moment of its own about the apex and very nearly makes up
-  for the Z component it gives up. That is why the servo could be pulled inboard
-  along the floor at all.
-- **No slot, no external guide.** The link is pinned at both ends; the only
-  sliding left is the coaxial tube-in-tube inside the link, which is what the
-  springs compress against. This replaced an earlier Scotch-yoke-plus-rail
-  scheme.
-- **Series springs are the whole trick.** Before contact the carriage follows the
-  servo with almost no load. After contact the carriage stops and every further
-  degree of servo goes into compressing the spring, so spring force — not
-  position — sets the preload. That is the "fast then slow and powerful"
-  behaviour, obtained without any cam.
-- **Toggle.** Running the preload phase near the crank's dead centre multiplies
-  force (the toggle-clamp effect) and lets the servo hold high force at low
-  torque, which also fixes the micro-servo overheating worry.
+### Sweep split and the spring
 
-Working numbers (first pass):
+The servo spline turns **±80°** (margin to an MG90's end stops). The first **20°**
+bring the rubber into contact; past that the carriage has nowhere to go and the
+remaining **60°** wind a **torsion spring without preload** between spline and
+horn. Spring torque — not position — sets the squeeze. The horn itself only ever
+swings ~25°.
 
-| | |
+Why the spring sits at the servo and not in a telescopic link: a spring at the
+servo only sees force if the servo sees torque, so the chain must have a
+near-constant ratio. The old crank ran near dead centre (toggle), where the servo
+sees almost no torque — a spring on its shaft would barely wind. Levers and
+links far from dead centre keep the ratio steady; the check is that no joint
+gets within 40° of dead centre.
+
+Why a lever at all: 1.4 mm of ear travel in 20° of horn needs a 4 mm horn, and
+0.2 mm of pin slop on that is 5% of the stroke. Through a 2.1:1 lever the horn is
+9.0 mm and servo-side slop reaches the carriage divided.
+
+**The lever rule that makes it "further out is more leverage" false.** Work in =
+work out: servo torque × servo angle = carriage moment × tilt. The tilt is fixed
+(~2.4°), so the multiplication is fixed by how much servo sweep the stroke uses,
+not by where the push lands. Pushing further out gains arm and costs travel in
+the same proportion. The push point is chosen for **packaging**.
+
+| Measured / derived | |
 |---|---|
-| Servo | MG90D (digital, ~0.22 Nm, ~0.08–0.1 s/60°) |
-| Crank radius | 6.3 mm |
-| Servo-side travel | ±6 mm |
-| Travel to contact at the push point | 1.40 mm |
-| Spring travel | ~4.6 mm |
-| Spring rate | ~20 N/mm **(placeholder)** |
-| Spring/rubber split | 10:1 at R = 50 mm **(placeholder, needs the rubber measurement)** |
+| Horn radius (derived from the split and the lever) | 9.04 mm |
+| Lever | 8.0 / 3.8 about (y 39.1, z 35.0), on a post from the ceiling |
+| Links | link1 7.6 mm, link2 7.5 mm |
+| Ear pin | (y 42.9, z 27.5), carriage frame |
+| Horn swing | 20.3° to contact, 24.8° at full preload |
+| Worst transmission angle | 41.7° |
+| Spring (placeholder) | 2.40 N·mm/°, 0.144 Nm after 60° = 80% of MG90 stall |
+| At full preload | 34 N on the ear, 1.44 Nm about the apex, 49 N normal |
 
-**The split is a ratio, not a constant.** A given spring and a given rubber look
-like a *different* ratio from a different radius, because the same push-point
-travel becomes a bigger tilt and the tilt is what squeezes the rubber — it goes
-as 1/R². The macro derives `spring_split` from the invented 10:1 and the radius
-it was invented at, so shortening the horn cannot quietly raise the preload.
-(Before that was fixed, going from R = 50 to R = 40 took the preload squeeze
-from 4.0 to 7.4 mm³ on a change that was only supposed to be about packaging.)
+`spring_ratio` (rubber vs spring stiffness, as servo-side angle past contact) is
+**15, invented**; it only sets how far the carriage still creeps past contact
+(φ_preload = 2.375°).
 
 ### Packaging
 
-- The **servo lies on the deck**, shaft on X, case running *inboard* along that
-  shaft axis. Outboard is the neighbouring axis' wall, 55.5 mm out, and the
-  stack (link, crank, standoff, 29 mm of case) needs 60. Inboard, under the
-  motor cone and above the deck, there is a pocket with nothing in it.
-- The **crank sits inboard of the link plane**, with its pin reaching outboard
-  through the link. Outboard, the crank's boss would have to cross the link
-  plane at the hub — and near dead centre the link lies right on top of the hub.
-- **Alternate axes are assembled turned over**: the same parts, rotated 180°
-  about their own radius, so their servo, crank and horn lie against the other
-  deck. It is a rotation, not a mirror, so it costs no new parts, and the shared
-  motor cones are symmetric in Z, so a turned-over axis still meshes with them.
-  Without it two neighbouring servos want the same corner of the same floor, and
-  no arrangement inside this box avoids it — the case is 29 mm along the shaft
-  and the crank has to sit beside the horn, so it reaches across the middle.
-  The decks and walls therefore carry **both hands** of every bracket's screw
-  pattern; a boss nothing screws into costs a gram.
+- **All four axes are identical, rotated about Z. Nothing is turned over.** Each
+  servo sits in its own (+X) corner of the pinwheel. (Alternate axes used to be
+  assembled upside down only because two servos lying on the same floor wanted
+  the same corner.)
+- **Servo under the ceiling**, shaft along +X, case x 0…29, y 5…28, z 36.5…48.7.
+  Below it the four-bar's upper links rise to z ≈ y + 5.7; that sets its height,
+  and its top sets the cube.
+- **The chain stacks back inboard under the servo's face.** The case ends at
+  y = 27.8 and the chain lives further out in Y, so its X band is free: horn
+  x 32.5…34.5 outboard of the face (spring between), then link1 and the lever's
+  post (different Y) at 30…32, lever 26.5…29.5, link2 24…26, ear 20.5…23.5. The
+  ear therefore lands beside the carriage's own +X arm and its bridge is a stub,
+  rooted on the arm's 45° jog and ending in a block round the pin.
+- The **servo bracket and the lever post mount to the ceiling**, not the wall.
+  Screws into the ceiling are not modelled.
+- Swept clearances over 9 tilts, pinned neighbours excluded: tightest **0.88 mm**
+  (link1 vs spring), lever vs servo case 0.94, link1 vs case 1.00.
 
-**Pick the servo on speed, not torque.** Torque is comfortable; the binding spec
-is getting free→contact done inside a push-off window of 50–150 ms. Digital also
-matters for its small deadband, because preload is set by small angle changes.
+**Pick the servo on speed, not torque.** The binding spec is getting
+free→contact done inside a push-off window of 50–150 ms: 20° is ~35 ms on an
+MG90-class servo, full preload ~135 ms. Digital also matters for its small
+deadband, because preload is set by small angle changes.
 
 ---
 
 ## 8. Torque estimate
 
-Moment balance about the apex gives a closed form:
+Moment balance about the apex gives a closed form. The cube is **1:1** now (no
+gear stage), so:
 
 ```
-ΣN      = F · lever / s̄                     normal force from the actuator force
-T_out   ≈ μ · F · lever · sin β · (Zc/Zp)
+ΣN      = F_ear · y_ear / s̄
+T_out   ≈ μ · F_ear · y_ear · sin β
 ```
 
-`lever` is the perpendicular distance from the apex to the actuation link's line
-of action (§7), **not** R_push — R_push would be the arm only if the push were
-vertical.
+The ear link pulls vertically, so its arm about the apex is simply its Y.
 
-With μ = 1.3, lever = 42.3 mm, β = 33°, Zc/Zp = 3: **≈ 0.090 Nm of output torque
-per newton of actuator force** — so ~2.2 Nm at 25 N and ~8.1 Nm at 90 N.
+With μ = 1.3, y_ear = 42.9 mm, β = 33°: **≈ 0.030 Nm of output torque per newton
+on the ear**; at the spring's 34 N, **≈ 1.0 Nm**. The overall cube ratio is
+ω_out/ω_motor = sin α / sin β = **1.50** — an overdrive. The reduction the tree
+needs (invariant 1) now has to live **between hubs**, and it has to beat that
+1.5.
 
 **Where the contact sits does not appear in that, and the cancellation is
 exact.** Moments about the apex give `F·lever = ∫ n(s)·s ds`, because a force
 perpendicular to the generatrix at distance `s` from the pivot has moment arm
 exactly `s`. The output torque is `μ·∫ n(s)·(s·sin β) ds`, the same integral —
 so `T = μ·sin β·F·lever` whatever the pressure distribution. Moving the rubber
-outward buys friction radius and costs normal force in the same proportion. It
-is the same property of the apex pivot that matches the surface speeds:
-everything scales with `s`.
+outward buys friction radius and costs normal force in the same proportion.
 
-So `lever / s̄` is **not** a torque multiplier, and reading it as one is a trap
-this document previously set. What it gives is the total NORMAL force, which is
-what the rubber has to develop inside the available squeeze — open question 1.
-The macro measures `s̄` at the centroid of the actual squeeze, 27.7 mm, giving
-**×1.53**; the band's midpoint, which is what an earlier ×2.4 came from,
-overstates it by half because the contact is not where the band's middle is.
+So `lever / s̄` is **not** a torque multiplier. What it gives is the total NORMAL
+force, which is what the rubber has to develop inside the available squeeze —
+open question 1.
 
 **This is an upper bound.** It assumes the rubber actually develops that normal
 force within the available squeeze, which is exactly the unmeasured number below.
@@ -367,36 +357,58 @@ back-drivable, which matters for the passive-dynamics goal.
 
 Recorded so they are not re-litigated. Each cost real time.
 
-**Concentric pinion (free = pinion concentric, as in v5).** Wanted because it
-puts the output shaft on the wall centre. It does not fit a pivoting carriage.
-Rotation moves each point by (distance from apex) × angle, so the pinion — about
-3× further from the apex than the rubber — digs into the corona 3× faster than
-the rubber squeezes. The clearance it can use is `0.25 · m`, so the module must
-grow, which grows the mesh travel `e`, which needs more angle. The bound is
+### Drive out of the cone
 
-```
-φc  >  2 · (Zc − Zp) · q / s̄            q = rubber squeeze, s̄ = mean rubber distance from apex
-```
+**Gear stage (pinion → idlers → corona, 1:3).** Worked, but asymmetric and
+heavy on the packaging; removed. **Concentric pinion** before it: needs a free
+gap angle of 10–12° whatever you do, because rotation moves the pinion ~3× faster
+than the rubber (bound φc > 2·(Zc − Zp)·q / s̄, independent of where the pinion
+sits). A beveloid pair has a working point at ~0.4 mm margin and module 0.85 —
+rejected as too tight, not as impossible.
 
-≈ 10–12° with any sensible numbers, and **independent of where the pinion sits** —
-lengthening the shaft gains travel and loses clearance in exactly the same
-proportion. Designing the pair as a conical/beveloid gear (the right family for
-small shaft angles, and the user was right that it exists) makes the tilt a
-design angle rather than a misalignment, and a working point does exist — α≈45°,
-pinion ~20 mm from the apex, module ~0.85, corona radius ~9 mm — but the
-clearance margin is ~0.4 mm and the module is at the edge of what FDM prints.
-**Rejected as too tight**, not as impossible.
+**Spline / crowned coupling, coaxial.** Assumed the axes only see an angle
+because they cross at the apex. False: at the teeth (y ≈ 48) they are 2 mm apart,
+and a spline cannot take offset — its side teeth would slide round the circle
+while the top ones stay put. Modelled, rubbed 68 mm³.
 
-**Cam (disc or drum) to get a variable ratio.** Unnecessary. The series spring
-already produces fast-then-powerful, because the load changes, not the ratio. A
-drum cam would be more compact than a disc (stroke becomes axial, so the diameter
-stops depending on it) if one were ever needed.
+**Corona on the cone shaft, always meshed; pinion/corona decoupled in free.**
+Neither works; see the gear-stage note above.
 
-**Scotch yoke with slot and rail.** Replaced by the telescopic link — fewer
-parts, no slot to jam, same toggle.
+**Double cardan, straight.** Works; ~40 mm long, the cube grows.
 
-**Belt or pulley reduction at the joint.** Breaks the stacking symmetry: the
-output must present the same interface as the input so cubes can chain.
+**Cardan + Oldham** (one joint per misalignment). Works, modelled on
+`v7-cardan-oldham`; too long.
+
+**Oldham alone.** Modelled on `v7-oldham`, 120.8 mm cube. Takes offset by
+construction and 2.4° with 0.08 mm of flank room, but the disc nods ±0.46 mm once
+a revolution, and it is a parallel-offset coupling asked to take an angle.
+
+**Folded cardan with the tube on the cone and the crosses just past the carriage.**
+Between the carriage (y 38) and the wall there is not enough length: the
+intermediate has to rise ~20°, its corner reached the wall and the ring bore
+rubbed the shaft. Moving the solid cross *into* the cone is what made it fit.
+
+### Actuation
+
+**Telescopic spring link from a crank on the floor.** Replaced: its crank ran
+near dead centre, and with the smaller cube the servo landed on the lower link.
+**Scotch yoke with slot and rail** before that. **Cam (disc or drum)** for a
+variable ratio: unnecessary, the series spring already gives fast-then-powerful.
+
+**Servo standing up in a corner.** Its horn turns in a horizontal plane and the
+carriage moves in a vertical one: the linkage would need ball joints.
+
+**Servo lying at mid-height in the side corner.** Lands on the neighbouring
+axis' cone and carriage ring; the free band between them is 9.6 mm against a
+12.2 mm case.
+
+**Servo flipped (bottom to the neighbour's wall, shaft inward).** Its chain
+would sit on the four-bar's upper links, and the ear would end up near the apex
+with a ~4–7 mm horn.
+
+**Turning alternate axes over.** Only needed while servos lay on the floor.
+
+**Belt or pulley reduction at the joint.** Breaks the stacking symmetry.
 
 **Flexure virtual pivot.** Deferred to v7 (PLA creep).
 
@@ -406,70 +418,43 @@ output must present the same interface as the input so cubes can chain.
 
 1. **Rubber stiffness — the number everything hangs on.** How much normal force
    does a 2 mm rubber layer develop at ~0.2 mm of squeeze? Until this is measured
-   the output torque is a guess. Bench test: press two rubber-faced coupons
-   together with a micrometer screw and a kitchen scale, and record N/cm at 0.04,
-   0.1 and 0.2 mm. Half an hour of work; it decides the spring, the servo and
-   whether the cones need to grow.
-2. **Spring rate and the spring/rubber split.** The 10:1 in §7 is invented. It
-   is now carried across changes of radius correctly (§7), but the number itself
-   still has to be measured.
-3. ~~**Four-bar drift.**~~ **Answered.** The macro solves the linkage and
-   measures the apex's travel at every stop: 0.133 mm at preload, split into
-   0.103 mm of slip along the generatrix and 0.085 mm of preload error normal to
-   it. See §5.
-4. **Making the rubber layer.** Wrapping a flat sector onto the cone is
-   geometrically right but untested: adhesive, seam, thickness uniformity.
-5. ~~**Packaging.**~~ **Answered, and checked.** Servo on the deck with its case
-   inboard, idler on a D-shaped bracket screwed to the wall from inside, frame
-   pivots on posts standing on the decks, alternate axes turned over (§7). The
-   macro checks every pair of parts at every stop, and each axis against all
-   three of its neighbours. What is left is not layout but sizing: none of the
-   brackets has been loaded or FEA'd.
-6. **Central motor sizing.** Depends on (1) and on how many axes are engaged at
-   once. Note the demands add, they do not divide: two engaged axes ask the motor
-   for the sum of their slip torques.
+   the output torque is a guess. It decides the spring, the servo and whether
+   the cones need to grow. No bench time for now: design for a range.
+2. **Spring rate and spring_ratio.** The torsion spring (2.4 N·mm/°) is sized to
+   the servo, not to the rubber; spring_ratio = 15 is invented.
+3. **Making the rubber layer.** The flat pattern exists; wrapping it onto the
+   cone is untested: adhesive, seam, thickness uniformity.
+4. **Sizing, not layout.** Every pair of parts is checked at every stop, the
+   links, the cardan and the actuation chain are swept as distances, and each
+   axis is checked against its three neighbours. Nothing has been loaded, FEA'd
+   or printed. Weakest-looking: the cross pins (Ø2, bending, at 4–7° all the
+   time), the output shaft's ~16 mm reach to the fork, the lever post from the
+   ceiling.
+5. **Central motor sizing.** Depends on (1) and on how many axes are engaged at
+   once. Demands add, they do not divide.
+6. **Where the reduction lives.** Each cube is now 1.5:1 overdrive; the chain
+   between hubs has to supply the tree's reduction.
 
 ---
 
 ## 11. Next steps
 
-1. **Done 2026-09-15:** `cad/motcore_v6_apex_pivot.py` — single-apex layout with
-   rubber-surface compensation, the continuous rubber band (with its 1:1 cutting
-   template, `cad/motcore_v6_flat_pattern.svg`), the four-bar with its drift
-   measured, the idler stage, the fasteners as solids, and 26 numeric checks.
-2. Run the rubber measurement (open question 1) before committing to a spring or
-   a servo. It is the only thing still blocking a torque figure.
-3. Print one axis. Everything above is geometry that has never been in a
-   printer.
-4. **Done 2026-09-12:** `cad/clutch_geometry_v6.html`, a standalone interactive
-   visualiser (four-bar with the instant centre traced, telescopic spring link,
-   gear front view with the idlers). Self-contained, no dependencies, ready to
-   publish on motcore.github.io. `cad/clutch_geometry_v5.html` can be retired.
+1. Print one axis. Everything above is geometry that has never been in a
+   printer: start with the cone + cardan + bearing, which is the new risk.
+2. Model the ceiling screws for the servo bracket and the lever post, and size
+   the torsion spring as a real part (wire, coils, legs).
+3. Run the rubber measurement when there is time.
+4. `cad/clutch_geometry_v6.html` is **stale** (telescopic link, gear front
+   view): update or retire it before publishing.
 
 ---
 
-## 12. Next session — raised 2026-09-15, not yet worked
+## 12. Ideas raised 2026-09-15 — status
 
-Notes as raised, not designs. Nothing here has been checked against the macro.
-
-1. **Give the output cone material at its tip.** It is a shell truncated 3 mm
-   from its own plastic apex, so the tip is the thinnest and least supported part
-   of the piece, and it is the end that points at the motor shaft.
-2. **The four-bar links look like they foul the motor cone** — and if they do,
-   this is where the "L" belongs: dog-leg the link out around the cone rather
-   than run it straight from pivot to pivot. Worth checking the *checks* at the
-   same time: the macro reports no contact at any stop, so either the clearance
-   is real and merely tight, or the motor cones are getting past the interference
-   matrix the way the wall and the decks once did.
-3. **The rubber band's edge is not square.** The band ends on a cut that is not
-   perpendicular to the surface it is bonded to; decide what that edge should be
-   and make the flat pattern cut it that way.
-4. **Get rid of the corona.** Two routes, both bigger than they look:
-   - a **flexible shaft** from the output cone out to the wall — viable, not
-     easy;
-   - or a **corona with clearance at the cone's tip**: the output shaft runs
-     all the way in to the tip of the cone, and the ring gear is printed into the
-     cone itself instead of being a separate part on its own shaft.
-5. **Design the servo link for real.** It is still a placeholder bar; it has to
-   become an actual telescopic tube-in-tube with the two springs inside, with the
-   spring's free length, travel and retention worked out.
+1. **Material at the cone tip.** Done: solid to y = 18.
+2. **Four-bar links near the motor cone.** Checked by a swept distance (1.40 mm
+   at the knuckle), not just at three stops.
+3. **The rubber band's edge is not square.** Open.
+4. **Get rid of the corona.** Done — replaced by the folded cardan (§6).
+5. **Design the servo link for real.** Superseded — the telescopic link is gone
+   (§7).

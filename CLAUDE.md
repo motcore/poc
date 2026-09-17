@@ -7,9 +7,10 @@ Motcore is an open hardware **multi-axis actuator tree**. One central motor
 clutches**. Each output axis has its own clutch module; engaging a clutch
 connects that axis to the rotating motor cone.
 
-Each output feeds the **next hub of the tree**, so every level is a
-**reduction**, never 1:1 — torque has to be regenerated at each stage, and
-speed is the resource there is plenty of.
+Each output feeds the **next hub of the tree**, so every level must end up a
+**reduction** — torque has to be regenerated at each stage, and speed is the
+resource there is plenty of. The cube itself is now 1.5:1 overdrive (friction
+only, 1:1 drive out), so the reduction lives **between hubs**.
 
 The target application is **passive-dynamic walkers** (a rocking biped, a
 bouncing quadruped), which changes what matters: a genuinely free "free" state,
@@ -30,11 +31,13 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
   nothing physical sits at the apex, which is just as well because the motor
   shaft is there.
 - **Output shaft**: horizontal, fixed, perpendicular to the motor axis at rest,
-  **centred on the wall**.
+  **centred on the wall**, driven from the tilting cone by a **folded double
+  cardan inside the hollow cone**.
 - **Contact**: a **continuous rubber layer** on both cones, meeting along the
   shared generatrix — rubber on rubber, never plastic.
 - Actuation is a single degree of freedom: the carriage's tilt angle.
-- **Four axes**, one per cube wall.
+- **Four axes**, one per cube wall, **identical rotated copies** (none turned
+  over).
 
 ```
         side view (one axis, Y-Z cross-section)
@@ -54,7 +57,7 @@ All mechanical design files are in `cad/`. Firmware in `src/`.
                 ╱      ╲      tilt UP   → output turns one way
                │   ○    │ ─── tilt DOWN → the other way
                 ╲      ╱      middle    → free
-                 └────┘       + pinion, idlers, corona (all meshed, always)
+                 └────┘       + folded cardan inside it → output shaft (1:1)
 ```
 
 ### Why two cones: one axis, both directions
@@ -81,28 +84,25 @@ Read that before proposing changes. Summary:
   O-rings. The **plastic** apexes are pulled back by `t / sin(half-angle)` so
   the **rubber** surfaces are what converge on the origin. Micro-slip ≈ 0
   (v5: 7.4%).
-- **The gear stage never disengages.** Free rotation comes from the rubber
-  separating, not from the gears letting go; the residual drag is the cone's
-  reflected inertia, ~2% of a leg's, with no torque threshold.
-- **Idler gears centre the output shaft.** Pinion (8t, on the carriage) →
-  idlers (8t, fixed axes, **left and right in X, never up/down**) → corona
-  (24t, output). Ratio 1/3, output on the wall centre.
-- **Actuation**: servo → crank → telescopic link with two springs inside → pin
-  on a **horn** on the carriage, below the corona's rim, 40 mm from the apex in
-  Y and 30 mm below the axis. No slot, no external guide. The springs make the
-  preload force-controlled rather than position-controlled.
-  **R_push is not the moment arm**: the force arrives along the link, so the arm
-  is the perpendicular distance from the apex to the link's line — 42.3 mm,
-  measured. Doc §7.
-- **The servo lies on the deck**, case running inboard along its shaft axis, and
-  **alternate axes are assembled turned over** (180° about their own radius —
-  the same parts, and the shared cones are symmetric in Z). Two neighbouring
-  servos otherwise want the same corner of the same floor. Doc §7.
+- **The cone is hollow and is the cardan's outer yoke.** It runs on one 6805
+  on its neck, held by the carriage, which is a ring round that neck. Inside:
+  ring cross (y 40, cone axis) → intermediate tube → solid cross (y 26, output
+  axis) → fork → output shaft in 2× MR105ZZ at the wall. Both crosses are in
+  front of the apex, so it is not constant-velocity: bends 6.6° / 4.2°,
+  ~0.11° error. Intermediate length changes 0.25 mm → slotted pin holes. Doc §6.
+- **Four-bar**: link rays at 45°, frame pivots r 55 on the wall, carriage pivots
+  r 40.5, links 14.5 mm. Apex drift 0.187 mm at preload, 0.60% slip. Doc §5.
+- **Actuation**: servo under the ceiling in the axis' own corner → torsion
+  spring (no preload) → horn r 9.04 → lever 8/3.8 → link → ear on the carriage's
+  +X arm. The servo turns ±80°: 20° to contact, the other 60° wind the spring,
+  and spring torque sets the squeeze. The chain stacks back inboard under the
+  servo's face. Doc §7.
+- **Further out is not more leverage.** Servo torque × servo angle = carriage
+  moment × tilt; the tilt is fixed, so the push point is chosen for packaging.
 
 ### Three carriage positions — symmetric, both ways from the middle
 
-The angle `φ` is measured from the mid position. There is **no mesh step**: the
-gears are always engaged.
+The angle `φ` is measured from the mid position.
 
 | # | Position | \|φ\| | State |
 |---|----------|-------|-------|
@@ -112,7 +112,8 @@ gears are always engaged.
 
 `φc = 90° − α − β` — the free gap angle **is** the cone geometry. That coupling
 is the central fact of v6: you cannot open the travel without thinning the
-output cone, which is why the concentric pinion does not fit (see the doc, §9).
+output cone. The four-bar's outward drift makes real contact arrive at 2.18°,
+at the band's outer end; preload stop 2.375°.
 
 ---
 
@@ -123,31 +124,27 @@ output cone, which is why the concentric pinion does not fit (see the doc, §9).
 | **α**  | 55°   | motor cone half-angle (from the vertical axis) |
 | **β**  | 33°   | output cone half-angle (from its own axis) |
 | **t**  | 2.0 mm | rubber layer thickness |
-| **L**  | 18 mm | contact line length along the generatrix |
+| **L**  | 23.4 mm | contact band along the generatrix (derived), s = 10…33.4 |
 | **s₀** | 10 mm | apex → start of the contact line |
-| **m**  | 1.8   | gear module — 1.0 is NOT buildable, see the doc §6 |
-| **Zp** | 8     | pinion teeth (on the carriage) |
-| **Zi** | 8     | idler teeth |
-| **Zc** | 24    | corona teeth (on the output shaft) |
-| **R_push** | 40 mm | apex → push point in Y (on the horn, 30 mm below the axis) |
-| **lever** | 42.3 mm | apex → the LINK's line of action. This is the moment arm |
-| **cube** | 119 mm | outside, set by the corona's running clearance |
-| **δφ** | ~0.6° | preload rotation past contact |
+| **four-bar** | 45°, r 55 / 40.5, link 14.5 | link rays, frame / carriage pivot radii |
+| **cardan** | crosses y 26 / 40 | solid cross (output axis) / ring cross (cone axis) |
+| **servo sweep** | ±80° (20 + 60) | to contact + spring wind |
+| **lever** | 8.0 / 3.8 | 2.1:1; horn radius 9.04 derived from it |
+| **ear** | y 42.9 | the moment arm of the vertical push |
+| **cube** | 106.4 mm | outside, set by the servo case under the ceiling |
 
-Derived at defaults:
+Derived at defaults (macro):
 
 | Quantity | Value |
 |----------|-------|
-| free gap angle `φc` | **2°** |
-| friction ratio | 1.503 |
-| gear ratio | 0.333 |
-| **total ω_out/ω_motor** | **0.501** (→ ×2.0 torque) |
+| free gap angle `φc` | **2°** (real contact 2.18°) |
+| cube ratio ω_out/ω_motor | **1.50** (sin α / sin β, 1:1 drive out) |
 | plastic apex offset, motor cones | 2.44 mm each |
 | plastic apex offset, output cone | 3.67 mm |
-| micro-slip from the ring/layer geometry | ≈ 0 (v5: 7.4%) |
-| residual apex drift from the four-bar | 0.133 mm at full preload = 0.44% slip |
-| force lever (lever / s̄, s̄ at the squeeze centroid) | **×1.53** — normal force, NOT torque |
-| output torque per newton of actuator force | ≈ 0.090 Nm/N **(upper bound, unverified)** |
+| residual apex drift from the four-bar | 0.187 mm at preload = 0.60% slip |
+| cardan residual angle error | ~0.11° |
+| normal force per N on the ear (y_ear / s̄, s̄ = 29.4) | **×1.46** — force, NOT torque |
+| output torque per N on the ear | ≈ 0.030 Nm/N; ~1.0 Nm at the spring's 34 N **(upper bound)** |
 
 ---
 
@@ -162,15 +159,12 @@ apex offset = t / sin(half-angle)          plastic pulled back so the RUBBER
 travel(p)   = distance(p, apex) · φ        every point moves by its own radius —
                                            this is what makes v6 unlike v5
 
-ratio_fric  = sin α / sin β
-ratio_gear  = Zp / Zc                      idlers do not change the ratio
-ratio_total = ratio_fric · ratio_gear      must stay < 1
+ratio_total = sin α / sin β               1.50 per cube; the tree's reduction
+                                           lives between hubs
 
 ΣN          = F · lever / s̄                normal force from actuator force
-T_out       = μ · F · lever · sin β · (Zc/Zp)
-
-                                           lever, NOT R_push: the push arrives
-                                           along the link, not vertically.
+T_out       = μ · F · lever · sin β        lever = y of the ear: the ear link
+                                           pulls vertically
 
                                            s̄ does NOT appear in T_out, and the
                                            cancellation is exact: the moment
@@ -185,7 +179,7 @@ T_out       = μ · F · lever · sin β · (Zc/Zp)
 
 Set by the preload between rubber layers, μ ≈ 1.2–1.5 (rubber on rubber). It is
 also a **per-axis torque limiter**: it slips above the preload-set threshold, and
-the preload is set by servo angle against the series spring, so each axis caps
+the preload is set by servo angle against the torsion spring, so each axis caps
 its own slip torque. Slipping also makes the joint back-drivable, which the
 passive-dynamics goal wants.
 
@@ -204,19 +198,22 @@ passive-dynamics goal wants.
 
 ## Design invariants — do not violate these
 
-1. **Reduction, not 1:1.** The output feeds the next hub of the tree; torque
-   must be regenerated at every level. Speed is the surplus resource.
+1. **Reduction across the tree.** Torque must be regenerated at every level.
+   Each cube is 1.5:1 overdrive now, so the chain between hubs must more than
+   undo that.
 2. **All three cones share ONE apex, and it is the pivot.** What must converge
    there are the **rubber** surfaces, so the plastic apexes are offset by
    `t / sin(half-angle)`. Never dial this in by hand.
 3. **Rubber on rubber only.** The plastic cone surfaces never touch.
-4. **The gear stage never disengages.** Free comes from the rubber separating.
-5. **The cone axis must pass through the apex**, which is why the output shaft
-   is the thing that gets centred by idlers, not the pinion.
-6. **Idlers on the X axis, never on Z.** The pinion moves vertically when the
-   carriage tilts; idlers above/below would jam on one side and disengage on the
-   other.
-7. **`Zc − Zp ≥ 8`** — internal-mesh interference.
+4. **Free comes from the rubber separating.** The drive out stays coupled.
+5. **The cone axis must pass through the apex.** Nothing rigid and coaxial can
+   join the cone to the output shaft: at any distance from the apex the axes
+   are offset as well as angled. Whatever couples them takes both (today: the
+   folded cardan).
+6. **Nothing may cross the apex.** The motor shaft is there; that is why the
+   pivot is virtual and why both cardan crosses sit in front of it.
+7. **All four axes are identical rotated copies.** Each owns one corner of the
+   pinwheel (+X side); nothing is turned over.
 8. **Free is the middle of the travel, not an end.** The two motor cones make
    each axis bidirectional.
 9. **The AS5600 on every output shaft is structural, not optional.** Friction
@@ -241,14 +238,15 @@ passive-dynamics goal wants.
   bench, every torque figure here is an estimate. It decides the spring, the
   servo and whether the cones must grow.
 - **Spring rate, and how the extra travel splits between spring and rubber.**
-  The 10:1 currently assumed is invented. It is a ratio *at a radius* and scales
-  as 1/R², which the macro now carries across; the number itself is still a
-  guess.
+  The torsion spring (2.4 N·mm/°) is sized to the servo, not the rubber;
+  `spring_ratio` = 15 is invented.
 - **How the rubber layer is made.** A cone unrolls into a flat sector, so a cut
   sheet can be wrapped on — untested (adhesive, seam, uniformity).
-- **Bracket sizing**: the layout is settled and the macro checks every pair of
-  parts at every stop, and each axis against all three neighbours — but no
-  bracket has been loaded or FEA'd, and nothing has been printed.
+- **Sizing**: the layout is settled and the macro checks every pair of parts at
+  every stop, sweeps the links, the cardan and the actuation chain as
+  distances, and checks each axis against all three neighbours — but nothing has
+  been loaded, FEA'd or printed. Weakest-looking: Ø2 cross pins, the output
+  shaft's reach to the fork, the lever post hanging from the ceiling.
 - **Central motor sizing.** Depends on the rubber measurement and on how many
   axes engage at once — demands **add**, they do not divide.
 
@@ -268,6 +266,14 @@ passive-dynamics goal wants.
   falling demand the same torque, so no threshold separates them.
 - **Interleaved O-rings** (v5). The interdigitation forces the cones apart and
   costs 7.4% micro-slip, uncorrectably. Replaced by the continuous layer.
+- **Gear stage** (pinion → idlers → corona), **spline/crowned coaxial
+  coupling** (axes are offset, not just angled), **straight double cardan** and
+  **cardan + Oldham** (too long), **Oldham alone** (120.8 mm cube, disc nods
+  ±0.46 mm). Replaced by the folded cardan inside the cone. Doc §9.
+- **Telescopic spring link from a crank on the floor**, **servo standing in a
+  corner** (horn and carriage move in different planes), **servo at mid-height in
+  the side corner** (hits the neighbour's cone), **servo flipped shaft-inward**
+  (chain on the four-bar links), **turning alternate axes over**. Doc §9.
 - **Concentric pinion in v6** (free = pinion concentric). Needs a gap angle of
   10–12° whatever you do, because rotation moves the pinion ~3× faster than the
   rubber and lengthening the shaft gains and loses in the same proportion. A
@@ -276,7 +282,7 @@ passive-dynamics goal wants.
   tight, not as impossible. Full reasoning in the doc, §9.
 - **Cam (disc or drum) for a variable ratio.** Unnecessary: the series spring
   already gives fast-then-powerful, because the load changes, not the ratio.
-- **Scotch yoke with slot and rail.** Replaced by the telescopic spring link.
+- **Scotch yoke with slot and rail.** Replaced long ago.
 - **Belt or pulley reduction at the joint.** Breaks stacking symmetry.
 - **Flexure virtual pivot.** Deferred to v7, not rejected — PLA creeps under
   sustained load.
@@ -288,10 +294,10 @@ passive-dynamics goal wants.
 | File | Purpose |
 |------|---------|
 | `docs/clutch-geometry-v6.md` | **v6 design — the source of truth.** Geometry, actuation, rejected alternatives, open questions, next steps |
-| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **the v6 assembly**. Run it headless (`freecadcmd`) and read its report: 26 numeric checks, the four-bar's measured drift, the actuation lever, the cube's driver, and the printed/purchased lists |
+| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **the v6 assembly**. Run it headless (`freecadcmd`) and read its report: 22 numeric checks, the four-bar's measured drift, the cardan's bends, the actuation chain, the cube's driver, and the printed/purchased lists |
 | `cad/motcore_v6_flat_pattern.svg` | 1:1 cutting template for the rubber bands, regenerated by the macro on every run |
 | `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — v5, superseded. Still the best reference for cone solids, FDM hole compensation, gear helpers and the self-check scaffolding |
-| `cad/clutch_geometry_v6.html` | Interactive 2D visualiser for v6 — four-bar, spring link, gear front view. Self-contained (no deps), meant for motcore.github.io |
+| `cad/clutch_geometry_v6.html` | Interactive 2D visualiser for v6 — **STALE** (telescopic link, gear front view); update before publishing |
 | `cad/clutch_geometry_v5.html` | 2D visualiser — superseded, two generations stale (single motor cone, one-sided ladder) |
 | `cad/clutch_geometry_v3.html` | Visualiser for the superseded tilting-disc design |
 | `cad/clutch_geometry.html`    | Older visualiser (superseded) |
