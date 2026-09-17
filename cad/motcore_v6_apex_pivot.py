@@ -86,27 +86,25 @@ rubber_lip = 2.0   # mm  — bare plastic left past the rubber's outer edge, to
 s0        = 10.0   # mm  — apex → start of the contact line, ON THE RUBBER
                     #       surface (which is the one whose apex is the origin)
 
-# ── Drive out of the cone: one Oldham ────────────────────────────────────────
-# The carriage shaft TILTS about the apex and the output shaft does not. At a
-# distance y from the apex their axes are apart by y*sin(phi) — ~2 mm here —
-# AND at an angle of phi. No rigid coaxial joint takes the offset: a spline's
-# side teeth would have to slide round the circle while its top teeth stay put
-# (a crowned spline was modelled on another branch and rubbed 68 mm3).
+# ── Drive out of the cone: a folded ("zig-zag") double cardan ────────────────
+# The cone TILTS about the apex and the output shaft does not. At a distance y
+# from the apex their axes are apart by y*sin(phi) AND at an angle of phi.
 #
-# An Oldham takes offset by construction, and it takes the angle too, cheaply,
-# because 2.4 deg is small. With the tilt axis sweeping round the tongue once a
-# revolution, a tongue of height h and length L needs:
-#   - across its flanks, h*tan(phi) of room (0.08 mm) — better as a slight
-#     barrel on the flanks than as play, since play there is backlash;
-#   - at its ends, (L/2)*sin(phi) of axial room (0.46 mm): the disc NODS once
-#     a revolution. That is the price, and it is wear and noise, not a jam.
-# The output angle error it adds is Hooke-like, ~0.025 deg. Commercial Oldhams
-# are rated ~0.5 deg because they are precision servo couplings built for life
-# at speed, not because the geometry forbids more.
+# The joint lives INSIDE the hollow cone. The cone itself is the outer yoke (a
+# bell): its neck carries a RING cross on pins along X. The ring's other pins
+# carry an intermediate TUBE, which runs back toward the apex to a SOLID cross
+# on the end of the output shaft, which reaches in through the ring.
 #
-# A cardan ahead of it, to keep the angle off the Oldham, was modelled on
-# another branch and works; this drops it, its ~1 deg of play, and ~45 mm of
-# cube. Everything on the axis, symmetric, 1:1.
+# Both crosses sit IN FRONT of the apex (the motor shaft is behind it), so the
+# two joints can never bend equally: the solid one always bends phi more than
+# the ring. The joint is therefore not constant-velocity; it behaves like one
+# Hooke joint of phi, ~0.025 deg of error at 2.4 deg. What the fold buys is
+# length: the further back the solid cross sits, the flatter the intermediate
+# (angle ~ ring_y*sin(phi) / (ring_y - cross_y)) and the smaller the ring's
+# bore, which only has to swallow the axes' offset AT the ring.
+#
+# With no carriage shaft left, the cone runs on ONE thin-section bearing on
+# the OUTSIDE of its neck, held by the carriage.
 
 # ── Four-bar virtual pivot (y, z), apex at the origin ────────────────────────
 # Both link axes must pass through the origin — that is what makes the
@@ -126,8 +124,14 @@ s0        = 10.0   # mm  — apex → start of the contact line, ON THE RUBBER
 #     ray 40, link 21.5 (this one)      drift 0.145      0.48%
 # — a third less drift than the layout it replaces, which also means less of the
 # preload travel lost to late contact.
-fb_A = (47.49, 39.85)  # mm — frame pivot, upper link (radius 62 at 40 deg)
-fb_B = (31.02, 26.03)  # mm — carriage pivot, upper link (radius 40.5)
+#
+# v7-cardan-zigzag: ray 45 deg, frame pivot r 55. With the Oldham gone the
+# frame post was what set the cube (54.5); at 45 deg and r 55 it drops under
+# the horn's 47 with the link at 14.5 mm. Swept on this linkage before
+# choosing: ray 40 r 52 gives the same cube at 0.65% slip, this one 0.61%.
+_fb_ray = math.radians(45.0)
+fb_A = (55.0 * math.cos(_fb_ray), 55.0 * math.sin(_fb_ray))   # frame pivot
+fb_B = (40.5 * math.cos(_fb_ray), 40.5 * math.sin(_fb_ray))   # carriage pivot
                         #      The lower pair is the mirror in z.
 link_x     = 9.0      # mm — X of the link plane (two sets, at +-link_x, for
                        #      out-of-plane stiffness). Just outboard of the
@@ -141,9 +145,13 @@ link_w     = 8.0      # mm — link width. Was 10, and the inner edge of the arm
                        #      almost nothing: 8 x 5 in compression is ample, and
                        #      the millimetre off each edge goes straight into
                        #      the clearance, 0.64 -> 1.63 mm.
-link_knuckle = 5.0    # mm — radius of the knuckle joining the pair into one
+link_knuckle = 4.5    # mm — radius of the knuckle joining the pair into one
                        #      part.
-link_knuckle_d = 15.0 # mm — where that knuckle sits, measured along the link
+link_knuckle_d = 14.5 # mm — (v7-cardan-zigzag: ON B. The 14.5 link is too
+                       #      short for the frame post's 6 mm lug and a knuckle
+                       #      to share it; at B the ray-45 layout keeps it 2 mm
+                       #      above the motor cone's rim.)
+                       #      where that knuckle sits, measured along the link
                        #      from the FRAME pivot A. It used to sit on the
                        #      carriage pivot B (d = link_len), and that is the
                        #      one place it must not: the knuckle is the only
@@ -298,32 +306,21 @@ AXES_SHOWN = 1     # 0..4 — output axes built (mechanism + wall). 1 keeps the
                     #        motor cones and shaft are always built.
 
 # ── Carriage ─────────────────────────────────────────────────────────────────
-hous_r        = 7.5    # mm — bearing housing radius. It lives INSIDE the cone,
-                        #      so the cavity sets it: 8.27 mm of radius at
-                        #      y = 21, leaving 0.77 of running clearance. Over
-                        #      the Ø10.3 bearing seat the wall is 2.35 mm.
-hous_y0       = 21.0   # mm — housing, cone-side face. Was 33.5, outside the cone
-                        #      altogether; those 12.5 mm are the whole prize.
-hous_y1       = 38.0   # mm — housing, pinion-side face, past the cone's mouth at
-                        #      30.8. ONE piece, not two halves: at this radius
-                        #      there is no room for clamp bolts and no need for
-                        #      them — the split existed only to keep the bearing
-                        #      seats off their sides while printing, and a
-                        #      housing this shape prints with its bore straight
-                        #      up. Both bearings go in from the pinion end,
-                        #      against a lip at the far one.
-block_hw      = 8.5    # mm — half-width (X and Z) of the PRISMATIC block that
-                        #      the housing turns into past the cone's mouth. It
-                        #      cannot start any earlier: inside the cone the
-                        #      cavity is round and tight (8.27 mm of radius at
-                        #      y = 21), and a square corner at half-width 8.5
-                        #      reaches 12.0 mm from the axis — it would cut into
-                        #      the cone. Past the mouth there is no cavity at
-                        #      all, so the block is free, and it is what the
-                        #      arms and the horn now root on directly instead
-                        #      of a web tangent to a cylinder. block_y0, where
-                        #      it starts, is derived below (§ Cone extents) —
-                        #      it needs out_base_y, which is not known yet here.
+# The carriage no longer lives inside the cone: the joint does. It is a RING
+# round the cone's neck now, holding the one thin-section bearing the cone runs
+# on (6805, 25x37x7), with the arms and the horn rooted on its outside.
+nb_id         = 25.0   # mm ┐
+nb_od         = 37.0   # mm │ 6805-2RS thin-section bearing on the cone's neck
+nb_w          = 7.0    # mm ┘
+nb_y0         = 34.0   # mm — bearing, cone-side face (cone frame). Clear of the
+                        #      cone's rim at 30.8 by the neck's own shoulder.
+hous_lip      = 1.0    # mm — lip on the cone side of the seat; the bearing goes
+                        #      in from the wall side and stops against it
+hous_lip_ri   = 16.0   # mm — the lip's bore: past the inner race and the neck's
+                        #      shoulder, so it only touches the outer race
+hous_ro       = 21.5   # mm — housing outer radius (2.3 mm over the seat)
+hous_y0       = nb_y0 - hous_lip          # DERIVED
+hous_y1       = nb_y0 + nb_w + 1.0        # DERIVED, 1 mm proud of the bearing
 side_x        = 15.0   # mm — X of the carriage's two arms. OUTBOARD of the
                         #      four-bar links, because the knuckle that joins
                         #      each pair of links into one part runs across the
@@ -357,18 +354,33 @@ bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see i
 trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
                         #      the project already buys, NOT a printed boss)
 
-# ── Oldham and output shaft support ───────────────────────────────────────
-# First prototype: cube size is not a goal. Positions are derived.
-oldham_d      = 22.0   # mm — hubs and disc, printed
-oldham_hub_t  = 4.0    # mm — hub body, on the carriage shaft / on the output shaft
-oldham_disc_t = 6.0    # mm — disc: a 2 mm slot in each face, 2 mm web
-tongue_h      = 2.0    # mm — tongue height = depth of the slot it works in
-oldham_float  = 0.7    # mm — axial float each side of the disc. It has to hold
-                        #      the NOD, (oldham_d/2)*sin(phi), as if all the tilt
-                        #      lands on one face, which nothing forbids.
-oldham_travel = 3.0    # mm — free slot length past the tongue = the offset it
-                        #      takes. Commercial Oldhams this size are rated
-                        #      for 0.1–0.2 mm; this one is printed for ~2.
+# ── Folded double cardan and output shaft support ─────────────────────────
+uj_cross_y    = 26.0   # mm — solid cross centre, on the OUTPUT axis. As far
+                        #      back as the cone's cavity lets the intermediate's
+                        #      tail go.
+uj_ring_y     = 40.0   # mm — ring cross centre, on the CONE axis (cone frame),
+                        #      under the neck bearing
+neck_ri       = 10.0   # mm — the cone's neck bore = the bell the joint turns in
+neck_ro       = nb_id / 2.0   # DERIVED — the neck IS the bearing's seat
+neck_shoulder = 1.0    # mm — radial step the bearing's inner race stops on
+neck_y1       = 42.0   # mm — end of the neck (cone frame)
+uj_ring_ri    = 4.9    # mm — ring bore: the output shaft passes through it,
+                        #      offset by ring_y*sin(phi) and tilted inside it
+uj_ring_ro    = 6.25   # mm
+uj_ring_t     = 3.0    # mm — ring thickness along its axis
+uj_mid_ri     = 6.75   # mm — intermediate tube
+uj_mid_ro     = 8.25   # mm
+uj_mid_end    = 1.5    # mm — tube material past each pin plane
+uj_pin_d      = 2.0    # mm — cross pins (steel, Ø2)
+uj_cross_a    = 2.5    # mm — half-size of the solid cross's centre block
+uj_fork_ri    = 3.0    # mm ┐ output fork arms: |x| between these, straddling the
+uj_fork_ro    = 5.0    # mm ┘ cross block and its X pins
+uj_fork_back  = 3.5    # mm — fork base starts this far past the cross, wall side
+uj_fork_base  = 3.0    # mm — base thickness
+uj_slide      = 0.4    # mm — the intermediate's length changes over the stroke
+                        #      (the ring moves with the cone, the cross does not):
+                        #      its ring-end pin holes are slotted this much along
+                        #      the tube instead of making the tube telescopic
 run_clr       = 1.0    # mm — running gap between parts moving against each other
 out_brg_wall  = 3.0    # mm — material wall around the output shaft's bearing
                         #      seat in the wall. out_brg_len (the seat's total
@@ -440,17 +452,10 @@ cone_tip_wall  = 0.8   # mm — minimum wall at a cone's truncated tip where a
                         #      through bore exists (motor cones)
 cone_bore_wall = 2.0   # mm — wall left at the far end of the output cone's
                         #      BLIND bore, which is what sets its depth
-tip_fill_y     = hous_y0  # DERIVED — the cone is SOLID (no shell cavity) from
-                        #      its tip out to the carriage housing's own face,
-                        #      so the fill stops exactly where the housing
-                        #      begins and neither part gives up ground to the
-                        #      other. Without this, the shell's own hollow
-                        #      cavity outgrows the shaft bore just ~1.5 mm past
-                        #      the bore's inner end — the cone LOOKED like it
-                        #      clamped 19.6 mm of shaft, but past that 1.5 mm
-                        #      the "bore" was already open shell, touching
-                        #      nothing. Filling the tip turns the real grip
-                        #      length into the full hous_y0 - 11.2 = 9.8 mm.
+tip_fill_y     = 18.0   # mm — the cone is SOLID from its tip to here, hollow
+                        #      beyond. No shaft to grip any more; this only has
+                        #      to stay clear of the joint's tail, which the
+                        #      all-pairs check measures.
 cone_wall     = 2.5    # mm — wall of the output cone, which is a SHELL. This is
                         #      what the whole outboard layout turns on: the cone
                         #      was a solid lump of plastic sitting between the
@@ -471,20 +476,14 @@ brg_seat_lip  = 1.5    # mm — lip at the cone end of the seat bore. Both beari
                         #      far one stops against.
 brg_fit_press = 0.15   # mm — radial add for a press fit (→ Ø10.3), FDM
                         #      calibrated on the Creality Hi, see build-log
-out_brg_len   = brg_w + brg_seat_lip   # DERIVED — the output shaft's own
+out_brg_len   = brg_w + brg_seat_lip   # DERIVED — the output shaft's OUTER
                         # bearing seat, total length: the bearing's own width
-                        # plus the shoulder that stops it. The same MR105ZZ as
-                        # the carriage's pair — its 4 mm width already matches
-                        # the wall's own 4 mm thickness, so the boss barely
-                        # has to stand proud of the wall at all: 1.5 mm of
-                        # shoulder, not the 14 mm the two bushings needed. Was
-                        # two polymer bushings, a floating mount — but nothing
-                        # past the Oldham actually needs the output shaft to
-                        # float; the coupling's own local clearance
-                        # (oldham_float) already absorbs its nod, right at the
-                        # disc. One ball bearing, press-fit both races, pins
-                        # the shaft radially AND axially — "bien fijo", and
-                        # better for whatever reads position off it downstream.
+                        # plus the shoulder that stops it, mostly inside the
+                        # wall's own 4 mm.
+                        # The shaft now reaches ~20 mm in from the wall to the
+                        # solid cross, so ONE bearing is not enough: a second
+                        # MR105ZZ sits in a boss on the wall's INNER face,
+                        # pressed in from inside against the wall's own hole.
 
 # ── FDM print calibration (Creality Hi / PLA) — see docs/build-log.md ────────
 # This printer runs small holes ~0.5 mm UNDERSIZE, so every hole that receives
@@ -512,17 +511,8 @@ apex_off_motor  = t_rubber / math.sin(alpha)
 apex_off_output = t_rubber / math.sin(beta)
 
 ratio_fric  = math.sin(alpha) / math.sin(beta)
-ratio_gear  = 1.0                     # an Oldham is 1:1
+ratio_gear  = 1.0                     # a double cardan is 1:1
 ratio_total = ratio_fric * ratio_gear
-
-# The drive, chained outward from the carriage housing. Rest pose, on +Y.
-oldham_a_y0 = hous_y1 + run_clr
-oldham_a_y1 = oldham_a_y0 + oldham_hub_t
-disc_y0     = oldham_a_y1 + oldham_float
-disc_y1     = disc_y0 + oldham_disc_t
-oldham_b_y0 = disc_y1 + oldham_float
-oldham_b_y1 = oldham_b_y0 + oldham_hub_t
-disc_mid_y  = (disc_y0 + disc_y1) / 2.0
 
 # Cone extents. s is measured along the generatrix from the cone's OWN plastic
 # apex; the rubber band is specified from the COMMON apex instead, and the two
@@ -551,15 +541,6 @@ out_apex_y  = apex_off_output                   # output cone's plastic apex
 out_base_y  = out_apex_y + s_out_hi * math.cos(beta)
 out_base_r  = s_out_hi * math.sin(beta)
 out_tip_y   = out_apex_y + s_output_lo * math.cos(beta)
-# Blind bore: deep enough to clamp on the shaft, stopping where the cone wall
-# has thinned to cone_bore_wall.
-out_bore_end_y = out_apex_y + (
-    (fdm_shaft_hole_d / 2.0 + cone_bore_wall) / math.tan(beta))
-out_bore_depth = out_base_y - out_bore_end_y
-
-# The carriage's block starts one running clearance past the cone's own widest
-# point — the earliest it can be square, see block_hw.
-block_y0 = out_base_y + run_clr
 
 mot_apex_z = apex_off_motor
 mot_base_z = mot_apex_z + s_mot_hi * math.cos(alpha)
@@ -681,6 +662,27 @@ drift_contact = apex_drift(phi_c)
 drift_preload = apex_drift(phi_preload)
 slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-slip
 
+
+def uj_geom(phi_t):
+    """The folded cardan at tilt phi_t, from where the four-bar actually puts
+    the ring (drift included): intermediate length, the intermediate's own
+    angle from +Y, and the ring centre (y, z). The solid cross does not move."""
+    T, _ = carriage_transform(phi_t)
+    R = T((uj_ring_y, 0.0))
+    dy, dz = R[0] - uj_cross_y, R[1]
+    return math.hypot(dy, dz), math.atan2(dz, dy), R
+
+
+_uj_sweep = [(phi_preload * k / 8.0, uj_geom(phi_preload * k / 8.0))
+             for k in range(-8, 9)]
+uj_L_rest    = uj_ring_y - uj_cross_y
+uj_L_range   = (min(g[0] for _, g in _uj_sweep), max(g[0] for _, g in _uj_sweep))
+uj_bend_cross = max(abs(g[1]) for _, g in _uj_sweep)             # rad
+uj_bend_ring  = max(abs(g[1] - p) for p, g in _uj_sweep)         # rad
+# Furthest the intermediate's front corner reaches toward the wall.
+uj_front_y = max(uj_cross_y + (g[0] + uj_mid_end) * math.cos(g[1])
+                 + uj_mid_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
+
 # ── Actuator state at the rendered pose ─────────────────────────────────────
 _UNREACHABLE = []
 
@@ -733,7 +735,8 @@ servo_y_end = crank_hub_y + 0.75 * servo_body[1] + servo_tab_out
 # of them — the horn ends up as the furthest thing out now that the gears are
 # behind it, which is exactly the point of the layout.
 cube_half_by = {
-    "Oldham output hub running clearance": oldham_b_y1 + wall_gap,
+    "cardan's intermediate + inner output bearing boss":
+        uj_front_y + run_clr + brg_w,
     "servo's far mounting tab": servo_y_end + servo_wall_clr,
     "push point and its horn": R_push + horn_w / 2.0 + 2.0,
     "four-bar frame post": fb_A[0] + fp_post_y + 1.0,
@@ -939,29 +942,35 @@ def make_motor_rubber(sd):
 
 def make_output_cone():
     """Output cone, rest pose: axis +Y, plastic apex pulled back to
-    y = apex_off_output, flaring toward the wall. Bored BLIND from the base —
-    a through bore would leave a 0.9 mm wall where the rubber band starts,
-    and the tip points at the motor shaft anyway, so nothing needs to come out
-    that end.
+    y = apex_off_output, flaring toward the wall, and now ALSO the cardan's
+    outer yoke: a neck past its rim carries the 6805 on the outside and the
+    ring cross's pins on the inside.
 
-    SOLID from the tip to tip_fill_y, shell beyond it. The shell cavity is cut
-    only where y > tip_fill_y — restricted with a half-space box rather than
-    by trimming the cone_frustum's own s-range, so the taper math stays
-    untouched and only the CUT changes. This is what gives the carriage shaft
-    a real length of grip instead of a nominal one: the shell's own cavity
-    outgrows the bore radius well before the bore itself runs out, so without
-    the fill the last ~18 mm of the "bore" was cutting into air that the shell
-    cut had already opened up."""
+    SOLID from the tip to tip_fill_y. Beyond it the cone is a shell whose
+    cavity stops cone_wall short of the rim, so the rim is a closed plate
+    joining shell to neck, and a Ø(2*neck_ri) bore runs from where the shell's
+    cavity is that wide right out through the neck."""
     cone = cone_frustum(v(0, out_apex_y, 0), Y_AXIS, beta,
                         s_output_lo, s_out_hi)
-    # The cavity: the same cone offset inward by the wall, open at the base.
-    # Its apex sits cone_wall/sin(beta) further out than the plastic one.
-    cavity = cone_frustum(v(0, out_apex_y + cone_wall / math.sin(beta), 0),
-                          Y_AXIS, beta, 0.0, s_out_hi + 5.0)
-    cavity = cavity.common(Part.makeBox(200.0, out_base_y + 10.0 - tip_fill_y,
+    # Neck: a shoulder the bearing's inner race stops on, then the seat.
+    cone = cone.fuse(cyl(neck_ro + neck_shoulder, nb_y0 - out_base_y + 1.0,
+                         v(0, out_base_y - 1.0, 0), Y_AXIS))
+    cone = cone.fuse(cyl(neck_ro, neck_y1 - nb_y0 + 0.5,
+                         v(0, nb_y0 - 0.5, 0), Y_AXIS))
+    cav_apex_y = out_apex_y + cone_wall / math.sin(beta)
+    cavity = cone_frustum(v(0, cav_apex_y, 0), Y_AXIS, beta, 0.0, s_out_hi + 5.0)
+    cavity = cavity.common(Part.makeBox(200.0, out_base_y - cone_wall - tip_fill_y,
                                         200.0, v(-100.0, tip_fill_y, -100.0)))
+    bore_y0 = cav_apex_y + neck_ri / math.tan(beta)
+    cavity = cavity.fuse(cyl(neck_ri, neck_y1 - bore_y0 + 1.0,
+                             v(0, bore_y0, 0), Y_AXIS))
     cone = cone.cut(cavity)
-    cone = cone.cut(d_bore(out_bore_end_y, out_bore_depth + 1.0))
+    # The ring cross's X pins: through the neck wall, under the bearing, which
+    # is what keeps them in.
+    for xs in (1, -1):
+        x0 = xs * (neck_ri - 1.0) if xs > 0 else -(neck_ro + 1.0)
+        cone = cone.cut(pin_x((uj_ring_y, 0.0), uj_pin_d + 0.1, x0,
+                              neck_ro - neck_ri + 2.0))
     return cone
 
 
@@ -984,52 +993,94 @@ def d_bore(y0, length, extra=0.0):
                                  v(-(fdm_shaft_hole_d / 2.0 + 1), y0, z_flat)))
 
 
-def make_carriage_shaft():
-    """Ø5 steel shaft on the carriage: cone clamped at one end, two bearings
-    between, and the Oldham's input hub keyed on the far end."""
-    y_end = oldham_a_y1
-    shaft = cyl(shaft_d / 2.0, y_end - out_bore_end_y,
-                v(0, out_bore_end_y, 0), Y_AXIS)
-    # The filed flat, the whole length: one pass of the file keys the cone and
-    # the Oldham's input hub.
-    return shaft.cut(Part.makeBox(shaft_d + 2, y_end - out_bore_end_y, shaft_d,
-                                  v(-(shaft_d / 2.0 + 1), out_bore_end_y,
-                                    shaft_flat_d / 2.0)))
+def make_uj_mid(L):
+    """Cardan intermediate, built on +Y from the solid cross (s = 0 at
+    uj_cross_y) at length L; uj_place() tilts it. A tube: the solid cross's Z
+    pins go into its tail, the ring's Z pins into slotted holes at its head
+    (the length changes by uj_slide over the stroke), and the ring's X pins
+    pass out through two windows on their way to the cone's neck."""
+    y0 = uj_cross_y - uj_mid_end
+    tube = cyl(uj_mid_ro, L + 2 * uj_mid_end, v(0, y0, 0), Y_AXIS).cut(
+        cyl(uj_mid_ri, L + 2 * uj_mid_end + 2, v(0, y0 - 1, 0), Y_AXIS))
+    hole = uj_pin_d / 2.0 + 0.05
+    span = 2 * uj_mid_ro + 2
+    tube = tube.cut(cyl(hole, span, v(0, uj_cross_y, -span / 2.0), Z_AXIS))
+    yr = uj_cross_y + L
+    for dy in (-uj_slide / 2.0, uj_slide / 2.0):
+        tube = tube.cut(cyl(hole, span, v(0, yr + dy, -span / 2.0), Z_AXIS))
+    tube = tube.cut(Part.makeBox(span, uj_slide, 2 * hole,
+                                 v(-span / 2.0, yr - uj_slide / 2.0, -hole)))
+    # Window: the X pin rocks about the Z pins by the ring's own bend, so it
+    # walks along the tube by r*sin(bend) each way, plus the slide.
+    wy = hole + uj_mid_ro * math.sin(uj_bend_ring) + uj_slide / 2.0 + 0.3
+    wz = hole + 0.3
+    tube = tube.cut(Part.makeBox(span, 2 * wy, 2 * wz,
+                                 v(-span / 2.0, yr - wy, -wz)))
+    return tube
 
 
-def drive_offset(st):
-    """(dy, dz) of the carriage axis at the Oldham disc's plane, from where it
-    sits at rest. The output axis does not move, so dz IS the offset the disc
-    slides through."""
-    c = st["T"]((disc_mid_y, 0.0))
-    return c[0] - disc_mid_y, c[1]
+def make_uj_ring(L):
+    """Ring cross at the head of the intermediate: the output shaft passes
+    through its bore. Z pins into the intermediate, X pins out through its
+    windows into the cone's neck. Pins modelled as part of it."""
+    yr = uj_cross_y + L
+    ring = cyl(uj_ring_ro, uj_ring_t, v(0, yr - uj_ring_t / 2.0, 0), Y_AXIS).cut(
+        cyl(uj_ring_ri, uj_ring_t + 2, v(0, yr - uj_ring_t / 2.0 - 1, 0), Y_AXIS))
+    r0 = uj_ring_ro - 0.5
+    z_len = uj_mid_ro - 0.2 - r0
+    x_len = (neck_ri + neck_ro) / 2.0 - r0
+    for s in (1, -1):
+        ring = ring.fuse(cyl(uj_pin_d / 2.0, z_len,
+                             v(0, yr, s * r0), v(0, 0, s)))
+        ring = ring.fuse(cyl(uj_pin_d / 2.0, x_len,
+                             v(s * r0, yr, 0), v(s, 0, 0)))
+    return ring
 
 
-def make_oldham_hub_a():
-    """Oldham input hub, keyed on the carriage shaft. It tilts with the
-    carriage; the disc and the output hub do not. Tongue not modelled — it
-    lives inside the axial float, so the envelope is what can collide."""
-    hub = cyl(oldham_d / 2.0, oldham_hub_t, v(0, oldham_a_y0, 0), Y_AXIS)
-    return hub.cut(d_bore(oldham_a_y0 - 1.0, oldham_hub_t + 2.0))
+def make_uj_cross():
+    """Solid cross on the output shaft's fork: a block with Z pins out to the
+    intermediate's tail and X pins into the fork's arms."""
+    a = uj_cross_a
+    body = Part.makeBox(2 * a, 2 * a, 2 * a, v(-a, uj_cross_y - a, -a))
+    for s in (1, -1):
+        body = body.fuse(cyl(uj_pin_d / 2.0, uj_mid_ro - 0.2 - (a - 0.5),
+                             v(0, uj_cross_y, s * (a - 0.5)), v(0, 0, s)))
+        body = body.fuse(cyl(uj_pin_d / 2.0, uj_fork_ro - 0.2 - (a - 0.5),
+                             v(s * (a - 0.5), uj_cross_y, 0), v(s, 0, 0)))
+    return body
 
 
-def make_oldham_disc(extra_r=0.0):
-    """Oldham disc envelope. It wanders on a circle of the offset's size, so
-    the checks grow it by half the offset at each pose."""
-    return cyl(oldham_d / 2.0 + extra_r, oldham_disc_t, v(0, disc_y0, 0), Y_AXIS)
+def make_uj_fork():
+    """Output-shaft fork: two arms straddling the solid cross in X, a base
+    keyed on the output shaft by the D."""
+    a = uj_cross_a
+    ya = uj_cross_y - (a + 1.0)
+    yb = uj_cross_y + uj_fork_back
+    h = a + 0.5
+    fork = cyl(uj_fork_ro, uj_fork_base, v(0, yb, 0), Y_AXIS)
+    for s in (1, -1):
+        x0 = uj_fork_ri if s > 0 else -uj_fork_ro
+        fork = fork.fuse(Part.makeBox(uj_fork_ro - uj_fork_ri, yb - ya + 0.5,
+                                      2 * h, v(x0, ya, -h)))
+    fork = fork.cut(pin_x((uj_cross_y, 0.0), uj_pin_d + 0.1,
+                          -uj_fork_ro - 1, 2 * uj_fork_ro + 2))
+    return fork.cut(d_bore(yb - 1.0, uj_fork_base + 2.0))
 
 
-def make_oldham_hub_b():
-    """Oldham output hub, keyed on the output shaft by the D."""
-    hub = cyl(oldham_d / 2.0, oldham_hub_t, v(0, oldham_b_y0, 0), Y_AXIS)
-    return hub.cut(d_bore(oldham_b_y0 - 1.0, oldham_hub_t + 2.0))
+def uj_place(shape, st):
+    """Tilt a cardan part (built on +Y from the solid cross) to the
+    intermediate's angle at this pose."""
+    sh = shape.copy()
+    ang = uj_geom(st["phi"])[1]
+    if abs(ang) > 1e-12:
+        sh.rotate(v(0, uj_cross_y, 0), X_AXIS, math.degrees(ang))
+    return sh
 
 
 def make_output_shaft():
-    """Ø5 output shaft: from the Oldham's output hub out through the wall's
-    one bearing, a little past its seat. Fixed there, both ways — see
-    out_brg_len for why it no longer needs to float."""
-    y0 = oldham_b_y0
+    """Ø5 output shaft: from the cardan's fork out through the wall's two
+    bearings (one in an inner boss, one in the wall), a little past."""
+    y0 = uj_cross_y + uj_fork_back
     y1 = cube_half + out_brg_len + 5.0
     shaft = cyl(shaft_d / 2.0, y1 - y0, v(0, y0, 0), Y_AXIS)
     return shaft.cut(Part.makeBox(shaft_d + 2, y1 - y0, shaft_d,
@@ -1037,47 +1088,16 @@ def make_output_shaft():
 
 
 def make_carriage():
-    """The carriage, in one piece: a bearing housing living inside the hollow
-    cone, two L-shaped arms out to the four-bar, and an L-shaped horn out to
-    the push point.
-
-    TWO cross-sections, not one. Inside the cone the housing has to stay round
-    and close to hous_r — the cavity is round and only 8.27 mm of radius at
-    y = 21 — but past the cone's mouth (block_y0) there is nothing left to be
-    round FOR, so it squares off into a prismatic block. That block is the one
-    thing the arms and the horn now attach to: a flat face to root an L on,
-    instead of a web tangent to a curved surface.
-
-    ONE piece again (housing+block together). It was split in two halves so
-    its bearing seats would not print as bridged horizontal holes; inside the
-    cone it is a slim cylinder, which prints with its bore straight up, so the
-    split bought nothing and cost four bolts. Both bearings still go in from
-    the pinion end and stop against a lip at the far one — the block does not
-    change that, it only changes what the OUTSIDE of that same bore looks like.
-
-    The arms can only leave through the cone's mouth — a shell has no other way
-    out — so they start at the block's outboard end and climb steeply. The horn
-    goes the other way: down clear of the corona's rim first, then forward,
-    because between those two it would cross the gear plane."""
-    body = cyl(hous_r, block_y0 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
-    body = body.fuse(Part.makeBox(2 * block_hw, hous_y1 - block_y0, 2 * block_hw,
-                                  v(-block_hw, block_y0, -block_hw)))
+    """The carriage, in one piece: a ring round the cone's neck holding the
+    6805, two L-shaped arms out to the four-bar, and the horn down to the push
+    point. Nothing of it is inside the cone any more — that is the joint's."""
+    body = cyl(hous_ro, hous_y1 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
     body = body.fuse(make_carriage_arms(1)).fuse(make_carriage_arms(-1))
     body = body.fuse(make_horn())
-
-    # Every hole LAST. The arms' own pivot holes were cut before the horn was
-    # fused on, and the horn — which runs down the same X band as the arms —
-    # filled the lower pair straight back in; the web that ties the arms to the
-    # housing did the same to the bearing seat. A hole that a later fuse closes
-    # looks perfectly fine until something is checked against it.
-    #
-    # Straight seat bore from the pinion end, with a lip at the cone end for the
-    # far bearing to seat against.
-    body = body.cut(cyl(brg_od / 2.0 + brg_fit_press,
-                        hous_y1 - hous_y0 - brg_seat_lip + 1.0,
-                        v(0, hous_y0 + brg_seat_lip, 0), Y_AXIS))
-    body = body.cut(cyl(shaft_d / 2.0 + 0.75, hous_y1 - hous_y0 + 2,
-                        v(0, hous_y0 - 1, 0), Y_AXIS))
+    # Every hole LAST: a later fuse fills an earlier hole straight back in.
+    body = body.cut(cyl(hous_lip_ri, 60.0, v(0, 0.0, 0), Y_AXIS))
+    body = body.cut(cyl(nb_od / 2.0 + brg_fit_press, 30.0,
+                        v(0, nb_y0, 0), Y_AXIS))
     for zs in (1, -1):
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
@@ -1088,44 +1108,23 @@ def make_carriage():
 
 
 def make_horn():
-    """Down, then forward: the arm that carries the push point out past the
-    gears. Straight across, it would cross the gear plane; below the corona's
-    rim there is nothing in the way at all. Roots on the block's flat bottom
-    face now, not tangent to the old round housing."""
-    # Out at the arms' own X, not on the centre line: down the middle is where
-    # the lower link's knuckle lives.
+    """Straight down off the housing to the push point's height, then along
+    to it if the two Y differ. Out at the arms' own X, off the centre line."""
     x0 = side_x - horn_t / 2.0
-    corner = (hous_y1 - 2.0, push_z)
-    horn = bar_yz((hous_y1 - 2.0, -block_hw + 1.0), corner, horn_w, x0, horn_t)
-    horn = horn.fuse(bar_yz(corner, (R_push, push_z), horn_w, x0, horn_t))
+    y_root = min(R_push, hous_y1 - horn_w / 2.0)
+    corner = (y_root, push_z)
+    horn = bar_yz((y_root, -(hous_ro - 1.0)), corner, horn_w, x0, horn_t)
+    if abs(R_push - y_root) > 1e-6:
+        horn = horn.fuse(bar_yz(corner, (R_push, push_z), horn_w, x0, horn_t))
     return horn
 
 def make_carriage_arms(sd):
-    """One upright of the carriage's 'H', from the block out to BOTH four-bar
-    pivots on this side.
-
-    Four short verticals collapsed into two long ones. Each side used to carry
-    its own top rib and bottom rib as separate pieces, with the block's height
-    as the only thing between them; now it is ONE prism running the full span
-    from the lower pivot's height to the upper one's, at the block's own Y —
-    still well clear of the cone's rim, same as the L version — with a short
-    horizontal jog at EACH end reaching its own pivot. With the block as the
-    crossbar and these two uprights either side of the axis, the whole
-    carriage reads as an H at a glance, which is the point of this pass over
-    the L: the L was already true to how force gets to each pivot, this is
-    true to how the four routes relate to each other.
-
-    bar_yz's round ends meet the elbow fillets as before, so the bends stay
-    printable, and the same numeric sweep that cleared the L clears this."""
+    """One upright of the carriage's 'H': a vertical bar at arm_root's Y, from
+    the lower pivot's height to the upper one's, crossing the housing ring it
+    roots on, with a short jog at each end out to its pivot."""
     x0 = sd * side_x - side_t / 2.0
-    # ONE web, spanning the block's own height, connecting its flat face to
-    # the arm plane — the two short per-elbow webs collapse into this too.
-    wx0, wx1 = sorted((sd * (block_hw - 1.0), x0 + (side_t if sd > 0 else 0.0)))
-    part = Part.makeBox(wx1 - wx0, hous_y1 - block_y0, 2 * block_hw,
-                        v(wx0, block_y0, -block_hw))
-    # ONE vertical bar, lower pivot's height to the upper one's.
-    part = part.fuse(bar_yz((arm_root[0], -fb_B[1]), (arm_root[0], fb_B[1]),
-                            arm_w, x0, side_t))
+    part = bar_yz((arm_root[0], -fb_B[1]), (arm_root[0], fb_B[1]),
+                  arm_w, x0, side_t)
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
         corner = (arm_root[0], zs * fb_B[1])
@@ -1143,11 +1142,18 @@ def make_trunnion():
     return cyl(trunnion_d / 2.0, act_x + link_t / 2.0 + 0.5 - lo,
                v(lo, R_push, push_z), X_AXIS)
 
+
 def make_carriage_bearing(y_face, sd):
     y_start = min(y_face, y_face + sd * brg_w)
     outer = cyl(brg_od / 2.0, brg_w, v(0, y_start, 0), Y_AXIS)
     return outer.cut(cyl(brg_id / 2.0 + 0.05, brg_w + 2,
                          v(0, y_start - 1, 0), Y_AXIS))
+
+
+def make_neck_bearing():
+    """The 6805 the cone runs on, as its envelope."""
+    outer = cyl(nb_od / 2.0, nb_w, v(0, nb_y0, 0), Y_AXIS)
+    return outer.cut(cyl(nb_id / 2.0 + 0.05, nb_w + 2, v(0, nb_y0 - 1, 0), Y_AXIS))
 
 
 def make_link_knuckle(A, B):
@@ -1477,8 +1483,14 @@ def make_wall():
                          v(0, cube_half, 0), Y_AXIS))
     wall = wall.cut(cyl(brg_od / 2.0 + brg_fit_press, out_brg_len - brg_seat_lip + 1.0,
                         v(0, cube_half + brg_seat_lip, 0), Y_AXIS))
-    wall = wall.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, out_brg_len + 2,
-                        v(0, cube_half - 1, 0), Y_AXIS))
+    # The INNER bearing: a boss on the inside face, seat open inward, the
+    # bearing pressed in until it stops against the wall's own hole.
+    wall = wall.fuse(cyl(brg_od / 2.0 + out_brg_wall, brg_w + 0.5,
+                         v(0, cube_half - brg_w, 0), Y_AXIS))
+    wall = wall.cut(cyl(brg_od / 2.0 + brg_fit_press, brg_w + 1.0,
+                        v(0, cube_half - brg_w - 1.0, 0), Y_AXIS))
+    wall = wall.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, out_brg_len + brg_w + 3,
+                        v(0, cube_half - brg_w - 1, 0), Y_AXIS))
     # Bosses on the INNER face, blind. Nothing passes through, so the outside
     # of the cube stays a clean surface.
     for sx, sz in both_hands(wall_screws()):
@@ -1624,20 +1636,16 @@ CARRIAGE_REST = [
     ("OutputRubber",  make_output_rubber(),                   (0.15, 0.15, 0.18), 0),
     ("Carriage",      make_carriage(),                        (0.70, 0.70, 0.72), 0),
     ("PushPin",       make_trunnion(),                        (0.60, 0.60, 0.60), 0),
-] + [
-    ("CarriageShaft", make_carriage_shaft(),                  (0.60, 0.60, 0.60), 0),
-    ("OldhamHubA",    make_oldham_hub_a(),                    (0.85, 0.65, 0.10), 0),
-    ("BearingCone",   make_carriage_bearing(hous_y0 + brg_seat_lip, 1),
-                                                              (0.30, 0.30, 0.32), 0),
-    ("BearingPinion", make_carriage_bearing(hous_y1, -1),     (0.30, 0.30, 0.32), 0),
+    ("NeckBearing",   make_neck_bearing(),                    (0.30, 0.30, 0.32), 0),
 ]
 
 # ── Fixed to the frame ──────────────────────────────────────────────────────
 FIXED_PARTS = [
     ("OutputShaft",   make_output_shaft(),                    (0.60, 0.60, 0.60), 0),
-    ("OldhamHubB",    make_oldham_hub_b(),                    (0.85, 0.65, 0.10), 0),
+    ("UJFork",        make_uj_fork(),                         (0.85, 0.65, 0.10), 0),
     ("BearingOutput", make_carriage_bearing(cube_half + out_brg_len, -1),
                                                               (0.30, 0.30, 0.32), 0),
+    ("BearingOutIn",  make_carriage_bearing(cube_half, -1),   (0.30, 0.30, 0.32), 0),
     ("FramePostT",    make_frame_bracket(1),                  (0.75, 0.75, 0.78), 0),
     ("FramePostB",    make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
@@ -1694,15 +1702,13 @@ def moving_parts(st):
         out.append((f"PinB{tag}",
                     pin_x(B, pin_d, -pin_reach_b, 2 * pin_reach_b),
                     _PIN_COL, 0))
-    # The disc sits between a TILTED hub (A, on the carriage) and a flat one (B,
-    # on the output). Put it halfway in both senses — half the offset, half the
-    # tilt — and grow its envelope by half the offset for the circle it wanders
-    # on. The all-on-one-face case is covered by a numeric check instead.
-    dy, dz = drive_offset(st)
-    disc = make_oldham_disc(abs(dz) / 2.0)
-    disc.rotate(v(0, disc_mid_y, 0), X_AXIS, math.degrees(st["phi"]) / 2.0)
-    disc.translate(v(0, dy / 2.0, dz / 2.0))
-    out.append(("OldhamDisc", disc, (0.95, 0.85, 0.30), 0))
+    # The cardan's moving parts, at the length and angle this pose gives the
+    # intermediate. Drawn in the phase where the bend lies in the tilt plane:
+    # both joints hinge on their X pins, the Z pins ride along.
+    L_now = uj_geom(st["phi"])[0]
+    out.append(("UJMid", uj_place(make_uj_mid(L_now), st), (0.90, 0.35, 0.20), 0))
+    out.append(("UJRing", uj_place(make_uj_ring(L_now), st), (0.50, 0.45, 0.85), 0))
+    out.append(("UJCross", uj_place(make_uj_cross(), st), (0.50, 0.45, 0.85), 0))
     out.append(("Crank", make_crank(st), _ACT_COL, 0))
     out.append(("ActLink", make_act_link(st), _ACT_COL, 0))
     return out
@@ -1934,19 +1940,27 @@ for _k in range(-4, 5):
                     _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
 
 
-# The Oldham, swept over the whole stroke:
-#   - OFFSET at the disc's plane, against the slot travel it was printed with;
-#   - the NOD, (oldham_d/2)*sin(phi), against the float — taken as if all the
-#     tilt lands on one face, since nothing stops it doing so;
-#   - the flank room a tongue needs to roll by the tilt, h*tan(phi). Reported,
-#     not checked: it becomes a barrel on the flanks, not a number here.
-_drv_off = _drv_ax = 0.0
-for _k in range(-8, 9):
-    _dy, _dz = drive_offset(pose_state(phi_preload * _k / 8.0))
-    _drv_off = max(_drv_off, abs(_dz))
-    _drv_ax = max(_drv_ax, abs(_dy))
-_nod = (oldham_d / 2.0) * math.sin(phi_preload)
-_flank = tongue_h * math.tan(phi_preload)
+# The cardan, swept as DISTANCES, same lesson as the link: its tightest
+# running gaps (intermediate inside the cone's bore, ring bore round the output
+# shaft, intermediate's head against the inner bearing boss) move with the
+# tilt, and "== 0 mm3" at three stops passes a part rubbing at half travel.
+_uj_gap, _uj_who = 1e9, "-"
+_fixed = {n: s for n, s, c, t in FIXED_PARTS}
+for _k in range(-4, 5):
+    _st_k = pose_state(phi_preload * _k / 4.0)
+    _L_k = uj_geom(_st_k["phi"])[0]
+    _mid = uj_place(make_uj_mid(_L_k), _st_k)
+    _ring = uj_place(make_uj_ring(_L_k), _st_k)
+    _cone = place_carriage(make_output_cone(), _st_k)
+    for _a, _an, _b, _bn in ((_mid, "UJMid", _cone, "OutputCone"),
+                             (_mid, "UJMid", _fixed["Wall"], "Wall"),
+                             (_mid, "UJMid", _fixed["BearingOutIn"], "BearingOutIn"),
+                             (_mid, "UJMid", _fixed["UJFork"], "UJFork"),
+                             (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft")):
+        _d = _a.distToShape(_b)[0]
+        if _d < _uj_gap:
+            _uj_gap = _d
+            _uj_who = f"{_an} x {_bn} at {math.degrees(_st_k['phi']):+.1f} deg"
 
 # What the actuator actually pulls against. R_push is the moment arm of a
 # VERTICAL push, and the link is not vertical: it comes up off the floor at
@@ -2054,12 +2068,10 @@ checks = [
      f"{beta_deg:.0f}..{90-alpha_deg:.0f} deg)",
      link_axis_deg, f"not in {beta_deg:.0f}..{90-alpha_deg:.0f}",
      not (beta_deg <= link_axis_deg <= 90 - alpha_deg)),
-    ("output cone blind-bore depth  (mm)",
-     out_bore_depth, ">= 15", out_bore_depth >= 15.0),
+    ("neck bearing clear of the cone's rim  (mm)",
+     nb_y0 - out_base_y, "> 1.0", nb_y0 - out_base_y > 1.0),
     ("output cone tip clears the motor shaft  (mm)",
      _tip_clr, "> 1.0", _tip_clr > 1.0),
-    ("bearing shoulder inside the housing  (mm)",
-     hous_y1 - hous_y0 - 2 * brg_w, "> 0", hous_y1 - hous_y0 - 2 * brg_w > 0),
     ("actuation lever about the apex, smallest of every stop  (mm)",
      min(_lever), "> 35", min(_lever) > 35.0),
     ("...and how much it MOVES over the stroke  (mm)",
@@ -2078,10 +2090,11 @@ checks = [
     # plus the pin's slop. Anything under that is touching once it is a part.
     (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
      _link_gap, "> 1.0", _link_gap > 1.0),
-    ("Oldham offset over the stroke, within its slot travel  (mm)",
-     _drv_off, f"< {oldham_travel:.1f}", _drv_off < oldham_travel),
-    ("Oldham disc nod, all tilt on one face, within its float  (mm)",
-     _nod + _drv_ax, f"< {oldham_float:.1f}", _nod + _drv_ax < oldham_float),
+    (f"cardan running clearance, SWEPT [{_uj_who}]  (mm)",
+     _uj_gap, "> 0.5", _uj_gap > 0.5),
+    ("cardan intermediate length change, within its slotted holes  (mm)",
+     uj_L_range[1] - uj_L_range[0], f"< {uj_slide:.1f}",
+     uj_L_range[1] - uj_L_range[0] < uj_slide),
     (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
      len(_invalid), "== 0", not _invalid),
     (f"every part is ONE connected solid  {_loose if _loose else ''}",
@@ -2195,16 +2208,24 @@ else:
           f" {math.degrees(phi_preload - phi_c):.3f} deg the pure-rotation"
           f" model gives")
 print("-" * 72)
-print("  DRIVE OUT: one Oldham, taking offset AND the tilt, 1:1")
-print(f"    Oldham \u00d8{oldham_d:.0f}: hub A y {oldham_a_y0:.1f}..{oldham_a_y1:.1f} (tilts),"
-      f" disc {disc_y0:.1f}..{disc_y1:.1f}, hub B {oldham_b_y0:.1f}..{oldham_b_y1:.1f}")
-print(f"    offset {_drv_off:.2f} mm of {oldham_travel:.1f} travel; axial {_drv_ax:.3f} mm;"
-      f" nod {_nod:.2f} mm of {oldham_float:.1f} float")
-print(f"    tongue flanks need {_flank:.3f} mm to roll {math.degrees(phi_preload):.1f} deg"
-      f" \u2014 print it as a barrel, not as play (play there is backlash)")
-print(f"    output shaft in ONE MR105ZZ in the wall, fixed both ways: seat"
-      f" {out_brg_len:.1f} mm ({brg_seat_lip:.1f} shoulder + {brg_w:.0f} bearing),"
-      f" {out_brg_len - wall_thick:.1f} mm of it proud of the wall")
+print("  DRIVE OUT: folded double cardan inside the cone, 1:1")
+print(f"    solid cross y {uj_cross_y:.1f} (output axis), ring y {uj_ring_y:.1f}"
+      f" (cone axis), intermediate {uj_L_rest:.1f} mm, tube"
+      f" \u00d8{2*uj_mid_ri:.1f}/{2*uj_mid_ro:.1f}, ring bore \u00d8{2*uj_ring_ri:.1f}")
+print(f"    bends at full preload: solid cross {math.degrees(uj_bend_cross):.2f} deg,"
+      f" ring {math.degrees(uj_bend_ring):.2f} deg  (never equal: both crosses are"
+      f" in front of the apex)")
+_hooke = (uj_bend_cross ** 2 - uj_bend_ring ** 2) / 4.0
+print(f"    residual angle error ~ (a1^2 - a2^2)/4 = {math.degrees(_hooke):.3f} deg"
+      f"  (one Hooke joint at the tilt would be"
+      f" {math.degrees(phi_preload**2/4):.3f})")
+print(f"    intermediate length {uj_L_range[0]:.3f}..{uj_L_range[1]:.3f} mm over the"
+      f" stroke -> ring-end pin holes slotted {uj_slide:.1f} mm")
+print(f"    cone runs on one 6805 ({nb_id:.0f}x{nb_od:.0f}x{nb_w:.0f}) on its neck,"
+      f" y {nb_y0:.1f}..{nb_y0+nb_w:.1f}, held by the carriage ring")
+print(f"    output shaft: 2x MR105ZZ, inner boss y {cube_half-brg_w:.1f}..{cube_half:.1f}"
+      f" and wall seat; reaches {cube_half - brg_w - (uj_cross_y + uj_fork_back):.1f}"
+      f" mm in from the inner bearing to the fork")
 print("-" * 72)
 print("  ACTUATION (placeholder until the rubber stiffness is measured)")
 print(f"    push point at R = {R_push:.1f} mm; crank r {crank_r:.2f} at"
@@ -2265,7 +2286,7 @@ for label, value, target, ok in checks:
 print("-" * 72)
 _cbb = BY_NAME["Carriage"].BoundBox
 print(f"  Carriage: ONE piece, {_cbb.YLength:.0f} x {_cbb.ZLength:.0f} x"
-      f" {_cbb.XLength:.0f} mm, bearing housing inside the hollow cone")
+      f" {_cbb.XLength:.0f} mm, a ring round the cone's neck")
 _cube_tied = [k for k, val in cube_half_by.items() if val > cube_half - 0.05]
 print(f"  Cube half-size ({cube_half:.1f}) = motor axis to the wall's inner"
       f" face, set by: {' AND '.join(_cube_tied)}")
@@ -2275,19 +2296,19 @@ print(f"  CUBE side {2 * cube_out:.1f} mm"
       f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
 print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
 print("           Carriage (one piece),")
-print("           OldhamHubA, OldhamDisc, OldhamHubB, FramePost x2,")
+print("           UJMid, UJRing, UJCross, UJFork, FramePost x2,")
 print("           Link x2 (each carries both its arms), Crank, ActLink,"
       " ServoBracket")
 print("  ASSEMBLY: alternate axes go in TURNED OVER \u2014 the same parts, rotated")
 print("            180 deg about their own radius, so their servo, crank and horn")
 print("            lie against the other deck. Two neighbours both wanting the same")
 print("            corner of the same floor is the one thing this box cannot fit.")
-print(f"  The cone and the Oldham's output hub are keyed by a D on a filed flat"
+print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
       f" ({shaft_flat_d:.1f} mm across);")
-print("  Filing the flats is the one manual step here.")
-print("  PURCHASED, per axis: 3x MR105ZZ (2 carriage, 1 output shaft),")
-print("             Ø5 rod (carriage shaft, output shaft, push pin),")
-print("             Ø4 pin stock (4 pivot pins),")
+print("  Filing the flat is the one manual step here.")
+print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
+print("             Ø5 rod (output shaft, push pin),")
+print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
 _fp_wall_screws = [q for q in wall_screws() if abs(q[1] - crank_hub[1]) > 1e-6]
 print(f"             {len(_fp_wall_screws) * 2}x M3x10 into the wall,"
       " into the frame posts,")
@@ -2297,5 +2318,5 @@ print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo.")
 print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
       f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
 print("=" * 72)
-print("Packaging (carriage arms, frame brackets, servo mount, Oldham) is")
+print("Packaging (carriage arms, frame brackets, servo mount, cardan) is")
 print("a first pass: the geometry above is derived, the brackets are not.")
