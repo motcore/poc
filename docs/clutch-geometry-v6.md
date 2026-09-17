@@ -170,7 +170,7 @@ under the next constraint for 0.61% slip; ray 40° at r = 52 gets the same cube 
 0.65%. The carriage pivot cannot come in below r = 40.5 without landing on the
 motor cone's rim. The knuckle sits on B because a 14.5 mm link is too short for
 the frame post's lug and a mid-span knuckle to share; at B the 45° ray keeps it
-1.4 mm off the motor cone (swept check).
+1.9 mm off the motor cone (swept check).
 
 **Measured by the macro** (`apex_drift`, on the linkage's own solved pose): at
 full preload the point that started at the apex moves **0.187 mm** (0.132 at
@@ -193,7 +193,7 @@ A flexure version was considered and **deferred to v7** — PLA creeps under
 sustained load, and the project already abandoned a compliant blade in v4.
 
 The carriage itself is now a **ring round the cone's neck** (§6) holding the
-bearing, with two arms at x = ±15 that rise at y = 36 and run to B at 45°.
+bearing, with two arms at x = ±15 whose uprights are flush with the ring (y 33…42) and run to B at 45°.
 
 ---
 
@@ -452,7 +452,7 @@ with a ~4–7 mm horn.
 ## 12. Ideas raised 2026-09-15 — status
 
 1. **Material at the cone tip.** Done: solid to y = 18.
-2. **Four-bar links near the motor cone.** Checked by a swept distance (1.40 mm
+2. **Four-bar links near the motor cone.** Checked by a swept distance (1.90 mm
    at the knuckle), not just at three stops.
 3. **The rubber band's edge is not square.** Open.
 4. **Get rid of the corona.** Done — replaced by the folded cardan (§6).
