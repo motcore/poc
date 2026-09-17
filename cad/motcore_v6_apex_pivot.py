@@ -226,6 +226,14 @@ ear_h         = 6.0    # mm — ear bridge height
 act_pin_d     = 3.0    # mm — actuation pins
 act_boss_r    = 2.5    # mm — boss radius round each actuation pin
 
+# ── Checks ───────────────────────────────────────────────────────────────────
+RUN_CHECKS = None   # None = automatic: all the checks when run headless
+                    # (freecadcmd), none when opened in the FreeCAD window, so
+                    # the model shows in seconds. True / False to force it.
+                    # The checks are what take the time: every pair of parts at
+                    # three stops, three swept distance checks, the four axes
+                    # against each other, and the rubber's real contact point.
+
 # ── Render pose ──────────────────────────────────────────────────────────────
 CARRIAGE_STOP = "contact"   # "free" | "contact" | "preload"
 CARRIAGE_DIR  = -1          # -1 = tilt DOWN (engages the LOWER motor cone),
@@ -244,10 +252,13 @@ nb_od         = 37.0   # mm │ 6805-2RS thin-section bearing on the cone's neck
 nb_w          = 7.0    # mm ┘
 nb_y0         = 34.0   # mm — bearing, cone-side face (cone frame). Clear of the
                         #      cone's rim at 30.8 by the neck's own shoulder.
-hous_lip      = 1.0    # mm — lip on the cone side of the seat; the bearing goes
-                        #      in from the wall side and stops against it
-hous_lip_ri   = 16.0   # mm — the lip's bore: past the inner race and the neck's
-                        #      shoulder, so it only touches the outer race
+hous_lip      = 1.0    # mm — seat left open past the bearing on the cone side
+                        #      (the arms' uprights are flush with this face)
+hous_flange_ri = 16.0  # mm — the flange the bearing stops against, on the WALL
+                        #      side: its bore clears the neck and the inner race.
+                        #      It runs solid from the bearing to the ring's
+                        #      wall-side face, which is the face the carriage
+                        #      prints on, so the stop grows up off the bed.
 hous_ro       = 21.5   # mm — housing outer radius (2.3 mm over the seat)
 hous_y0       = nb_y0 - hous_lip          # DERIVED
 hous_y1       = nb_y0 + nb_w + 1.0        # DERIVED, 1 mm proud of the bearing
@@ -1033,15 +1044,25 @@ def make_output_shaft():
 
 def make_carriage():
     """The carriage, in one piece: a ring round the cone's neck holding the
-    6805, two L-shaped arms out to the four-bar, and the horn down to the push
-    point. Nothing of it is inside the cone any more — that is the joint's."""
-    body = cyl(hous_ro, hous_y1 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
+    6805, two arms out to the four-bar, and the ear the actuation pulls on.
+    Nothing of it is inside the cone any more — that is the joint's.
+
+    Printed with its WALL-side face on the bed: the bearing seat comes out as a
+    vertical round hole and the 45 deg jogs out to B rise from it unsupported.
+    The ring runs on toward the wall past the bearing, to the ear block's own
+    far face, so the two stand on the bed together — and that extra length IS
+    the bearing's stop: a solid flange from the bearing down to the bed. The
+    bearing goes in from the cone side, then carriage and bearing slide onto
+    the neck together. The arms' uprights stay the bearing's width."""
+    y_end = max(hous_y1, E0[0] + act_boss_r + 0.5)
+    body = cyl(hous_ro, y_end - hous_y0, v(0, hous_y0, 0), Y_AXIS)
     body = body.fuse(make_carriage_arms(1)).fuse(make_carriage_arms(-1))
     body = body.fuse(make_ear())
     # Every hole LAST: a later fuse fills an earlier hole straight back in.
-    body = body.cut(cyl(hous_lip_ri, 60.0, v(0, 0.0, 0), Y_AXIS))
-    body = body.cut(cyl(nb_od / 2.0 + brg_fit_press, 30.0,
-                        v(0, nb_y0, 0), Y_AXIS))
+    seat_r = nb_od / 2.0 + brg_fit_press
+    body = body.cut(cyl(hous_flange_ri, 60.0, v(0, 0.0, 0), Y_AXIS))
+    body = body.cut(cyl(seat_r, nb_y0 + nb_w - (hous_y0 - 1.0),
+                        v(0, hous_y0 - 1.0, 0), Y_AXIS))
     for zs in (1, -1):
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
@@ -1667,400 +1688,6 @@ add(doc, "MotorShaft", cyl(shaft_d / 2.0, 2 * _ms_reach, v(0, 0, -_ms_reach)),
 
 doc.recompute()
 
-# ═══════════════════════════════════════════════════════════════════
-# CHECKS
-# ═══════════════════════════════════════════════════════════════════
-# Booleans and distances, not "it did not raise". Geometry this macro gets
-# wrong comes out as a part in the wrong place, never as an exception.
-
-_mc_lo, _mc_up = make_motor_cone(-1), make_motor_cone(1)
-_mr_lo, _mr_up = make_motor_rubber(-1), make_motor_rubber(1)
-_oc_now = BY_NAME["OutputCone"]
-_or_now = BY_NAME["OutputRubber"]
-
-# Rubber, at the rendered pose: which side is engaged, and by how much.
-_rub_lo = _or_now.common(_mr_lo).Volume
-_rub_up = _or_now.common(_mr_up).Volume
-_gap_lo = _or_now.distToShape(_mr_lo)[0]
-_gap_up = _or_now.distToShape(_mr_up)[0]
-_plastic_ov = _oc_now.common(_mc_lo).Volume + _oc_now.common(_mc_up).Volume
-
-# At FREE the rubber must be clear of both cones (that IS the free state).
-_or_free = make_output_rubber()
-_free_gap = min(_or_free.distToShape(_mr_lo)[0], _or_free.distToShape(_mr_up)[0])
-
-
-def _rubber_gap(phi_t):
-    """Real distance between the rubber surfaces at tilt phi_t, on the engaged
-    side — measured on the solids at the four-bar's actual pose, not on the
-    ideal rotation. Also returns how far from the apex the closest point sits,
-    which says whether the band meets at its inner or its outer end."""
-    moved = place_carriage(make_output_rubber(), pose_state(phi_t))
-    dist, pts, _ = moved.distToShape(_mr_up if phi_t > 0 else _mr_lo)
-    s_at = math.hypot(pts[0][0].y, pts[0][0].z) if pts else float("nan")
-    return dist, s_at
-
-
-# Where does contact ACTUALLY happen? phi_c is the pure-rotation answer. The
-# four-bar's drift is almost entirely along +Y — the output cone backs away from
-# the apex — and backing a cone off along its own axis moves its surface away
-# from the motor cone by drift*sin(beta). That OPENS the contact, and because
-# the drift grows roughly as phi^2 while the tilt closes the gap linearly, the
-# two nearly cancel: contact is late, and it starts at the OUTER end of the band
-# (where the closing rate s*dphi is biggest) instead of along the whole line.
-# Bisected on the solids rather than extrapolated — a two-sample linear fit gets
-# this badly wrong, for exactly the quadratic reason above.
-def _rubber_squeeze(phi_t):
-    """Overlap solid between the two rubber layers at phi_t: its volume, and
-    how much of the designed contact band it actually covers. Interference
-    volume stands in for squeeze because the layers are modelled rigid."""
-    moved = place_carriage(make_output_rubber(), pose_state(phi_t))
-    lump = moved.common(_mr_up if phi_t > 0 else _mr_lo)
-    if lump.Volume < 1e-9:
-        return 0.0, None, None, float("nan")
-    # Edges discretised, not just vertices: the overlap is a sliver bounded by
-    # two smooth tangential surfaces, so its only VERTICES sit on the band's
-    # trimmed rim and reading those alone says "a point at s = 28", which is
-    # wrong — the patch runs a good way inboard from there.
-    ss = []
-    for e in lump.Edges:
-        for pt in e.discretize(24):
-            ss.append(math.hypot(pt.y, pt.z))
-    # common() hands back a Compound, which has no CenterOfMass of its own:
-    # weight the solids' centroids by their volumes.
-    tot = sum(sol.Volume for sol in lump.Solids) or 1.0
-    cy = sum(sol.CenterOfMass.y * sol.Volume for sol in lump.Solids) / tot
-    cz = sum(sol.CenterOfMass.z * sol.Volume for sol in lump.Solids) / tot
-    return lump.Volume, min(ss), max(ss), math.hypot(cy, cz)
-
-
-_sq_vol, _sq_lo, _sq_hi, _sq_sbar = _rubber_squeeze(-phi_preload)
-_lo_phi, _hi_phi = phi_c, 2.5 * phi_c
-_hi_gap, _hi_s = _rubber_gap(-_hi_phi)
-if _hi_gap > 1e-6:
-    phi_contact_real, contact_s = None, float("nan")
-else:
-    for _ in range(14):
-        _mid = (_lo_phi + _hi_phi) / 2.0
-        if _rubber_gap(-_mid)[0] > 1e-6:
-            _lo_phi = _mid
-        else:
-            _hi_phi = _mid
-    phi_contact_real = (_lo_phi + _hi_phi) / 2.0
-    contact_s = _rubber_gap(-phi_contact_real * 1.02)[1]
-
-# EVERY pair of parts, at every stop. The earlier version of this check only
-# compared carriage parts against fixed ones, which left two whole categories
-# unchecked — carriage parts against each other (the output cone IS a carriage
-# part, and the arms were cutting into it) and the actuation train against
-# anything at all (its link was inside the corona). Bounding boxes first, so
-# the ~200 pairs cost three booleans, not two hundred.
-#
-# Only the meshing gear pairs are exempt: at a tilt the pinion rolls to
-# whatever phase the mesh needs, so a solid overlap there is an artefact of
-# drawing it at its free-pose phase. The mesh itself is checked at free, where
-# the phasing is exact.
-# Nothing is meant to share volume: the Oldham's tongues live inside the
-# disc's axial float, which the sweep checks like any other clearance.
-_MESH_PAIRS = set()
-
-
-def _exempt(na, nb):
-    """Pairs that are MEANT to share volume.
-
-    Meshing gears, drawn at their free-pose phase (the mesh itself is checked
-    at free, and a phase is proven to exist at tilt). And a self-tapping screw
-    in its pilot hole: the screw is Ø3 into a Ø2.6 pilot, and that difference
-    is the thread it forms. Everything else that overlaps is a mistake."""
-    if (na, nb) in _MESH_PAIRS or (nb, na) in _MESH_PAIRS:
-        return True
-    for host, screw in (("Wall", "WallScrew"), ("DeckTop", "DeckScrewT"),
-                        ("DeckBottom", "DeckScrewB")):
-        if {na, nb} == {host} | {n for n in (na, nb) if n.startswith(screw)}:
-            return True
-    return False
-
-
-def _bb_hit(a, b):
-    A, B = a.BoundBox, b.BoundBox
-    return (A.XMin < B.XMax and B.XMin < A.XMax
-            and A.YMin < B.YMax and B.YMin < A.YMax
-            and A.ZMin < B.ZMax and B.ZMin < A.ZMax)
-
-
-# Parts shared by every axis: they are built once, so they are not in
-# AXIS_PARTS and the all-pairs loop never sees them. The decks landed here too —
-# the same blind spot the wall was in.
-_SHARED = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
-           ("DeckTop", make_deck(1)), ("DeckBottom", make_deck(-1))]
-_carr_mot_who = "-"
-_pair_ov, _pair_who = 0.0, "-"
-_carr_mot_ov = 0.0
-for _tag, _phi_t in (("free", 0.0), ("up", phi_preload), ("dn", -phi_preload)):
-    _parts = moving_parts(pose_state(_phi_t)) + FIXED_PARTS
-    for _i in range(len(_parts)):
-        _na, _sa = _parts[_i][0], _parts[_i][1]
-        for _j in range(_i + 1, len(_parts)):
-            _nb, _sb = _parts[_j][0], _parts[_j][1]
-            if _exempt(_na, _nb):
-                continue
-            if not _bb_hit(_sa, _sb):
-                continue
-            _ov = _sa.common(_sb).Volume
-            if _ov > max(_pair_ov, 1e-6):
-                _pair_ov, _pair_who = _ov, f"{_na} x {_nb} at {_tag}"
-        for _shn, _shs in _SHARED:
-            if _bb_hit(_sa, _shs) and not _exempt(_na, _shn):
-                _ov = _sa.common(_shs).Volume
-                if _ov > _carr_mot_ov:
-                    _carr_mot_ov, _carr_mot_who = _ov, f"{_na} x {_shn}"
-
-
-# The link, swept, as a DISTANCE. Everything above is "do they overlap", at
-# three stops. Both of those hid the same fault, and it took the two of them:
-#
-#   - the minimum is INTERIOR to the stroke. The four-bar's drift carries the
-#     carriage outward while the tilt carries the link inward, the two nearly
-#     cancel, and what is left is a shallow bowl with its floor at about half
-#     travel. The three stops sample the rim of that bowl, never its floor.
-#   - and at the floor the parts still did not overlap. They cleared by
-#     0.077 mm, which "== 0 mm3" passes and a printer does not: it is finer
-#     than the wall roughness on either face.
-#
-# So this one sweeps, and it reports millimetres. The link is the part worth
-# the cost — it is the only thing that swings through the gap between the
-# motor cone's rim and the frame post, and its knuckle crosses x = 0, where
-# the cone is widest.
-_LINK_CONES = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up)]
-_LINK_POSTS = [(_n, _s) for _n, _s, _c, _t in FIXED_PARTS
-               if _n.startswith("FramePost")]
-_link_gap, _link_who = 1e9, "-"
-for _k in range(-4, 5):
-    _phi_k = phi_preload * _k / 4.0
-    _st_k = pose_state(_phi_k)
-    for _A_k, _Bk in ((A1, "B1"), (A2, "B2")):
-        # Whole link against the cones; knuckle only against the posts, since
-        # the arms are meant to run close there — see make_link_knuckle.
-        for _sub, _against in ((make_link(_A_k, _st_k[_Bk]), _LINK_CONES),
-                               (make_link_knuckle(_A_k, _st_k[_Bk]), _LINK_POSTS)):
-            for _n, _s in _against:
-                _d = _sub.distToShape(_s)[0]
-                if _d < _link_gap:
-                    _link_gap = _d
-                    _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
-
-
-# The cardan, swept as DISTANCES, same lesson as the link: its tightest
-# running gaps (intermediate inside the cone's bore, ring bore round the output
-# shaft, intermediate's head against the inner bearing boss) move with the
-# tilt, and "== 0 mm3" at three stops passes a part rubbing at half travel.
-_uj_gap, _uj_who = 1e9, "-"
-_fixed = {n: s for n, s, c, t in FIXED_PARTS}
-for _k in range(-4, 5):
-    _st_k = pose_state(phi_preload * _k / 4.0)
-    _L_k = uj_geom(_st_k["phi"])[0]
-    _mid = uj_place(make_uj_mid(_L_k), _st_k)
-    _ring = uj_place(make_uj_ring(_L_k), _st_k)
-    # The prism alone: its pins sit in the fork's holes by design.
-    _cross = uj_place(make_uj_cross(pins=False), _st_k)
-    _cone = place_carriage(make_output_cone(), _st_k)
-    for _a, _an, _b, _bn in ((_mid, "UJMid", _cone, "OutputCone"),
-                             (_mid, "UJMid", _fixed["Wall"], "Wall"),
-                             (_mid, "UJMid", _fixed["BearingOutIn"], "BearingOutIn"),
-                             (_mid, "UJMid", _fixed["UJFork"], "UJFork"),
-                             (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft"),
-                             (_cross, "UJCross", _fixed["UJFork"], "UJFork")):
-        _d = _a.distToShape(_b)[0]
-        if _d < _uj_gap:
-            _uj_gap = _d
-            _uj_who = f"{_an} x {_bn} at {math.degrees(_st_k['phi']):+.1f} deg"
-
-# The actuation chain over the whole stroke: it must assemble everywhere, the
-# horn must swing about what the sweep split was designed for, and no joint may
-# go near dead centre (a link nearly in line with its arm transmits nothing
-# useful and multiplies slop).
-def _trans(a, b, c):
-    """Angle at b between b->a and b->c, folded to 0..90 (90 = best)."""
-    u = (a[0] - b[0], a[1] - b[1])
-    w = (c[0] - b[0], c[1] - b[1])
-    cosang = (u[0] * w[0] + u[1] * w[1]) / (math.hypot(*u) * math.hypot(*w))
-    ang = math.degrees(math.acos(max(-1.0, min(1.0, cosang))))
-    return min(ang, 180.0 - ang)
-
-
-_act_fail = 0
-_trans_min = 90.0
-for _k in range(-8, 9):
-    _st_k = pose_state(phi_preload * _k / 8.0)
-    if _st_k["O"] is None or _st_k["H"] is None:
-        _act_fail += 1
-        continue
-    _trans_min = min(_trans_min,
-                     _trans(P_act, _st_k["O"], _st_k["E"]),
-                     _trans(P_act, _st_k["I"], _st_k["H"]),
-                     _trans(S_act, _st_k["H"], _st_k["I"]))
-_st_c = pose_state(phi_c)
-_horn_contact = (abs(math.degrees(_st_c["horn_a"]))
-                 if _st_c["horn_a"] is not None else float("nan"))
-_st_p = pose_state(phi_preload)
-_horn_preload = (abs(math.degrees(_st_p["horn_a"]))
-                 if _st_p["horn_a"] is not None else float("nan"))
-
-# The chain, swept as DISTANCES over the stroke, same lesson as the links and
-# the cardan: its stack is 0.5 mm plate to plate and it runs past the servo's
-# case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
-# not enough. Pairs joined by a pin are left out — their 0.5 mm is the
-# designed gap between neighbouring plates, not a running clearance.
-_ACT_PINNED = {frozenset(p) for p in (("Horn", "Link1"), ("Link1", "Lever"),
-                                      ("Lever", "Link2"), ("Link2", "Carriage"),
-                                      ("Lever", "LeverPost"),
-                                      ("Horn", "HornSpring"),
-                                      ("Horn", "ServoBody"))}  # on its spline
-_ACT_AGAINST = ("ServoBody", "ServoBracket", "HornSpring", "LeverPost",
-                "FramePostT", "FramePostB", "Wall")
-_act_gap, _act_who = 1e9, "-"
-_act_tight = {}
-_fixed_act = {n: s for n, s, c, t in FIXED_PARTS if n in _ACT_AGAINST}
-for _k in range(-4, 5):
-    _st_k = pose_state(phi_preload * _k / 4.0)
-    _mov = {n: s for n, s, c, t in act_moving_parts(_st_k)
-            if not n.startswith("Pin")}
-    _mov["Carriage"] = place_carriage(make_carriage(), _st_k)
-    _pairs = [(a, b) for a in _mov for b in _fixed_act]
-    _names = list(_mov)
-    _pairs += [(_names[i], _names[j]) for i in range(len(_names))
-               for j in range(i + 1, len(_names))]
-    for _a, _b in _pairs:
-        if frozenset((_a, _b)) in _ACT_PINNED:
-            continue
-        # The carriage against the wall and the posts is the four-bar's own
-        # business, already swept above; here it only meets the chain.
-        if _a == "Carriage" and _b in ("Wall", "FramePostT", "FramePostB"):
-            continue
-        _sa = _mov[_a]
-        _sb = _mov[_b] if _b in _mov else _fixed_act[_b]
-        _d = _sa.distToShape(_sb)[0]
-        if _d < 1.5:
-            _act_tight[(_a, _b)] = min(_d, _act_tight.get((_a, _b), 9.0))
-        if _d < _act_gap:
-            _act_gap = _d
-            _act_who = f"{_a} x {_b} at {math.degrees(_st_k['phi']):+.1f} deg"
-
-
-# Every other axis, not just the next one. The four of them share one box.
-_mech = None
-for _n, _s, _c, _t in AXIS_PARTS:
-    if _n == "Wall":
-        _wall_shape = _s
-        continue
-    _mech = _s.copy() if _mech is None else _mech.fuse(_s)
-
-
-def axis_shape(k):
-    """Axis k of the pinwheel, as one shape.
-
-    All four axes are the SAME, rotated about Z — nothing is turned over any
-    more. Each axis' servo sits in its own (+X) corner of the pinwheel, so no
-    two want the same one. (Turning alternate axes over was only ever there
-    for two servos lying on the same floor.)"""
-    shape = _mech.copy().fuse(_wall_shape)
-    shape.rotate(ORIGIN, Z_AXIS, 90.0 * k)
-    return shape
-
-
-_asm = axis_shape(0)
-_adj_overlap = 0.0
-_adj_worst = 0
-for _k in (1, 2, 3):
-    _v = _asm.common(axis_shape(_k)).Volume
-    if _v > _adj_overlap:
-        _adj_overlap, _adj_worst = _v, _k
-
-# Output cone tip vs the motor shaft it points at.
-_tip_clr = out_tip_y - shaft_d / 2.0
-
-# Every shape in the tree is a valid solid. A boolean that half-failed leaves a
-# shape that still draws and still has a volume, so this is not free.
-_invalid = [o.Name for o in doc.Objects if not o.Shape.isValid()]
-
-# And every part is ONE solid. Fusing shapes that do not touch is silent: the
-# result is valid, has the right volume, draws correctly and is not a part.
-# The carriage was exactly that — housing plus two side plates, fused, with
-# nothing between them (the web that now joins them did not exist).
-_loose = [n for n, sh, c, t in AXIS_PARTS if len(sh.Solids) != 1]
-_loose += [n for n, sh in (("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
-                           ("MotorRubberLower", _mr_lo), ("MotorRubberUpper", _mr_up))
-           if len(sh.Solids) != 1]
-
-checks = [
-    # Informational, and NOT below 1: at 1:1 the cube is an overdrive, the
-    # friction stage alone. The reduction invariant 1 demands lives between
-    # hubs now, and it has to beat THIS number, not 0.5.
-    ("cube ratio w_out/w_motor  (reduction moved between hubs)",
-     ratio_total, "info", True),
-    ("free gap angle phi_c = 90 - alpha - beta  (deg)",
-     math.degrees(phi_c), "> 0", phi_c > 0),
-    ("link axes converge on the apex  (deg between the two rays)",
-     link_axis_err, "< 0.2", link_axis_err < 0.2),
-    ("link axis outside the cone wedge  (beta..90-alpha = "
-     f"{beta_deg:.0f}..{90-alpha_deg:.0f} deg)",
-     link_axis_deg, f"not in {beta_deg:.0f}..{90-alpha_deg:.0f}",
-     not (beta_deg <= link_axis_deg <= 90 - alpha_deg)),
-    ("neck bearing clear of the cone's rim  (mm)",
-     nb_y0 - out_base_y, "> 1.0", nb_y0 - out_base_y > 1.0),
-    ("output cone tip clears the motor shaft  (mm)",
-     _tip_clr, "> 1.0", _tip_clr > 1.0),
-    ("actuation chain assembles at every tilt of the stroke  (poses failed)",
-     _act_fail, "== 0", _act_fail == 0),
-    ("horn swing, free -> contact  (deg, designed "
-     f"{sv_theta_c:.0f})",
-     _horn_contact, f"{sv_theta_c-5:.0f}..{sv_theta_c+5:.0f}",
-     abs(_horn_contact - sv_theta_c) < 5.0),
-    ("worst transmission angle in the chain  (deg from dead centre)",
-     _trans_min, "> 40", _trans_min > 40.0),
-    ("FREE: rubber clear of both motor cones  (mm)",
-     _free_gap, "> 0.10", _free_gap > 0.10),
-    ("plastic never touches plastic  (mm3)",
-     _plastic_ov, "== 0", _plastic_ov < 1e-6),
-    (f"every pair of parts, every stop [{_pair_who}]  (mm3)",
-     _pair_ov, "== 0", _pair_ov < 1e-6),
-    (f"nothing on the axis touches the shared parts [{_carr_mot_who}]  (mm3)",
-     _carr_mot_ov, "== 0", _carr_mot_ov < 1e-6),
-    # A printed clearance, not a mathematical one: 1 mm is about two perimeters
-    # plus the pin's slop. Anything under that is touching once it is a part.
-    (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
-     _link_gap, "> 1.0", _link_gap > 1.0),
-    # Drawn in one phase only: the prism is aligned with the tube there. Half
-    # a turn later it rocks inside it about the Z pins, and its far corner is
-    # what comes closest to the tube's bore.
-    # Same for the ring inside the tube's head: half a turn on, it rocks about
-    # its Z pins by the ring joint's own bend.
-    ("ring cross inside the tube's head, any phase  (mm)",
-     uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
-                   + uj_ring_t / 2.0 * math.sin(uj_bend_ring)),
-     "> 0.3",
-     uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
-                   + uj_ring_t / 2.0 * math.sin(uj_bend_ring)) > 0.3),
-    ("solid cross prism inside the intermediate, any phase  (mm)",
-     uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2),
-     "> 0.5",
-     uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2) > 0.5),
-    (f"cardan running clearance, SWEPT [{_uj_who}]  (mm)",
-     _uj_gap, "> 0.5", _uj_gap > 0.5),
-    (f"actuation chain running clearance, SWEPT [{_act_who}]  (mm)",
-     _act_gap, "> 0.5", _act_gap > 0.5),
-    ("cardan intermediate length change, within its slotted holes  (mm)",
-     uj_L_range[1] - uj_L_range[0], f"< {uj_slide:.1f}",
-     uj_L_range[1] - uj_L_range[0] < uj_slide),
-    (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
-     len(_invalid), "== 0", not _invalid),
-    (f"every part is ONE connected solid  {_loose if _loose else ''}",
-     len(_loose), "== 0", not _loose),
-    (f"every other axis, all identical and rotated [worst: {_adj_worst*90}"
-     f" deg]  (mm3)",
-     _adj_overlap, "== 0", _adj_overlap < 1e-6),
-]
-
 if HAS_GUI:
     try:
         Gui.ActiveDocument = Gui.getDocument(doc.Name)
@@ -2069,179 +1696,584 @@ if HAS_GUI:
     except AttributeError:
         pass   # freecadcmd: no real view, geometry is already built
 
-# ═══════════════════════════════════════════════════════════════════
-# REPORT
-# ═══════════════════════════════════════════════════════════════════
-print("=" * 72)
-print(f"Motcore v6 — Apex Pivot ({len(AXES)} bidirectional axes, {AXES_SHOWN} built)")
-print(f"  alpha = {alpha_deg:.1f} deg (motor)   beta = {beta_deg:.1f} deg (output)"
-      f"   rubber t = {t_rubber:.1f} mm")
-print(f"  Friction ratio {ratio_fric:.3f} x gear ratio {ratio_gear:.3f}"
-      f"  =  {ratio_total:.3f}  (-> x{1/ratio_total:.2f} torque)")
-print(f"  Plastic apex offsets (invariant 2): motor {apex_off_motor:.3f} mm,"
-      f" output {apex_off_output:.3f} mm")
-print(f"  Contact band on the rubber surface: s = {s_rub_lo:.1f}..{s_rub_hi:.1f} mm"
-      f" from the apex  (L = {L_line:.1f})")
-print(f"  L is DERIVED: the band fills the cone, stopping {rubber_lip:.1f} mm"
-      f" short of the rim so the wrapped")
-print(f"  sheet has a lip to bond to. Cone generatrix {s_mot_hi:.1f} mm (motor),"
-      f" {s_out_hi:.1f} mm (output — shorter,")
-print(f"  its shallower angle reaches the same rubber radius with less plastic)")
-print("-" * 72)
-print("  FLAT PATTERN — a cone is developable, so the rubber is cut from sheet")
-for _tag, _ha, _qty in (("motor ", alpha, 2), ("output", beta, 4)):
-    _arc, _k, _psi, _len = seam_spiral(_ha)
-    print(f"    {_tag} (x{_qty}): annular sector, r {s_rub_lo:.1f}..{s_rub_hi:.1f}"
-          f" mm, {math.degrees(_arc):.0f} deg of arc"
-          f"  ->  needs {2*s_rub_hi:.0f} x {2*s_rub_hi:.0f} mm of sheet")
-    print(f"            spiral seam theta = {_k:.3f} * ln(s / {s_rub_lo:.0f}):"
-          f" {math.degrees(_psi):.0f} deg from the generatrix, {_len:.0f} mm long")
-print("    Both edges are the SAME spiral, offset by the sector arc. A seam at"
-      " that angle crosses the")
-print("    contact line at one point that sweeps along it as the cone turns,"
-      " instead of the whole")
-print("    line landing on the seam once per revolution. Shallower still (bigger"
-      " k) keeps a crossing")
-print("    permanently in contact, at the cost of seam length.")
-if WRITE_FLAT_PATTERN:
-    try:
-        _here = os.path.dirname(os.path.abspath(__file__))
-    except NameError:
-        _here = os.getcwd()
-    try:
-        _svg, _svg_err = write_flat_pattern(
-            os.path.join(_here, "motcore_v6_flat_pattern.svg"))
-        print(f"    -> written 1:1 to {_svg}")
-        print(f"       [{'OK ' if _svg_err < 2e-3 else 'FAIL'}] pattern area vs"
-              f" the analytic band area: {_svg_err*100:.3f}% off")
-    except OSError as exc:
-        print(f"    -> could NOT write the template: {exc}")
-print("-" * 72)
-print("  STOPS (tilt from the middle; free is the middle, both ways)")
-print(f"    free    phi = 0.000 deg")
-print(f"    contact phi = {math.degrees(phi_c):.3f} deg"
-      f"   servo {sv_theta_c:.0f} deg")
-print(f"    preload phi = {math.degrees(phi_preload):.3f} deg"
-      f"   servo {sv_theta_max:.0f} deg, split 1:{spring_split-1:.1f}")
-print(f"  Rendering '{CARRIAGE_STOP}' "
-      f"{'up' if CARRIAGE_DIR > 0 else 'down'}  ->  phi = {math.degrees(phi):+.3f} deg")
-print("-" * 72)
-print("  FOUR-BAR (answers doc open question 10.3)")
-print(f"    links {link_len:.2f} mm at {link_axis_deg:.2f} deg from +Y,"
-      f" frame pivots r = {r_frame_pivot:.2f}, carriage pivots r = {r_carriage_pivot:.2f}")
-for _name, _d in (("contact", drift_contact), ("preload", drift_preload)):
-    print(f"    apex drift at {_name:<8} {_d[0]:.4f} mm"
-          f"   along generatrix {_d[1]:+.4f}  normal {_d[2]:+.4f}")
-print(f"    -> residual slip {slip_fourbar*100:.2f}% of the contact line"
-      f"   (v5, interleaved O-rings: 7.4%)")
-print(f"    -> the normal component is a preload error of"
-      f" {abs(drift_preload[2]):.3f} mm, {abs(drift_preload[2])/t_rubber*100:.0f}%"
-      f" of the rubber thickness: NOT negligible against a ~0.2 mm squeeze")
-print("-" * 72)
-print("  CONTACT STATE at the rendered pose")
-print(f"    rubber gap: lower cone {_gap_lo:.4f} mm, upper cone {_gap_up:.4f} mm")
-print(f"    rubber squeeze volume: lower {_rub_lo:.2f} mm3, upper {_rub_up:.2f} mm3")
-print(f"    free-state gap (both cones, phi = 0): {_free_gap:.4f} mm")
-if phi_contact_real is None:
-    print("    !! the rubber never meets within 2.5x phi_c: the four-bar's outward")
-    print("       drift opens the contact as fast as the tilt closes it")
+if RUN_CHECKS is None:
+    RUN_CHECKS = not getattr(App, "GuiUp", 0)
+
+if RUN_CHECKS:
+    # ═══════════════════════════════════════════════════════════════════
+    # CHECKS
+    # ═══════════════════════════════════════════════════════════════════
+    # Booleans and distances, not "it did not raise". Geometry this macro gets
+    # wrong comes out as a part in the wrong place, never as an exception.
+
+    _mc_lo, _mc_up = make_motor_cone(-1), make_motor_cone(1)
+    _mr_lo, _mr_up = make_motor_rubber(-1), make_motor_rubber(1)
+    _oc_now = BY_NAME["OutputCone"]
+    _or_now = BY_NAME["OutputRubber"]
+
+    # Rubber, at the rendered pose: which side is engaged, and by how much.
+    _rub_lo = _or_now.common(_mr_lo).Volume
+    _rub_up = _or_now.common(_mr_up).Volume
+    _gap_lo = _or_now.distToShape(_mr_lo)[0]
+    _gap_up = _or_now.distToShape(_mr_up)[0]
+    _plastic_ov = _oc_now.common(_mc_lo).Volume + _oc_now.common(_mc_up).Volume
+
+    # At FREE the rubber must be clear of both cones (that IS the free state).
+    _or_free = make_output_rubber()
+    _free_gap = min(_or_free.distToShape(_mr_lo)[0], _or_free.distToShape(_mr_up)[0])
+
+
+    def _rubber_gap(phi_t):
+        """Real distance between the rubber surfaces at tilt phi_t, on the engaged
+        side — measured on the solids at the four-bar's actual pose, not on the
+        ideal rotation. Also returns how far from the apex the closest point sits,
+        which says whether the band meets at its inner or its outer end."""
+        moved = place_carriage(make_output_rubber(), pose_state(phi_t))
+        dist, pts, _ = moved.distToShape(_mr_up if phi_t > 0 else _mr_lo)
+        s_at = math.hypot(pts[0][0].y, pts[0][0].z) if pts else float("nan")
+        return dist, s_at
+
+
+    # Where does contact ACTUALLY happen? phi_c is the pure-rotation answer. The
+    # four-bar's drift is almost entirely along +Y — the output cone backs away from
+    # the apex — and backing a cone off along its own axis moves its surface away
+    # from the motor cone by drift*sin(beta). That OPENS the contact, and because
+    # the drift grows roughly as phi^2 while the tilt closes the gap linearly, the
+    # two nearly cancel: contact is late, and it starts at the OUTER end of the band
+    # (where the closing rate s*dphi is biggest) instead of along the whole line.
+    # Bisected on the solids rather than extrapolated — a two-sample linear fit gets
+    # this badly wrong, for exactly the quadratic reason above.
+    def _rubber_squeeze(phi_t):
+        """Overlap solid between the two rubber layers at phi_t: its volume, and
+        how much of the designed contact band it actually covers. Interference
+        volume stands in for squeeze because the layers are modelled rigid."""
+        moved = place_carriage(make_output_rubber(), pose_state(phi_t))
+        lump = moved.common(_mr_up if phi_t > 0 else _mr_lo)
+        if lump.Volume < 1e-9:
+            return 0.0, None, None, float("nan")
+        # Edges discretised, not just vertices: the overlap is a sliver bounded by
+        # two smooth tangential surfaces, so its only VERTICES sit on the band's
+        # trimmed rim and reading those alone says "a point at s = 28", which is
+        # wrong — the patch runs a good way inboard from there.
+        ss = []
+        for e in lump.Edges:
+            for pt in e.discretize(24):
+                ss.append(math.hypot(pt.y, pt.z))
+        # common() hands back a Compound, which has no CenterOfMass of its own:
+        # weight the solids' centroids by their volumes.
+        tot = sum(sol.Volume for sol in lump.Solids) or 1.0
+        cy = sum(sol.CenterOfMass.y * sol.Volume for sol in lump.Solids) / tot
+        cz = sum(sol.CenterOfMass.z * sol.Volume for sol in lump.Solids) / tot
+        return lump.Volume, min(ss), max(ss), math.hypot(cy, cz)
+
+
+    _sq_vol, _sq_lo, _sq_hi, _sq_sbar = _rubber_squeeze(-phi_preload)
+    _lo_phi, _hi_phi = phi_c, 2.5 * phi_c
+    _hi_gap, _hi_s = _rubber_gap(-_hi_phi)
+    if _hi_gap > 1e-6:
+        phi_contact_real, contact_s = None, float("nan")
+    else:
+        for _ in range(14):
+            _mid = (_lo_phi + _hi_phi) / 2.0
+            if _rubber_gap(-_mid)[0] > 1e-6:
+                _lo_phi = _mid
+            else:
+                _hi_phi = _mid
+        phi_contact_real = (_lo_phi + _hi_phi) / 2.0
+        contact_s = _rubber_gap(-phi_contact_real * 1.02)[1]
+
+    # EVERY pair of parts, at every stop. The earlier version of this check only
+    # compared carriage parts against fixed ones, which left two whole categories
+    # unchecked — carriage parts against each other (the output cone IS a carriage
+    # part, and the arms were cutting into it) and the actuation train against
+    # anything at all (its link was inside the corona). Bounding boxes first, so
+    # the ~200 pairs cost three booleans, not two hundred.
+    #
+    # Only the meshing gear pairs are exempt: at a tilt the pinion rolls to
+    # whatever phase the mesh needs, so a solid overlap there is an artefact of
+    # drawing it at its free-pose phase. The mesh itself is checked at free, where
+    # the phasing is exact.
+    # Nothing is meant to share volume: the Oldham's tongues live inside the
+    # disc's axial float, which the sweep checks like any other clearance.
+    _MESH_PAIRS = set()
+
+
+    def _exempt(na, nb):
+        """Pairs that are MEANT to share volume.
+
+        Meshing gears, drawn at their free-pose phase (the mesh itself is checked
+        at free, and a phase is proven to exist at tilt). And a self-tapping screw
+        in its pilot hole: the screw is Ø3 into a Ø2.6 pilot, and that difference
+        is the thread it forms. Everything else that overlaps is a mistake."""
+        if (na, nb) in _MESH_PAIRS or (nb, na) in _MESH_PAIRS:
+            return True
+        for host, screw in (("Wall", "WallScrew"), ("DeckTop", "DeckScrewT"),
+                            ("DeckBottom", "DeckScrewB")):
+            if {na, nb} == {host} | {n for n in (na, nb) if n.startswith(screw)}:
+                return True
+        return False
+
+
+    def _bb_hit(a, b):
+        A, B = a.BoundBox, b.BoundBox
+        return (A.XMin < B.XMax and B.XMin < A.XMax
+                and A.YMin < B.YMax and B.YMin < A.YMax
+                and A.ZMin < B.ZMax and B.ZMin < A.ZMax)
+
+
+    # Parts shared by every axis: they are built once, so they are not in
+    # AXIS_PARTS and the all-pairs loop never sees them. The decks landed here too —
+    # the same blind spot the wall was in.
+    _SHARED = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
+               ("DeckTop", make_deck(1)), ("DeckBottom", make_deck(-1))]
+    _carr_mot_who = "-"
+    _pair_ov, _pair_who = 0.0, "-"
+    _carr_mot_ov = 0.0
+    for _tag, _phi_t in (("free", 0.0), ("up", phi_preload), ("dn", -phi_preload)):
+        _parts = moving_parts(pose_state(_phi_t)) + FIXED_PARTS
+        for _i in range(len(_parts)):
+            _na, _sa = _parts[_i][0], _parts[_i][1]
+            for _j in range(_i + 1, len(_parts)):
+                _nb, _sb = _parts[_j][0], _parts[_j][1]
+                if _exempt(_na, _nb):
+                    continue
+                if not _bb_hit(_sa, _sb):
+                    continue
+                _ov = _sa.common(_sb).Volume
+                if _ov > max(_pair_ov, 1e-6):
+                    _pair_ov, _pair_who = _ov, f"{_na} x {_nb} at {_tag}"
+            for _shn, _shs in _SHARED:
+                if _bb_hit(_sa, _shs) and not _exempt(_na, _shn):
+                    _ov = _sa.common(_shs).Volume
+                    if _ov > _carr_mot_ov:
+                        _carr_mot_ov, _carr_mot_who = _ov, f"{_na} x {_shn}"
+
+
+    # The link, swept, as a DISTANCE. Everything above is "do they overlap", at
+    # three stops. Both of those hid the same fault, and it took the two of them:
+    #
+    #   - the minimum is INTERIOR to the stroke. The four-bar's drift carries the
+    #     carriage outward while the tilt carries the link inward, the two nearly
+    #     cancel, and what is left is a shallow bowl with its floor at about half
+    #     travel. The three stops sample the rim of that bowl, never its floor.
+    #   - and at the floor the parts still did not overlap. They cleared by
+    #     0.077 mm, which "== 0 mm3" passes and a printer does not: it is finer
+    #     than the wall roughness on either face.
+    #
+    # So this one sweeps, and it reports millimetres. The link is the part worth
+    # the cost — it is the only thing that swings through the gap between the
+    # motor cone's rim and the frame post, and its knuckle crosses x = 0, where
+    # the cone is widest.
+    _LINK_CONES = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up)]
+    _LINK_POSTS = [(_n, _s) for _n, _s, _c, _t in FIXED_PARTS
+                   if _n.startswith("FramePost")]
+    _link_gap, _link_who = 1e9, "-"
+    for _k in range(-4, 5):
+        _phi_k = phi_preload * _k / 4.0
+        _st_k = pose_state(_phi_k)
+        for _A_k, _Bk in ((A1, "B1"), (A2, "B2")):
+            # Whole link against the cones; knuckle only against the posts, since
+            # the arms are meant to run close there — see make_link_knuckle.
+            for _sub, _against in ((make_link(_A_k, _st_k[_Bk]), _LINK_CONES),
+                                   (make_link_knuckle(_A_k, _st_k[_Bk]), _LINK_POSTS)):
+                for _n, _s in _against:
+                    _d = _sub.distToShape(_s)[0]
+                    if _d < _link_gap:
+                        _link_gap = _d
+                        _link_who = f"{_n} at {math.degrees(_phi_k):+.1f} deg"
+
+
+    # The cardan, swept as DISTANCES, same lesson as the link: its tightest
+    # running gaps (intermediate inside the cone's bore, ring bore round the output
+    # shaft, intermediate's head against the inner bearing boss) move with the
+    # tilt, and "== 0 mm3" at three stops passes a part rubbing at half travel.
+    _uj_gap, _uj_who = 1e9, "-"
+    _fixed = {n: s for n, s, c, t in FIXED_PARTS}
+    for _k in range(-4, 5):
+        _st_k = pose_state(phi_preload * _k / 4.0)
+        _L_k = uj_geom(_st_k["phi"])[0]
+        _mid = uj_place(make_uj_mid(_L_k), _st_k)
+        _ring = uj_place(make_uj_ring(_L_k), _st_k)
+        # The prism alone: its pins sit in the fork's holes by design.
+        _cross = uj_place(make_uj_cross(pins=False), _st_k)
+        _cone = place_carriage(make_output_cone(), _st_k)
+        for _a, _an, _b, _bn in ((_mid, "UJMid", _cone, "OutputCone"),
+                                 (_mid, "UJMid", _fixed["Wall"], "Wall"),
+                                 (_mid, "UJMid", _fixed["BearingOutIn"], "BearingOutIn"),
+                                 (_mid, "UJMid", _fixed["UJFork"], "UJFork"),
+                                 (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft"),
+                                 (_cross, "UJCross", _fixed["UJFork"], "UJFork")):
+            _d = _a.distToShape(_b)[0]
+            if _d < _uj_gap:
+                _uj_gap = _d
+                _uj_who = f"{_an} x {_bn} at {math.degrees(_st_k['phi']):+.1f} deg"
+
+    # The actuation chain over the whole stroke: it must assemble everywhere, the
+    # horn must swing about what the sweep split was designed for, and no joint may
+    # go near dead centre (a link nearly in line with its arm transmits nothing
+    # useful and multiplies slop).
+    def _trans(a, b, c):
+        """Angle at b between b->a and b->c, folded to 0..90 (90 = best)."""
+        u = (a[0] - b[0], a[1] - b[1])
+        w = (c[0] - b[0], c[1] - b[1])
+        cosang = (u[0] * w[0] + u[1] * w[1]) / (math.hypot(*u) * math.hypot(*w))
+        ang = math.degrees(math.acos(max(-1.0, min(1.0, cosang))))
+        return min(ang, 180.0 - ang)
+
+
+    _act_fail = 0
+    _trans_min = 90.0
+    for _k in range(-8, 9):
+        _st_k = pose_state(phi_preload * _k / 8.0)
+        if _st_k["O"] is None or _st_k["H"] is None:
+            _act_fail += 1
+            continue
+        _trans_min = min(_trans_min,
+                         _trans(P_act, _st_k["O"], _st_k["E"]),
+                         _trans(P_act, _st_k["I"], _st_k["H"]),
+                         _trans(S_act, _st_k["H"], _st_k["I"]))
+    _st_c = pose_state(phi_c)
+    _horn_contact = (abs(math.degrees(_st_c["horn_a"]))
+                     if _st_c["horn_a"] is not None else float("nan"))
+    _st_p = pose_state(phi_preload)
+    _horn_preload = (abs(math.degrees(_st_p["horn_a"]))
+                     if _st_p["horn_a"] is not None else float("nan"))
+
+    # The chain, swept as DISTANCES over the stroke, same lesson as the links and
+    # the cardan: its stack is 0.5 mm plate to plate and it runs past the servo's
+    # case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
+    # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
+    # designed gap between neighbouring plates, not a running clearance.
+    _ACT_PINNED = {frozenset(p) for p in (("Horn", "Link1"), ("Link1", "Lever"),
+                                          ("Lever", "Link2"), ("Link2", "Carriage"),
+                                          ("Lever", "LeverPost"),
+                                          ("Horn", "HornSpring"),
+                                          ("Horn", "ServoBody"))}  # on its spline
+    _ACT_AGAINST = ("ServoBody", "ServoBracket", "HornSpring", "LeverPost",
+                    "FramePostT", "FramePostB", "Wall")
+    _act_gap, _act_who = 1e9, "-"
+    _act_tight = {}
+    _fixed_act = {n: s for n, s, c, t in FIXED_PARTS if n in _ACT_AGAINST}
+    for _k in range(-4, 5):
+        _st_k = pose_state(phi_preload * _k / 4.0)
+        _mov = {n: s for n, s, c, t in act_moving_parts(_st_k)
+                if not n.startswith("Pin")}
+        _mov["Carriage"] = place_carriage(make_carriage(), _st_k)
+        _pairs = [(a, b) for a in _mov for b in _fixed_act]
+        _names = list(_mov)
+        _pairs += [(_names[i], _names[j]) for i in range(len(_names))
+                   for j in range(i + 1, len(_names))]
+        for _a, _b in _pairs:
+            if frozenset((_a, _b)) in _ACT_PINNED:
+                continue
+            # The carriage against the wall and the posts is the four-bar's own
+            # business, already swept above; here it only meets the chain.
+            if _a == "Carriage" and _b in ("Wall", "FramePostT", "FramePostB"):
+                continue
+            _sa = _mov[_a]
+            _sb = _mov[_b] if _b in _mov else _fixed_act[_b]
+            _d = _sa.distToShape(_sb)[0]
+            if _d < 1.5:
+                _act_tight[(_a, _b)] = min(_d, _act_tight.get((_a, _b), 9.0))
+            if _d < _act_gap:
+                _act_gap = _d
+                _act_who = f"{_a} x {_b} at {math.degrees(_st_k['phi']):+.1f} deg"
+
+
+    # Every other axis, not just the next one. The four of them share one box.
+    _mech = None
+    for _n, _s, _c, _t in AXIS_PARTS:
+        if _n == "Wall":
+            _wall_shape = _s
+            continue
+        _mech = _s.copy() if _mech is None else _mech.fuse(_s)
+
+
+    def axis_shape(k):
+        """Axis k of the pinwheel, as one shape.
+
+        All four axes are the SAME, rotated about Z — nothing is turned over any
+        more. Each axis' servo sits in its own (+X) corner of the pinwheel, so no
+        two want the same one. (Turning alternate axes over was only ever there
+        for two servos lying on the same floor.)"""
+        shape = _mech.copy().fuse(_wall_shape)
+        shape.rotate(ORIGIN, Z_AXIS, 90.0 * k)
+        return shape
+
+
+    _asm = axis_shape(0)
+    _adj_overlap = 0.0
+    _adj_worst = 0
+    for _k in (1, 2, 3):
+        _v = _asm.common(axis_shape(_k)).Volume
+        if _v > _adj_overlap:
+            _adj_overlap, _adj_worst = _v, _k
+
+    # Output cone tip vs the motor shaft it points at.
+    _tip_clr = out_tip_y - shaft_d / 2.0
+
+    # Every shape in the tree is a valid solid. A boolean that half-failed leaves a
+    # shape that still draws and still has a volume, so this is not free.
+    _invalid = [o.Name for o in doc.Objects if not o.Shape.isValid()]
+
+    # And every part is ONE solid. Fusing shapes that do not touch is silent: the
+    # result is valid, has the right volume, draws correctly and is not a part.
+    # The carriage was exactly that — housing plus two side plates, fused, with
+    # nothing between them (the web that now joins them did not exist).
+    _loose = [n for n, sh, c, t in AXIS_PARTS if len(sh.Solids) != 1]
+    _loose += [n for n, sh in (("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
+                               ("MotorRubberLower", _mr_lo), ("MotorRubberUpper", _mr_up))
+               if len(sh.Solids) != 1]
+
+    checks = [
+        # Informational, and NOT below 1: at 1:1 the cube is an overdrive, the
+        # friction stage alone. The reduction invariant 1 demands lives between
+        # hubs now, and it has to beat THIS number, not 0.5.
+        ("cube ratio w_out/w_motor  (reduction moved between hubs)",
+         ratio_total, "info", True),
+        ("free gap angle phi_c = 90 - alpha - beta  (deg)",
+         math.degrees(phi_c), "> 0", phi_c > 0),
+        ("link axes converge on the apex  (deg between the two rays)",
+         link_axis_err, "< 0.2", link_axis_err < 0.2),
+        ("link axis outside the cone wedge  (beta..90-alpha = "
+         f"{beta_deg:.0f}..{90-alpha_deg:.0f} deg)",
+         link_axis_deg, f"not in {beta_deg:.0f}..{90-alpha_deg:.0f}",
+         not (beta_deg <= link_axis_deg <= 90 - alpha_deg)),
+        ("neck bearing clear of the cone's rim  (mm)",
+         nb_y0 - out_base_y, "> 1.0", nb_y0 - out_base_y > 1.0),
+        ("output cone tip clears the motor shaft  (mm)",
+         _tip_clr, "> 1.0", _tip_clr > 1.0),
+        ("actuation chain assembles at every tilt of the stroke  (poses failed)",
+         _act_fail, "== 0", _act_fail == 0),
+        ("horn swing, free -> contact  (deg, designed "
+         f"{sv_theta_c:.0f})",
+         _horn_contact, f"{sv_theta_c-5:.0f}..{sv_theta_c+5:.0f}",
+         abs(_horn_contact - sv_theta_c) < 5.0),
+        ("worst transmission angle in the chain  (deg from dead centre)",
+         _trans_min, "> 40", _trans_min > 40.0),
+        ("FREE: rubber clear of both motor cones  (mm)",
+         _free_gap, "> 0.10", _free_gap > 0.10),
+        ("plastic never touches plastic  (mm3)",
+         _plastic_ov, "== 0", _plastic_ov < 1e-6),
+        (f"every pair of parts, every stop [{_pair_who}]  (mm3)",
+         _pair_ov, "== 0", _pair_ov < 1e-6),
+        (f"nothing on the axis touches the shared parts [{_carr_mot_who}]  (mm3)",
+         _carr_mot_ov, "== 0", _carr_mot_ov < 1e-6),
+        # A printed clearance, not a mathematical one: 1 mm is about two perimeters
+        # plus the pin's slop. Anything under that is touching once it is a part.
+        (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
+         _link_gap, "> 1.0", _link_gap > 1.0),
+        # Drawn in one phase only: the prism is aligned with the tube there. Half
+        # a turn later it rocks inside it about the Z pins, and its far corner is
+        # what comes closest to the tube's bore.
+        # Same for the ring inside the tube's head: half a turn on, it rocks about
+        # its Z pins by the ring joint's own bend.
+        ("ring cross inside the tube's head, any phase  (mm)",
+         uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
+                       + uj_ring_t / 2.0 * math.sin(uj_bend_ring)),
+         "> 0.3",
+         uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
+                       + uj_ring_t / 2.0 * math.sin(uj_bend_ring)) > 0.3),
+        ("solid cross prism inside the intermediate, any phase  (mm)",
+         uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2),
+         "> 0.5",
+         uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2) > 0.5),
+        (f"cardan running clearance, SWEPT [{_uj_who}]  (mm)",
+         _uj_gap, "> 0.5", _uj_gap > 0.5),
+        (f"actuation chain running clearance, SWEPT [{_act_who}]  (mm)",
+         _act_gap, "> 0.5", _act_gap > 0.5),
+        ("cardan intermediate length change, within its slotted holes  (mm)",
+         uj_L_range[1] - uj_L_range[0], f"< {uj_slide:.1f}",
+         uj_L_range[1] - uj_L_range[0] < uj_slide),
+        (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
+         len(_invalid), "== 0", not _invalid),
+        (f"every part is ONE connected solid  {_loose if _loose else ''}",
+         len(_loose), "== 0", not _loose),
+        (f"every other axis, all identical and rotated [worst: {_adj_worst*90}"
+         f" deg]  (mm3)",
+         _adj_overlap, "== 0", _adj_overlap < 1e-6),
+    ]
+
+    # ═══════════════════════════════════════════════════════════════════
+    # REPORT
+    # ═══════════════════════════════════════════════════════════════════
+    print("=" * 72)
+    print(f"Motcore v6 — Apex Pivot ({len(AXES)} bidirectional axes, {AXES_SHOWN} built)")
+    print(f"  alpha = {alpha_deg:.1f} deg (motor)   beta = {beta_deg:.1f} deg (output)"
+          f"   rubber t = {t_rubber:.1f} mm")
+    print(f"  Friction ratio {ratio_fric:.3f} x gear ratio {ratio_gear:.3f}"
+          f"  =  {ratio_total:.3f}  (-> x{1/ratio_total:.2f} torque)")
+    print(f"  Plastic apex offsets (invariant 2): motor {apex_off_motor:.3f} mm,"
+          f" output {apex_off_output:.3f} mm")
+    print(f"  Contact band on the rubber surface: s = {s_rub_lo:.1f}..{s_rub_hi:.1f} mm"
+          f" from the apex  (L = {L_line:.1f})")
+    print(f"  L is DERIVED: the band fills the cone, stopping {rubber_lip:.1f} mm"
+          f" short of the rim so the wrapped")
+    print(f"  sheet has a lip to bond to. Cone generatrix {s_mot_hi:.1f} mm (motor),"
+          f" {s_out_hi:.1f} mm (output — shorter,")
+    print(f"  its shallower angle reaches the same rubber radius with less plastic)")
+    print("-" * 72)
+    print("  FLAT PATTERN — a cone is developable, so the rubber is cut from sheet")
+    for _tag, _ha, _qty in (("motor ", alpha, 2), ("output", beta, 4)):
+        _arc, _k, _psi, _len = seam_spiral(_ha)
+        print(f"    {_tag} (x{_qty}): annular sector, r {s_rub_lo:.1f}..{s_rub_hi:.1f}"
+              f" mm, {math.degrees(_arc):.0f} deg of arc"
+              f"  ->  needs {2*s_rub_hi:.0f} x {2*s_rub_hi:.0f} mm of sheet")
+        print(f"            spiral seam theta = {_k:.3f} * ln(s / {s_rub_lo:.0f}):"
+              f" {math.degrees(_psi):.0f} deg from the generatrix, {_len:.0f} mm long")
+    print("    Both edges are the SAME spiral, offset by the sector arc. A seam at"
+          " that angle crosses the")
+    print("    contact line at one point that sweeps along it as the cone turns,"
+          " instead of the whole")
+    print("    line landing on the seam once per revolution. Shallower still (bigger"
+          " k) keeps a crossing")
+    print("    permanently in contact, at the cost of seam length.")
+    if WRITE_FLAT_PATTERN:
+        try:
+            _here = os.path.dirname(os.path.abspath(__file__))
+        except NameError:
+            _here = os.getcwd()
+        try:
+            _svg, _svg_err = write_flat_pattern(
+                os.path.join(_here, "motcore_v6_flat_pattern.svg"))
+            print(f"    -> written 1:1 to {_svg}")
+            print(f"       [{'OK ' if _svg_err < 2e-3 else 'FAIL'}] pattern area vs"
+                  f" the analytic band area: {_svg_err*100:.3f}% off")
+        except OSError as exc:
+            print(f"    -> could NOT write the template: {exc}")
+    print("-" * 72)
+    print("  STOPS (tilt from the middle; free is the middle, both ways)")
+    print(f"    free    phi = 0.000 deg")
+    print(f"    contact phi = {math.degrees(phi_c):.3f} deg"
+          f"   servo {sv_theta_c:.0f} deg")
+    print(f"    preload phi = {math.degrees(phi_preload):.3f} deg"
+          f"   servo {sv_theta_max:.0f} deg, split 1:{spring_split-1:.1f}")
+    print(f"  Rendering '{CARRIAGE_STOP}' "
+          f"{'up' if CARRIAGE_DIR > 0 else 'down'}  ->  phi = {math.degrees(phi):+.3f} deg")
+    print("-" * 72)
+    print("  FOUR-BAR (answers doc open question 10.3)")
+    print(f"    links {link_len:.2f} mm at {link_axis_deg:.2f} deg from +Y,"
+          f" frame pivots r = {r_frame_pivot:.2f}, carriage pivots r = {r_carriage_pivot:.2f}")
+    for _name, _d in (("contact", drift_contact), ("preload", drift_preload)):
+        print(f"    apex drift at {_name:<8} {_d[0]:.4f} mm"
+              f"   along generatrix {_d[1]:+.4f}  normal {_d[2]:+.4f}")
+    print(f"    -> residual slip {slip_fourbar*100:.2f}% of the contact line"
+          f"   (v5, interleaved O-rings: 7.4%)")
+    print(f"    -> the normal component is a preload error of"
+          f" {abs(drift_preload[2]):.3f} mm, {abs(drift_preload[2])/t_rubber*100:.0f}%"
+          f" of the rubber thickness: NOT negligible against a ~0.2 mm squeeze")
+    print("-" * 72)
+    print("  CONTACT STATE at the rendered pose")
+    print(f"    rubber gap: lower cone {_gap_lo:.4f} mm, upper cone {_gap_up:.4f} mm")
+    print(f"    rubber squeeze volume: lower {_rub_lo:.2f} mm3, upper {_rub_up:.2f} mm3")
+    print(f"    free-state gap (both cones, phi = 0): {_free_gap:.4f} mm")
+    if phi_contact_real is None:
+        print("    !! the rubber never meets within 2.5x phi_c: the four-bar's outward")
+        print("       drift opens the contact as fast as the tilt closes it")
+    else:
+        print(f"    contact really happens at phi ="
+              f" {math.degrees(phi_contact_real):.3f} deg, not"
+              f" {math.degrees(phi_c):.3f} — the drift is outward along +Y, so it")
+        print(f"    OPENS the contact by ~drift*sin(beta); first touch is at s ="
+              f" {contact_s:.1f} mm (band is {s_rub_lo:.0f}..{s_rub_hi:.0f}),"
+              f" i.e. the {'outer' if contact_s > (s_rub_lo+s_rub_hi)/2 else 'inner'} end")
+        print(f"    at the PRELOAD stop the squeeze is {_sq_vol:.2f} mm3"
+              + (f", over s = {_sq_lo:.1f}..{_sq_hi:.1f} mm"
+                 f" = the outer {(_sq_hi-_sq_lo)/L_line*100:.0f}% of the band"
+                 if _sq_lo is not None else " — nothing touches"))
+        if _sq_lo is not None:
+            print(f"       (contact starts at the rim and spreads inward as the"
+                  f" preload grows, instead of arriving along the whole line at once)")
+        print(f"    -> usable preload travel is"
+              f" {math.degrees(phi_preload - phi_contact_real):+.3f} deg, not the"
+              f" {math.degrees(phi_preload - phi_c):.3f} deg the pure-rotation"
+              f" model gives")
+    print("-" * 72)
+    print("  DRIVE OUT: folded double cardan inside the cone, 1:1")
+    print(f"    solid cross y {uj_cross_y:.1f} (output axis), ring y {uj_ring_y:.1f}"
+          f" (cone axis), intermediate {uj_L_rest:.1f} mm, tube"
+          f" \u00d8{2*uj_mid_ri:.1f}/{2*uj_mid_ro:.1f} (head \u00d8{2*uj_head_ri:.1f}/{2*uj_head_ro:.1f}),"
+          f" ring \u00d8{2*uj_ring_ri:.1f}/{2*uj_ring_ro:.1f} x {uj_ring_t:.0f}")
+    print(f"    bends at full preload: solid cross {math.degrees(uj_bend_cross):.2f} deg,"
+          f" ring {math.degrees(uj_bend_ring):.2f} deg  (never equal: both crosses are"
+          f" in front of the apex)")
+    _hooke = (uj_bend_cross ** 2 - uj_bend_ring ** 2) / 4.0
+    print(f"    residual angle error ~ (a1^2 - a2^2)/4 = {math.degrees(_hooke):.3f} deg"
+          f"  (one Hooke joint at the tilt would be"
+          f" {math.degrees(phi_preload**2/4):.3f})")
+    print(f"    intermediate length {uj_L_range[0]:.3f}..{uj_L_range[1]:.3f} mm over the"
+          f" stroke -> ring-end pin holes slotted {uj_slide:.1f} mm")
+    print(f"    cone runs on one 6805 ({nb_id:.0f}x{nb_od:.0f}x{nb_w:.0f}) on its neck,"
+          f" y {nb_y0:.1f}..{nb_y0+nb_w:.1f}, held by the carriage ring")
+    print(f"    output shaft: 2x MR105ZZ, inner boss y {cube_half-brg_w:.1f}..{cube_half:.1f}"
+          f" and wall seat; reaches {cube_half - brg_w - (uj_cross_y + uj_fork_back):.1f}"
+          f" mm in from the inner bearing to the fork")
+    print("-" * 72)
+    print("  ACTUATION: servo -> torsion spring -> horn -> lever 2:1 -> link -> ear")
+    print("  (spring and forces are placeholders until the rubber stiffness is measured)")
+    print(f"    servo shaft at (y {S_act[0]:.1f}, z {S_act[1]:.1f}), horn r {horn_r:.2f}"
+          f" (derived), lever {lever_in:.1f}/{lever_out:.1f} about"
+          f" (y {P_act[0]:.1f}, z {P_act[1]:.1f}), ear at (y {E0[0]:.1f}, z {E0[1]:.1f})")
+    print(f"    links: link1 {link1_len:.1f} mm, link2 {link2_len:.1f} mm;"
+          f" X stack ear {x_ear[0]:.1f}.., link2 {x_l2[0]:.1f}.., lever {x_lev[0]:.1f}..,"
+          f" link1/post {x_l1[0]:.1f}.., horn {x_horn[0]:.1f}..{x_horn[1]:.1f}")
+    print(f"    horn swing: {_horn_contact:.1f} deg to contact, {_horn_preload:.1f} deg"
+          f" at full preload; servo spline {sv_theta_max:.0f} deg — the difference"
+          f" winds the spring")
+    _tau = sv_use * sv_stall
+    _k_spring = _tau / math.radians(sv_theta_max - sv_theta_c)
+    _F_ear = _tau / (horn_r / 1000.0) * (lever_in / lever_out)
+    _M = _F_ear * E0[0] / 1000.0
+    _mu_ref = 1.3
+    print(f"    spring: {_k_spring:.3f} Nm/rad = {_k_spring*1000*math.pi/180:.2f} N.mm/deg,"
+          f" {_tau:.3f} Nm after {sv_theta_max - sv_theta_c:.0f} deg of wind"
+          f" ({sv_use*100:.0f}% of an MG90's stall)")
+    print(f"    at full preload: {_F_ear:.0f} N on the ear, {_M:.2f} Nm about the apex,"
+          f" normal force {_M*1000/_sq_sbar:.0f} N (s_bar {_sq_sbar:.1f} mm)")
+    print(f"    output torque ceiling: mu*sin(beta)*M = {_mu_ref*math.sin(beta)*_M:.2f} Nm"
+          f" at mu = {_mu_ref} — IF the rubber takes that force within its squeeze")
+    for (_a, _b), _d in sorted(_act_tight.items(), key=lambda kv: kv[1]):
+        print(f"    chain clearance under 1.5 mm, worst over the stroke: {_a} x {_b}  {_d:.2f} mm")
+    print("-" * 72)
+    for label, value, target, ok in checks:
+        print(f"  [{'OK ' if ok else 'FAIL'}] {label}:  {value:.3f}  ({target})")
+    print("-" * 72)
+    _cbb = BY_NAME["Carriage"].BoundBox
+    print(f"  Carriage: ONE piece, {_cbb.YLength:.0f} x {_cbb.ZLength:.0f} x"
+          f" {_cbb.XLength:.0f} mm, a ring round the cone's neck")
+    _cube_tied = [k for k, val in cube_half_by.items() if val > cube_half - 0.05]
+    print(f"  Cube half-size ({cube_half:.1f}) = motor axis to the wall's inner"
+          f" face, set by: {' AND '.join(_cube_tied)}")
+    for _k, _val in sorted(cube_half_by.items(), key=lambda kv: -kv[1]):
+        print(f"      {_val:5.1f}  {_k}")
+    print(f"  CUBE side {2 * cube_out:.1f} mm"
+          f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
+    print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
+    print("           Carriage (one piece),")
+    print("           UJMid, UJRing, UJCross, UJFork, FramePost x2,")
+    print("           Link x2 (each carries both its arms), Horn, Link1, Lever,"
+          " Link2, LeverPost, ServoBracket")
+    print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
+    print("            its own corner under the ceiling.")
+    print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
+          f" ({shaft_flat_d:.1f} mm across);")
+    print("  Filing the flat is the one manual step here.")
+    print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
+    print("             Ø5 rod (output shaft),")
+    print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
+    print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
+          " into the frame posts,")
+    print("             Ø3 pin stock (5 actuation pins), 1 torsion spring,")
+    print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
+    print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
+          f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
+    print("=" * 72)
+    print("Packaging (carriage arms, frame brackets, servo mount, cardan) is")
+    print("a first pass: the geometry above is derived, the brackets are not.")
+
 else:
-    print(f"    contact really happens at phi ="
-          f" {math.degrees(phi_contact_real):.3f} deg, not"
-          f" {math.degrees(phi_c):.3f} — the drift is outward along +Y, so it")
-    print(f"    OPENS the contact by ~drift*sin(beta); first touch is at s ="
-          f" {contact_s:.1f} mm (band is {s_rub_lo:.0f}..{s_rub_hi:.0f}),"
-          f" i.e. the {'outer' if contact_s > (s_rub_lo+s_rub_hi)/2 else 'inner'} end")
-    print(f"    at the PRELOAD stop the squeeze is {_sq_vol:.2f} mm3"
-          + (f", over s = {_sq_lo:.1f}..{_sq_hi:.1f} mm"
-             f" = the outer {(_sq_hi-_sq_lo)/L_line*100:.0f}% of the band"
-             if _sq_lo is not None else " — nothing touches"))
-    if _sq_lo is not None:
-        print(f"       (contact starts at the rim and spreads inward as the"
-              f" preload grows, instead of arriving along the whole line at once)")
-    print(f"    -> usable preload travel is"
-          f" {math.degrees(phi_preload - phi_contact_real):+.3f} deg, not the"
-          f" {math.degrees(phi_preload - phi_c):.3f} deg the pure-rotation"
-          f" model gives")
-print("-" * 72)
-print("  DRIVE OUT: folded double cardan inside the cone, 1:1")
-print(f"    solid cross y {uj_cross_y:.1f} (output axis), ring y {uj_ring_y:.1f}"
-      f" (cone axis), intermediate {uj_L_rest:.1f} mm, tube"
-      f" \u00d8{2*uj_mid_ri:.1f}/{2*uj_mid_ro:.1f} (head \u00d8{2*uj_head_ri:.1f}/{2*uj_head_ro:.1f}),"
-      f" ring \u00d8{2*uj_ring_ri:.1f}/{2*uj_ring_ro:.1f} x {uj_ring_t:.0f}")
-print(f"    bends at full preload: solid cross {math.degrees(uj_bend_cross):.2f} deg,"
-      f" ring {math.degrees(uj_bend_ring):.2f} deg  (never equal: both crosses are"
-      f" in front of the apex)")
-_hooke = (uj_bend_cross ** 2 - uj_bend_ring ** 2) / 4.0
-print(f"    residual angle error ~ (a1^2 - a2^2)/4 = {math.degrees(_hooke):.3f} deg"
-      f"  (one Hooke joint at the tilt would be"
-      f" {math.degrees(phi_preload**2/4):.3f})")
-print(f"    intermediate length {uj_L_range[0]:.3f}..{uj_L_range[1]:.3f} mm over the"
-      f" stroke -> ring-end pin holes slotted {uj_slide:.1f} mm")
-print(f"    cone runs on one 6805 ({nb_id:.0f}x{nb_od:.0f}x{nb_w:.0f}) on its neck,"
-      f" y {nb_y0:.1f}..{nb_y0+nb_w:.1f}, held by the carriage ring")
-print(f"    output shaft: 2x MR105ZZ, inner boss y {cube_half-brg_w:.1f}..{cube_half:.1f}"
-      f" and wall seat; reaches {cube_half - brg_w - (uj_cross_y + uj_fork_back):.1f}"
-      f" mm in from the inner bearing to the fork")
-print("-" * 72)
-print("  ACTUATION: servo -> torsion spring -> horn -> lever 2:1 -> link -> ear")
-print("  (spring and forces are placeholders until the rubber stiffness is measured)")
-print(f"    servo shaft at (y {S_act[0]:.1f}, z {S_act[1]:.1f}), horn r {horn_r:.2f}"
-      f" (derived), lever {lever_in:.1f}/{lever_out:.1f} about"
-      f" (y {P_act[0]:.1f}, z {P_act[1]:.1f}), ear at (y {E0[0]:.1f}, z {E0[1]:.1f})")
-print(f"    links: link1 {link1_len:.1f} mm, link2 {link2_len:.1f} mm;"
-      f" X stack ear {x_ear[0]:.1f}.., link2 {x_l2[0]:.1f}.., lever {x_lev[0]:.1f}..,"
-      f" link1/post {x_l1[0]:.1f}.., horn {x_horn[0]:.1f}..{x_horn[1]:.1f}")
-print(f"    horn swing: {_horn_contact:.1f} deg to contact, {_horn_preload:.1f} deg"
-      f" at full preload; servo spline {sv_theta_max:.0f} deg — the difference"
-      f" winds the spring")
-_tau = sv_use * sv_stall
-_k_spring = _tau / math.radians(sv_theta_max - sv_theta_c)
-_F_ear = _tau / (horn_r / 1000.0) * (lever_in / lever_out)
-_M = _F_ear * E0[0] / 1000.0
-_mu_ref = 1.3
-print(f"    spring: {_k_spring:.3f} Nm/rad = {_k_spring*1000*math.pi/180:.2f} N.mm/deg,"
-      f" {_tau:.3f} Nm after {sv_theta_max - sv_theta_c:.0f} deg of wind"
-      f" ({sv_use*100:.0f}% of an MG90's stall)")
-print(f"    at full preload: {_F_ear:.0f} N on the ear, {_M:.2f} Nm about the apex,"
-      f" normal force {_M*1000/_sq_sbar:.0f} N (s_bar {_sq_sbar:.1f} mm)")
-print(f"    output torque ceiling: mu*sin(beta)*M = {_mu_ref*math.sin(beta)*_M:.2f} Nm"
-      f" at mu = {_mu_ref} — IF the rubber takes that force within its squeeze")
-for (_a, _b), _d in sorted(_act_tight.items(), key=lambda kv: kv[1]):
-    print(f"    chain clearance under 1.5 mm, worst over the stroke: {_a} x {_b}  {_d:.2f} mm")
-print("-" * 72)
-for label, value, target, ok in checks:
-    print(f"  [{'OK ' if ok else 'FAIL'}] {label}:  {value:.3f}  ({target})")
-print("-" * 72)
-_cbb = BY_NAME["Carriage"].BoundBox
-print(f"  Carriage: ONE piece, {_cbb.YLength:.0f} x {_cbb.ZLength:.0f} x"
-      f" {_cbb.XLength:.0f} mm, a ring round the cone's neck")
-_cube_tied = [k for k, val in cube_half_by.items() if val > cube_half - 0.05]
-print(f"  Cube half-size ({cube_half:.1f}) = motor axis to the wall's inner"
-      f" face, set by: {' AND '.join(_cube_tied)}")
-for _k, _val in sorted(cube_half_by.items(), key=lambda kv: -kv[1]):
-    print(f"      {_val:5.1f}  {_k}")
-print(f"  CUBE side {2 * cube_out:.1f} mm"
-      f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
-print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
-print("           Carriage (one piece),")
-print("           UJMid, UJRing, UJCross, UJFork, FramePost x2,")
-print("           Link x2 (each carries both its arms), Horn, Link1, Lever,"
-      " Link2, LeverPost, ServoBracket")
-print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
-print("            its own corner under the ceiling.")
-print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
-      f" ({shaft_flat_d:.1f} mm across);")
-print("  Filing the flat is the one manual step here.")
-print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
-print("             Ø5 rod (output shaft),")
-print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
-print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
-      " into the frame posts,")
-print("             Ø3 pin stock (5 actuation pins), 1 torsion spring,")
-print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
-print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
-      f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
-print("=" * 72)
-print("Packaging (carriage arms, frame brackets, servo mount, cardan) is")
-print("a first pass: the geometry above is derived, the brackets are not.")
+    print("=" * 72)
+    print(f"Motcore v6 — Apex Pivot: geometry only, CHECKS SKIPPED (RUN_CHECKS)")
+    print(f"  cube side {2 * cube_out:.1f} mm, set by {cube_half_driver}")
+    print("  Run headless, or set RUN_CHECKS = True, before trusting a change.")
+    print("=" * 72)
