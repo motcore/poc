@@ -300,7 +300,16 @@ uj_mid_ri     = 6.75   # mm — intermediate tube
 uj_mid_ro     = 8.25   # mm
 uj_mid_end    = 1.5    # mm — tube material past each pin plane
 uj_pin_d      = 2.0    # mm — cross pins (steel, Ø2)
-uj_cross_a    = 2.5    # mm — half-size of the solid cross's centre block
+uj_cross_a    = 2.3    # mm — solid cross, half-size in X (between the fork's arms, 0.7 each side)
+uj_cross_hy   = 2.0    # mm — ...half-size along the shaft (Y)
+uj_cross_hz   = 5.0    # mm — ...half-size in Z: a PRISM, long toward the tube.
+                        #      One pin goes right through its narrow X to both
+                        #      fork arms (they carry the most load, ~125 N a side
+                        #      at 1 Nm); the two short pins to the tube go into
+                        #      its long ends, so each sits ~4 mm deep — deeper
+                        #      than the 1.75 mm they could slide before the cone
+                        #      stops them. Its far corner, at any phase of the
+                        #      turn, must still clear the tube's bore.
 uj_fork_ri    = 3.0    # mm ┐ output fork arms: |x| between these, straddling the
 uj_fork_ro    = 5.0    # mm ┘ cross block and its X pins
 uj_fork_back  = 3.5    # mm — fork base starts this far past the cross, wall side
@@ -944,16 +953,22 @@ def make_uj_ring(L):
     return ring
 
 
-def make_uj_cross():
-    """Solid cross on the output shaft's fork: a block with Z pins out to the
-    intermediate's tail and X pins into the fork's arms."""
-    a = uj_cross_a
-    body = Part.makeBox(2 * a, 2 * a, 2 * a, v(-a, uj_cross_y - a, -a))
-    for s in (1, -1):
-        body = body.fuse(cyl(uj_pin_d / 2.0, uj_mid_ro - 0.2 - (a - 0.5),
-                             v(0, uj_cross_y, s * (a - 0.5)), v(0, 0, s)))
-        body = body.fuse(cyl(uj_pin_d / 2.0, uj_fork_ro - 0.2 - (a - 0.5),
-                             v(s * (a - 0.5), uj_cross_y, 0), v(s, 0, 0)))
+def make_uj_cross(pins=True):
+    """Solid cross on the output shaft's fork: a prism, narrow in X and long in
+    Z. One through pin in X to the fork's arms; two short pins from its long
+    ends out to the intermediate's tail, each in a blind hole that stops short
+    of the through pin."""
+    a, hy, hz = uj_cross_a, uj_cross_hy, uj_cross_hz
+    body = Part.makeBox(2 * a, 2 * hy, 2 * hz, v(-a, uj_cross_y - hy, -hz))
+    if not pins:
+        return body
+    r = uj_pin_d / 2.0
+    x_len = uj_fork_ro - 0.2
+    body = body.fuse(cyl(r, 2 * x_len, v(-x_len, uj_cross_y, 0), X_AXIS))
+    z_in = r + 0.5                      # blind: stops clear of the through pin
+    for sgn in (1, -1):
+        body = body.fuse(cyl(r, uj_mid_ro - 0.2 - z_in,
+                             v(0, uj_cross_y, sgn * z_in), v(0, 0, sgn)))
     return body
 
 
@@ -1824,12 +1839,15 @@ for _k in range(-4, 5):
     _L_k = uj_geom(_st_k["phi"])[0]
     _mid = uj_place(make_uj_mid(_L_k), _st_k)
     _ring = uj_place(make_uj_ring(_L_k), _st_k)
+    # The prism alone: its pins sit in the fork's holes by design.
+    _cross = uj_place(make_uj_cross(pins=False), _st_k)
     _cone = place_carriage(make_output_cone(), _st_k)
     for _a, _an, _b, _bn in ((_mid, "UJMid", _cone, "OutputCone"),
                              (_mid, "UJMid", _fixed["Wall"], "Wall"),
                              (_mid, "UJMid", _fixed["BearingOutIn"], "BearingOutIn"),
                              (_mid, "UJMid", _fixed["UJFork"], "UJFork"),
-                             (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft")):
+                             (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft"),
+                             (_cross, "UJCross", _fixed["UJFork"], "UJFork")):
         _d = _a.distToShape(_b)[0]
         if _d < _uj_gap:
             _uj_gap = _d
@@ -1990,6 +2008,13 @@ checks = [
     # plus the pin's slop. Anything under that is touching once it is a part.
     (f"link clearance, SWEPT not stopped [{_link_who}]  (mm)",
      _link_gap, "> 1.0", _link_gap > 1.0),
+    # Drawn in one phase only: the prism is aligned with the tube there. Half
+    # a turn later it rocks inside it about the Z pins, and its far corner is
+    # what comes closest to the tube's bore.
+    ("solid cross prism inside the intermediate, any phase  (mm)",
+     uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2),
+     "> 0.5",
+     uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2) > 0.5),
     (f"cardan running clearance, SWEPT [{_uj_who}]  (mm)",
      _uj_gap, "> 0.5", _uj_gap > 0.5),
     (f"actuation chain running clearance, SWEPT [{_act_who}]  (mm)",
