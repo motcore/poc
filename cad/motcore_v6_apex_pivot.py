@@ -292,13 +292,26 @@ neck_ri       = 10.0   # mm — the cone's neck bore = the bell the joint turns 
 neck_ro       = nb_id / 2.0   # DERIVED — the neck IS the bearing's seat
 neck_shoulder = 1.0    # mm — radial step the bearing's inner race stops on
 neck_y1       = 42.0   # mm — end of the neck (cone frame)
-uj_ring_ri    = 4.9    # mm — ring bore: the output shaft passes through it,
+uj_ring_ri    = 5.1    # mm — ring bore: the output shaft passes through it,
                         #      offset by ring_y*sin(phi) and tilted inside it
-uj_ring_ro    = 6.25   # mm
-uj_ring_t     = 3.0    # mm — ring thickness along its axis
+uj_ring_ro    = 7.3    # mm — 2.4 mm of wall for its pins to sit in (was 1.35,
+                        #      ~30 MPa on the plastic at 1 Nm; now ~17)
+uj_ring_t     = 5.0    # mm — ring thickness along its axis: 1.5 mm of material
+                        #      each side of a Ø2 hole (was 3, i.e. 0.5)
 uj_mid_ri     = 6.75   # mm — intermediate tube
 uj_mid_ro     = 8.25   # mm
-uj_mid_end    = 1.5    # mm — tube material past each pin plane
+uj_mid_end    = 1.5    # mm — tube material past the solid cross's pin plane
+# The tube is STEPPED: narrow at its tail, where it sits in the cone's conical
+# cavity and cannot grow, and wide only at its head, round the ring. The step
+# sits just behind the ring because the tube rocks ~4 deg inside the cone, and
+# near the ring that moves it sideways by tenths, further back by more.
+uj_head_ri    = 7.8    # mm ┐ tube head: 2.0 mm of wall for the ring's Z pins
+uj_head_ro    = 9.8    # mm ┘
+uj_head_back  = 3.0    # mm — head starts this far behind the ring's pin plane
+uj_head_end   = 3.0    # mm — ...and ends this far past it
+neck_ri_head  = 10.5   # mm — the neck's bore round the tube head; 2.0 mm of
+                        #      neck wall left for the ring's X pins, which the
+                        #      6805 then covers
 uj_pin_d      = 2.0    # mm — cross pins (steel, Ø2)
 uj_cross_a    = 2.3    # mm — solid cross, half-size in X (between the fork's arms, 0.7 each side)
 uj_cross_hy   = 2.0    # mm — ...half-size along the shaft (Y)
@@ -617,8 +630,8 @@ uj_L_range   = (min(g[0] for _, g in _uj_sweep), max(g[0] for _, g in _uj_sweep)
 uj_bend_cross = max(abs(g[1]) for _, g in _uj_sweep)             # rad
 uj_bend_ring  = max(abs(g[1] - p) for p, g in _uj_sweep)         # rad
 # Furthest the intermediate's front corner reaches toward the wall.
-uj_front_y = max(uj_cross_y + (g[0] + uj_mid_end) * math.cos(g[1])
-                 + uj_mid_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
+uj_front_y = max(uj_cross_y + (g[0] + uj_head_end) * math.cos(g[1])
+                 + uj_head_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
 
 # ── Actuation chain, rest geometry (Y, Z) ────────────────────────────────────
 # Servo shaft S; horn tip H (horn level, pointing +Y, so H moves in Z); link1
@@ -880,13 +893,17 @@ def make_output_cone():
     bore_y0 = cav_apex_y + neck_ri / math.tan(beta)
     cavity = cavity.fuse(cyl(neck_ri, neck_y1 - bore_y0 + 1.0,
                              v(0, bore_y0, 0), Y_AXIS))
+    # Wider round the tube's head.
+    y_head = uj_ring_y - uj_head_back - 1.0
+    cavity = cavity.fuse(cyl(neck_ri_head, neck_y1 - y_head + 1.0,
+                             v(0, y_head, 0), Y_AXIS))
     cone = cone.cut(cavity)
     # The ring cross's X pins: through the neck wall, under the bearing, which
     # is what keeps them in.
     for xs in (1, -1):
-        x0 = xs * (neck_ri - 1.0) if xs > 0 else -(neck_ro + 1.0)
+        x0 = xs * (neck_ri_head - 1.0) if xs > 0 else -(neck_ro + 1.0)
         cone = cone.cut(pin_x((uj_ring_y, 0.0), uj_pin_d + 0.1, x0,
-                              neck_ro - neck_ri + 2.0))
+                              neck_ro - neck_ri_head + 2.0))
     return cone
 
 
@@ -911,24 +928,29 @@ def d_bore(y0, length, extra=0.0):
 
 def make_uj_mid(L):
     """Cardan intermediate, built on +Y from the solid cross (s = 0 at
-    uj_cross_y) at length L; uj_place() tilts it. A tube: the solid cross's Z
-    pins go into its tail, the ring's Z pins into slotted holes at its head
-    (the length changes by uj_slide over the stroke), and the ring's X pins
-    pass out through two windows on their way to the cone's neck."""
+    uj_cross_y) at length L; uj_place() tilts it. A stepped tube: the solid
+    cross's Z pins go into its narrow tail, the ring's Z pins into slotted holes
+    in its wide head (the length changes by uj_slide over the stroke), and the
+    ring's X pins pass out through two windows in the head to the cone's neck."""
     y0 = uj_cross_y - uj_mid_end
-    tube = cyl(uj_mid_ro, L + 2 * uj_mid_end, v(0, y0, 0), Y_AXIS).cut(
-        cyl(uj_mid_ri, L + 2 * uj_mid_end + 2, v(0, y0 - 1, 0), Y_AXIS))
-    hole = uj_pin_d / 2.0 + 0.05
-    span = 2 * uj_mid_ro + 2
-    tube = tube.cut(cyl(hole, span, v(0, uj_cross_y, -span / 2.0), Z_AXIS))
     yr = uj_cross_y + L
+    yh = yr - uj_head_back
+    tail = cyl(uj_mid_ro, yh - y0 + 0.5, v(0, y0, 0), Y_AXIS)
+    head = cyl(uj_head_ro, uj_head_back + uj_head_end, v(0, yh, 0), Y_AXIS)
+    tube = tail.fuse(head)
+    tube = tube.cut(cyl(uj_mid_ri, yh - y0 + 2, v(0, y0 - 1, 0), Y_AXIS))
+    tube = tube.cut(cyl(uj_head_ri, uj_head_back + uj_head_end + 1,
+                        v(0, yh, 0), Y_AXIS))
+    hole = uj_pin_d / 2.0 + 0.05
+    span = 2 * uj_head_ro + 2
+    tube = tube.cut(cyl(hole, span, v(0, uj_cross_y, -span / 2.0), Z_AXIS))
     for dy in (-uj_slide / 2.0, uj_slide / 2.0):
         tube = tube.cut(cyl(hole, span, v(0, yr + dy, -span / 2.0), Z_AXIS))
     tube = tube.cut(Part.makeBox(span, uj_slide, 2 * hole,
                                  v(-span / 2.0, yr - uj_slide / 2.0, -hole)))
     # Window: the X pin rocks about the Z pins by the ring's own bend, so it
     # walks along the tube by r*sin(bend) each way, plus the slide.
-    wy = hole + uj_mid_ro * math.sin(uj_bend_ring) + uj_slide / 2.0 + 0.3
+    wy = hole + uj_head_ro * math.sin(uj_bend_ring) + uj_slide / 2.0 + 0.3
     wz = hole + 0.3
     tube = tube.cut(Part.makeBox(span, 2 * wy, 2 * wz,
                                  v(-span / 2.0, yr - wy, -wz)))
@@ -943,8 +965,8 @@ def make_uj_ring(L):
     ring = cyl(uj_ring_ro, uj_ring_t, v(0, yr - uj_ring_t / 2.0, 0), Y_AXIS).cut(
         cyl(uj_ring_ri, uj_ring_t + 2, v(0, yr - uj_ring_t / 2.0 - 1, 0), Y_AXIS))
     r0 = uj_ring_ro - 0.5
-    z_len = uj_mid_ro - 0.2 - r0
-    x_len = (neck_ri + neck_ro) / 2.0 - r0
+    z_len = uj_head_ro - 0.2 - r0
+    x_len = (neck_ri_head + neck_ro) / 2.0 - r0
     for s in (1, -1):
         ring = ring.fuse(cyl(uj_pin_d / 2.0, z_len,
                              v(0, yr, s * r0), v(0, 0, s)))
@@ -2011,6 +2033,14 @@ checks = [
     # Drawn in one phase only: the prism is aligned with the tube there. Half
     # a turn later it rocks inside it about the Z pins, and its far corner is
     # what comes closest to the tube's bore.
+    # Same for the ring inside the tube's head: half a turn on, it rocks about
+    # its Z pins by the ring joint's own bend.
+    ("ring cross inside the tube's head, any phase  (mm)",
+     uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
+                   + uj_ring_t / 2.0 * math.sin(uj_bend_ring)),
+     "> 0.3",
+     uj_head_ri - (uj_ring_ro * math.cos(uj_bend_ring)
+                   + uj_ring_t / 2.0 * math.sin(uj_bend_ring)) > 0.3),
     ("solid cross prism inside the intermediate, any phase  (mm)",
      uj_mid_ri - math.sqrt(uj_cross_a ** 2 + uj_cross_hy ** 2 + uj_cross_hz ** 2),
      "> 0.5",
@@ -2137,7 +2167,8 @@ print("-" * 72)
 print("  DRIVE OUT: folded double cardan inside the cone, 1:1")
 print(f"    solid cross y {uj_cross_y:.1f} (output axis), ring y {uj_ring_y:.1f}"
       f" (cone axis), intermediate {uj_L_rest:.1f} mm, tube"
-      f" \u00d8{2*uj_mid_ri:.1f}/{2*uj_mid_ro:.1f}, ring bore \u00d8{2*uj_ring_ri:.1f}")
+      f" \u00d8{2*uj_mid_ri:.1f}/{2*uj_mid_ro:.1f} (head \u00d8{2*uj_head_ri:.1f}/{2*uj_head_ro:.1f}),"
+      f" ring \u00d8{2*uj_ring_ri:.1f}/{2*uj_ring_ro:.1f} x {uj_ring_t:.0f}")
 print(f"    bends at full preload: solid cross {math.degrees(uj_bend_cross):.2f} deg,"
       f" ring {math.degrees(uj_bend_ring):.2f} deg  (never equal: both crosses are"
       f" in front of the apex)")
