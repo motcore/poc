@@ -169,132 +169,52 @@ link_knuckle_d = 14.5 # mm — (v7-cardan-zigzag: ON B. The 14.5 link is too
                        #      Swept in the checks below, not assumed.
 pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 
-# ── Actuation: servo → crank → telescopic spring link → carriage trunnion ────
-# First pass. Everything here is a placeholder until the rubber stiffness is
-# measured (doc §10.1) — that number decides the spring, and the spring decides
-# the servo.
-R_push        = 40.0   # mm — apex → push point, measured in Y. It is NOT the
-                        #      lever any more, and that is the point of this
-                        #      number being 40 and not 50.
-                        #      R_push would be the moment arm if the push were
-                        #      vertical. It is not: the servo lies on the floor
-                        #      and the link comes up at a shallow angle, so the
-                        #      arm is the perpendicular distance from the apex
-                        #      to the LINK's line — measured, see push_lever().
-                        #      Swept over R_push = 32..50 that distance barely
-                        #      moves (39..45 mm): pushing from further out costs
-                        #      as much angle as it gains radius. So R_push is
-                        #      chosen for PACKAGING instead, and a shorter horn
-                        #      is a stiffer horn, less mass on the part that
-                        #      tilts, and — at anything under 48 — a cube set by
-                        #      the corona rather than by the horn.
-                        #      What DOES move the lever is the servo's own Y,
-                        #      see crank_hub_y.
-push_z        = -30.0  # mm — Z of the push point. Off the centre line because
-                        #      the output shaft is on it, and below the corona's
-                        #      rim so the horn never crosses the gear plane.
-act_amp       = 6.0    # mm — servo-side travel of the push point, each way
-spring_ratio  = 10.0   # —  — rubber stiffness / spring stiffness, seen at the
-                        #      push point, with the push point at spring_ratio_R.
-                        #      Invented (doc §10.2), to be measured.
-spring_ratio_R = 50.0  # mm — where that ratio was invented. It is not a free
-                        #      parameter: a given spring and a given rubber look
-                        #      like a DIFFERENT ratio from a different radius,
-                        #      because the same push-point travel becomes a
-                        #      bigger tilt, and the tilt is what squeezes the
-                        #      rubber. The ratio at the push point therefore
-                        #      goes as 1/R^2, and spring_split below carries it
-                        #      across. Without that, shortening the horn from 50
-                        #      to 40 quietly raised the preload by half — the
-                        #      squeeze went from 4.0 to 7.4 mm3 — on a design
-                        #      change that was supposed to be about packaging.
-crank_hub_y   = 14.0   # mm — Y of the servo output shaft. The push point
-                        #      stays where it was; the link's own length and
-                        #      angle absorb wherever the shaft ends up, and the
-                        #      lever barely moves either way (39.7 mm here vs
-                        #      ~40 further out — the link's Y and Z components
-                        #      trade off almost exactly, doc §7).
-                        #      Y is bounded on BOTH sides now, not free to run
-                        #      out as far as it likes: the case runs OUTWARD
-                        #      toward the wall (see servo_box), so past ~15 its
-                        #      far corner starts sweeping into the four-bar's
-                        #      lower link, which runs from (31, -26) down to
-                        #      (47, -40) — the same link that used to cap this
-                        #      from the OTHER direction, when the case ran
-                        #      inward instead. 14 clears it with margin.
-                        #      Its Z is DERIVED — see servo_lift.
-servo_lift    = 6.5    # mm — how far the bracket's foot lifts the case off the
-                        #      deck. Not cosmetic: the crank's radius is 6.3 and
-                        #      the shaft sits only 6.1 above a case lying flat,
-                        #      so without the lift the crank circle cuts the
-                        #      floor. Came down from 11 when the horn appeared
-                        #      overhead: the case's top face, and the bracket
-                        #      plate that reaches it, have to stay under the
-                        #      horn's lower edge — which is at z = -35 at rest
-                        #      and 1.5 mm lower at full preload down.
-                        #      The crank's own swept circle is what stops it
-                        #      going lower: 9.3 mm about a shaft 6.1 above the
-                        #      case's underside, against a floor 55 mm down.
-                        #      (Was (46, -28), directly under the push point.
-                        #      on the push point's own vertical: off it, the
-                        #      distance hub→push point varies over the stroke
-                        #      and the link stops reaching one end. Moved to
-                        #      y = 40 to dodge the corona, it could no longer
-                        #      reach the top of the stroke at all (34.5 mm
-                        #      needed, 34.3 available) — the clearance came
-                        #      from moving the actuation plane out in X
-                        #      instead, see act_x.)
-crank_r       = 6.3    # mm — crank radius
-# act_link_len is DERIVED: the link's free length is whatever spans hub to push
-# point at rest, so moving the servo cannot silently put it out of reach.
-act_x         = 24.0   # mm — X of the actuation plane (link + trunnion).
-                        #      Set by the clamp nuts, which stand 2.4 mm proud
-                        #      of the block's outer face at x = 17: at 22 the
-                        #      link sat 0.1 mm off one of them.
-                        #      Moved out from 20 when the arms became L-shaped:
-                        #      their uprights run straight down at y = 37..46,
-                        #      which is exactly where the crank pin swings, and
-                        #      the diagonal arms used to pass inboard of it.
-                        #      OUTBOARD of the carriage side plate: inboard of
-                        #      it the only gap is the 4 mm between the housing
-                        #      (r = 8) and the plate, and the link is 5 thick.
-                        #      The trunnion therefore spans housing → plate →
-                        #      link, i.e. it is held at both ends rather than
-                        #      cantilevered off the housing.
-                        #      NOTE the push is single-sided here: a real
-                        #      symmetric push would need a fork straddling the
-                        #      bearing housing, or a second servo.
-servo_body    = (29.0, 23.0, 12.2)   # mm (X, Y, Z) — MG90-class placeholder.
-                        #      The shaft comes out of the TOP face, so the case's
-                        #      29 mm height runs along the shaft axis, X. The
-                        #      other two turn about it, and here the case lies
-                        #      FLAT ON THE FLOOR: 12.2 of thickness up Z, 23 of
-                        #      length along Y, reaching inward from the shaft
-                        #      toward the motor.
+# ── Actuation: servo → torsion spring → horn → lever 2:1 → link → ear ───────
+# Everything lives in ONE vertical plane per part (Y-Z), stacked in X, in the
+# band between the carriage's top and the ceiling, in this axis' own corner of
+# the pinwheel (+X). All four axes are identical rotated copies: no part is
+# turned over any more, so each servo has a corner of its own.
+#
+# The servo spline turns sv_theta_max each way. The first sv_theta_c of it
+# brings the rubber into contact; past that the carriage has nowhere to go and
+# the rest of the sweep winds a torsion spring between spline and horn, which
+# is what sets the squeeze. The HORN therefore only ever swings ~sv_theta_c.
+sv_theta_c    = 20.0   # deg — servo sweep, free → contact
+sv_theta_max  = 80.0   # deg — servo sweep, free → full preload (margin to the
+                        #       MG90's own ~90 deg end stops)
+sv_stall      = 0.18   # Nm  — MG90-class stall torque; the spring is sized to
+sv_use        = 0.8    #       reach this fraction of it at full preload
+spring_ratio  = 15.0   # —   — rubber stiffness / spring stiffness, both seen as
+                        #       servo-side angle past contact. Invented (doc
+                        #       §10.2): it only sets how far past contact the
+                        #       carriage still creeps, i.e. phi_preload.
+servo_body    = (29.0, 22.8, 12.2)   # mm (X along the shaft, Y length, Z
+                        #      width) — MG90-class. Lying under the ceiling,
+                        #      shaft pointing +X out of the case's top face.
+sv_face_x     = 29.0   # mm — X of the case's top (shaft) face; case runs to −X
+sv_y0         = 5.0    # mm — Y of the case's near end. Its shaft sits at the
+                        #      FAR quarter, nearer the carriage.
+sv_z0         = 36.5   # mm — case underside: clear of the four-bar's upper
+                        #      links, whose top edge reaches z = y + 5.7 at the
+                        #      case's far end
+sv_z_clr      = 0.5    # mm — case top to the ceiling
 servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
-servo_tab_out = 4.7    # mm — how far each tab reaches past the body (an MG90 is
-                        #      32.2 long over the tabs against 22.8 of body)
+servo_tab_out = 4.7    # mm — how far each tab reaches past the body
 servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
-servo_plate_t = 3.0    # mm — bracket face plate thickness
-crank_web_t   = 3.5    # mm — crank web thickness (X)
-crank_hub_r   = 5.0    # mm — crank boss radius. It passes through a clearance
-                        #      hole in the bracket plate, and the servo's near
-                        #      tab screw is 8.15 mm from the shaft, so this is
-                        #      what leaves the plate ~1 mm of material between
-                        #      the two.
-crank_boss_h  = 4.0    # mm — how far the crank's web stands off the servo's top
-                        #      face: the boss wraps the output spline, which is
-                        #      what lets the crank sweep OVER the two tab screws
-                        #      (its swept radius is 10.3 and they sit at 8.15,
-                        #      so flat on the case they collide).
-                        #      It can stay this short — a long boss is a long
-                        #      lever on the servo's own shaft — only because the
-                        #      crank sits INBOARD of the link plane, with the
-                        #      pin reaching outboard through it. Outboard, the
-                        #      boss would have to cross the link plane at the
-                        #      hub, and near dead centre the link lies right on
-                        #      top of the hub.
-servo_wall_clr = 1.5   # mm — clearance from the servo's far tab to the wall
+horn_t        = 2.0    # mm ┐ X stack, from the servo face outward: spring,
+act_gap       = 0.5    # mm │ horn, link1, lever (with its deck post on the
+lk_t          = 2.0    # mm │ servo side), link2, and the ear inboard of the
+lever_t       = 3.0    # mm ┘ lever
+spring_len    = 1.5    # mm — torsion spring envelope along X
+spring_r      = 5.5    # mm — its outer radius
+lever_in      = 8.0    # mm — lever arm to link1
+lever_out     = 4.0    # mm — lever arm to link2 → 2:1
+lever_z       = 37.0   # mm — Z of the lever's pivot and arms at rest
+ear_z         = 27.5   # mm — Z of the ear pin at rest (carriage frame)
+ear_w         = 5.0    # mm — ear bridge width
+ear_h         = 6.0    # mm — ear bridge height
+act_pin_d     = 3.0    # mm — actuation pins
+act_boss_r    = 2.5    # mm — boss radius round each actuation pin
 
 # ── Render pose ──────────────────────────────────────────────────────────────
 CARRIAGE_STOP = "contact"   # "free" | "contact" | "preload"
@@ -343,16 +263,11 @@ arm_root      = (36.0, 5.0)   # mm (y, |z|) — where each arm leaves the block.
                         #      swapped for two straight legs so the shape reads
                         #      at a glance and each face prints flat. Checked
                         #      by the sweep below, not assumed.
-horn_w        = 10.0   # mm — width of the horn that carries the push point
-horn_t        = 6.0    # mm — its thickness (X). It is the whole actuation load
-                        #      path, so it is the thickest plate on the part.
 bolt_d        = 3.0    # mm ┐
 bolt_head_d   = 5.5    # mm │ M3 socket head and nut, as envelopes. Modelled as
 bolt_head_h   = 3.0    # mm │ solids and not just as holes, because a hole
 bolt_nut_d    = 6.4    # mm │ collides with nothing: it was the HEAD that ran
 bolt_nut_h    = 2.4    # mm ┘ into the actuation link, and nothing could see it.
-trunnion_d    = 5.0    # mm — push trunnion diameter (a length of the Ø5 rod
-                        #      the project already buys, NOT a printed boss)
 
 # ── Folded double cardan and output shaft support ─────────────────────────
 uj_cross_y    = 26.0   # mm — solid cross centre, on the OUTPUT axis. As far
@@ -649,12 +564,12 @@ def apex_drift(phi):
 
 
 # ── Stop ladder. No mesh step: the gears never disengage (invariant 4) ───────
-# After contact, 1 part of further servo travel goes into the carriage and
-# (split - 1) into the spring.
-spring_split = 1.0 + spring_ratio * (spring_ratio_R / R_push) ** 2
-contact_travel = R_push * phi_c                 # push-point travel, free→contact
-phi_preload = (contact_travel
-               + (act_amp - contact_travel) / spring_split) / R_push
+# Before contact the carriage follows the servo at sv_theta_c per phi_c. After
+# it, of every further degree of servo sweep 1 part still reaches the carriage
+# (squeezing the rubber) and spring_ratio parts wind the spring.
+spring_split = 1.0 + spring_ratio
+phi_preload = phi_c + (math.radians(sv_theta_max - sv_theta_c)
+                       * (phi_c / math.radians(sv_theta_c)) / spring_split)
 STOPS = {"free": 0.0, "contact": phi_c, "preload": phi_preload}
 phi = CARRIAGE_DIR * STOPS[CARRIAGE_STOP] if CARRIAGE_STOP != "free" else 0.0
 
@@ -683,95 +598,70 @@ uj_bend_ring  = max(abs(g[1] - p) for p, g in _uj_sweep)         # rad
 uj_front_y = max(uj_cross_y + (g[0] + uj_mid_end) * math.cos(g[1])
                  + uj_mid_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
 
-# ── Actuator state at the rendered pose ─────────────────────────────────────
-_UNREACHABLE = []
+# ── Actuation chain, rest geometry (Y, Z) ────────────────────────────────────
+# Servo shaft S; horn tip H (horn level, pointing +Y, so H moves in Z); link1
+# straight down to the lever's input I; lever pivot P on a post from the
+# ceiling; output O; link2 straight down to the ear E on the carriage.
+# Horn radius is DERIVED from the sweep split: the horn must swing sv_theta_c
+# while the ear rises by E_y * phi_c, through the lever's 2:1.
+S_act = (sv_y0 + 0.75 * servo_body[1], sv_z0 + servo_body[2] / 2.0)
+_k_act = phi_c * (lever_in / lever_out) / math.radians(sv_theta_c)
+horn_r = (S_act[0] + lever_in + lever_out) * _k_act / (1.0 - _k_act)
+H0 = (S_act[0] + horn_r, S_act[1])
+I0 = (H0[0], lever_z)
+P_act = (I0[0] + lever_in, lever_z)
+O0 = (P_act[0] + lever_out, lever_z)
+E0 = (O0[0], ear_z)
+link1_len = math.dist(H0, I0)
+link2_len = math.dist(O0, E0)
+
+# X stack, from the servo's face outward.
+x_spring = (sv_face_x, sv_face_x + spring_len)
+x_horn = (x_spring[1] + act_gap, x_spring[1] + act_gap + horn_t)
+x_l1 = (x_horn[1] + act_gap, x_horn[1] + act_gap + lk_t)
+x_lev = (x_l1[1] + act_gap, x_l1[1] + act_gap + lever_t)
+x_l2 = (x_lev[1] + act_gap, x_lev[1] + act_gap + lk_t)
 
 
-def actuator(phi_r):
-    """Servo-side push-point position and crank pin, from the series-spring
-    model in the visualiser: before contact the carriage follows the servo,
-    after it only 1/spring_split of further servo travel reaches the carriage
-    and the rest compresses the spring."""
-    zh = R_push * phi_r
-    sgn = 1.0 if zh >= 0 else -1.0
-    if abs(zh) <= contact_travel:
-        zc = zh
-    else:
-        zc = sgn * (contact_travel + (abs(zh) - contact_travel) * spring_split)
-    # Crank pin = the crank circle meeting the link circle about the push
-    # point. Circle-circle rather than the visualiser's closed form, so that
-    # the branch can be chosen: the two solutions are mirror images about the
-    # hub→push-point line, and the crank sweeping on the MOTOR side (pin_y <
-    # R_push) is what keeps the link out of the gear plane. On the wall side
-    # the pin reaches y = 52.3 and the link, being a tube, put its shoulder
-    # 0.2 mm inside the corona's front face. Same mechanism, mirrored.
-    pin = _circ_int(crank_hub, crank_r, (R_push, push_z + zc), act_link_len,
-                    (crank_hub[0] - crank_r, crank_hub[1]))
-    if pin is None:      # crank + link cannot reach this stop at all
-        if abs(zc) <= act_amp + 1e-9:    # only the design stroke must be
-            _UNREACHABLE.append(zc)      # reachable; the contact bisection
-                                          # deliberately explores well past it
-        pin = (crank_hub[0] + crank_r, crank_hub[1])
-    psi = math.atan2(pin[0] - crank_hub[0], pin[1] - crank_hub[1])
-    return zc, psi, pin
+def _rot_about(p, c, a):
+    ca, sa = math.cos(a), math.sin(a)
+    dy, dz = p[0] - c[0], p[1] - c[1]
+    return (c[0] + ca * dy - sa * dz, c[1] + sa * dy + ca * dz)
 
+
+def act_chain(T):
+    """Solve the chain backwards from the carriage: the ear is where the
+    four-bar puts it, the lever follows through link2, the horn through link1.
+    Returns the points and the lever's and horn's rotations; None-valued if a
+    circle-circle step has no solution (the chain cannot reach)."""
+    E = T(E0)
+    O = _circ_int(P_act, lever_out, E, link2_len, O0)
+    if O is None:
+        return {"E": E, "O": None, "I": None, "H": None,
+                "lever_a": None, "horn_a": None}
+    lev_a = (math.atan2(O[1] - P_act[1], O[0] - P_act[0])
+             - math.atan2(O0[1] - P_act[1], O0[0] - P_act[0]))
+    I = _rot_about(I0, P_act, lev_a)
+    H = _circ_int(S_act, horn_r, I, link1_len, H0)
+    horn_a = None if H is None else (
+        math.atan2(H[1] - S_act[1], H[0] - S_act[0])
+        - math.atan2(H0[1] - S_act[1], H0[0] - S_act[0]))
+    return {"E": E, "O": O, "I": I, "H": H, "lever_a": lev_a, "horn_a": horn_a}
 
 
 # ── Cube ──────────────────────────────────────────────────────────────────────
-# Short face: the running clearance to the Oldham's output hub.
-# Y of the servo's far end. 0.75, not 0.25: the case runs OUTWARD from the
-# crank now (see servo_box), so the far edge is three quarters of its length
-# past crank_hub_y, not one quarter.
-servo_y_end = crank_hub_y + 0.75 * servo_body[1] + servo_tab_out
-# The cube is as small as the FURTHEST thing that must fit. Printing which one
-# binds is the point: at the defaults it is the servo,
-# whose case runs outboard from its shaft, so shaving the corona's clearance
-# buys nothing until the servo moves.
-# The tabs span the same Y as the case, so they are not a separate entry — they
-# were, with a different margin, which is how a tie came to be reported as a
-# winner.
-# Everything that has to fit inside the wall. The push point and the four-bar's
-# frame post were missing from this list, and the wall promptly closed in on top
-# of them — the horn ends up as the furthest thing out now that the gears are
-# behind it, which is exactly the point of the layout.
+# The cube is as small as the FURTHEST thing that must fit, in Y (to the wall)
+# or in Z (to the ceiling) — it is a cube, so both are the same number.
 cube_half_by = {
     "cardan's intermediate + inner output bearing boss":
         uj_front_y + run_clr + brg_w,
-    "servo's far mounting tab": servo_y_end + servo_wall_clr,
-    "push point and its horn": R_push + horn_w / 2.0 + 2.0,
     "four-bar frame post": fb_A[0] + fp_post_y + 1.0,
+    "servo case under the ceiling": sv_z0 + servo_body[2] + sv_z_clr,
+    "actuation lever's output boss (to the wall)":
+        O0[0] + act_boss_r + run_clr,
 }
 cube_half_driver = max(cube_half_by, key=cube_half_by.get)
 cube_half = cube_half_by[cube_half_driver]
-# Z kept in terms of servo_lift, even though the bracket no longer stands on
-# the deck to get it: the number still works (crank clears the case, see
-# servo_lift), and re-deriving it from scratch would only rename the same
-# value, not change it.
-crank_hub = (crank_hub_y,
-             -cube_half + servo_lift + servo_body[2] / 2.0)
-act_link_len = math.dist(crank_hub, (R_push, push_z))  # free length = hub to
-                                                       # push point at rest
-# X of the crank's web, and of the servo's top face crank_boss_h behind it. The
-# case runs INBOARD from that face, not outboard: outboard it is the NEIGHBOURING
-# axis' wall that stops it, 57 mm out, and the stack (link, crank, standoff, 29 mm
-# of case) needs 60. Inboard, under the motor cone and above the deck, there is a
-# pocket 40 mm deep with nothing in it. That flip is what lets the cube close.
-crank_web_x  = act_x - link_t / 2.0 - 0.5 - crank_web_t
-servo_face_x = crank_web_x - crank_boss_h
-# The bracket's wall screws go through its own plate, which is on the shaft
-# side of the tabs.
-servo_anchor_x = servo_face_x + servo_plate_t / 2.0
-sw_screw_x = 6.0    # mm — |X| the bracket's two wall screws sit off the
-                     # foot's own centre line (sw_foot_cx), NOT off the servo
-                     # — see sw_foot_cx for why the foot is not straight out
-                     # from the servo at all.
-sw_foot_x = sw_screw_x + foot_edge   # DERIVED — half-width of that foot
-sw_foot_cx = 34.0   # mm — X of the servo bracket's wall foot. The bottom
-                     # frame post's own foot already owns |x| <= fp_post_x
-                     # (22) directly out from the servo (fb_A[1] and
-                     # crank_hub[1] are only 3.95 mm apart in Z), so the
-                     # reach jogs out past its edge instead of landing on
-                     # top of it — sw_foot_cx - sw_foot_x clears 22 by 1.5.
 cube_out  = cube_half + wall_thick
 # Brackets seat on the bosses, not on the wall itself.
 wall_face_y = cube_half - wall_boss_h
@@ -851,9 +741,9 @@ def pose_state(phi_t):
     and the actuation train were consequently never checked against anything —
     which is exactly where two real collisions were hiding."""
     T, pose = carriage_transform(phi_t)
-    zc, psi, pin = actuator(phi_t)
-    return {"phi": phi_t, "T": T, "B1": pose[0], "B2": pose[1],
-            "pin": pin, "tab": T((R_push, push_z)), "zc": zc, "psi": psi}
+    st = {"phi": phi_t, "T": T, "B1": pose[0], "B2": pose[1]}
+    st.update(act_chain(T))
+    return st
 
 
 def make_screw(base, direction, d, length, head_d, head_h):
@@ -871,8 +761,6 @@ def _deck_seat_t(sx):
     """Material UNDER a deck screw's head. The frame posts present a plain
     foot; the servo bracket's pad is counterbored, because the servo's own case
     sits 2 mm above it and a head standing proud would be inside it."""
-    if abs(sx - servo_anchor_x) < 1e-6:
-        return servo_lift - deck_boss_h - (bolt_head_h + 0.5)
     return foot_t
 
 
@@ -892,10 +780,7 @@ def wall_screws():
     precedent the deck version had ("the servo's only exists on the bottom
     deck; putting it in both is harmless") — both_hands() cannot tell this
     pair apart from the frame pivots' genuinely symmetric ones."""
-    out = [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
-    out += [(sw_foot_cx - sw_screw_x, crank_hub[1]),
-            (sw_foot_cx + sw_screw_x, crank_hub[1])]
-    return out
+    return [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
 
 
 def place_carriage(shape, st):
@@ -1093,7 +978,7 @@ def make_carriage():
     point. Nothing of it is inside the cone any more — that is the joint's."""
     body = cyl(hous_ro, hous_y1 - hous_y0, v(0, hous_y0, 0), Y_AXIS)
     body = body.fuse(make_carriage_arms(1)).fuse(make_carriage_arms(-1))
-    body = body.fuse(make_horn())
+    body = body.fuse(make_ear())
     # Every hole LAST: a later fuse fills an earlier hole straight back in.
     body = body.cut(cyl(hous_lip_ri, 60.0, v(0, 0.0, 0), Y_AXIS))
     body = body.cut(cyl(nb_od / 2.0 + brg_fit_press, 30.0,
@@ -1102,21 +987,28 @@ def make_carriage():
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
                               2 * (side_x + side_t / 2.0 + 2.0)))
-    body = body.cut(pin_x((R_push, push_z), fdm_dowel_hole_d,
-                          side_x - horn_t / 2.0 - 1.0, horn_t + 2.0))
+    body = body.cut(pin_x(E0, act_pin_d + 0.2, x_lev[0] - 1.0, lever_t + 2.0))
     return body
 
 
-def make_horn():
-    """Straight down off the housing to the push point's height, then along
-    to it if the two Y differ. Out at the arms' own X, off the centre line."""
-    x0 = side_x - horn_t / 2.0
-    y_root = min(R_push, hous_y1 - horn_w / 2.0)
-    corner = (y_root, push_z)
-    horn = bar_yz((y_root, -(hous_ro - 1.0)), corner, horn_w, x0, horn_t)
-    if abs(R_push - y_root) > 1e-6:
-        horn = horn.fuse(bar_yz(corner, (R_push, push_z), horn_w, x0, horn_t))
-    return horn
+def make_ear():
+    """The ear the actuation pulls on: a bridge from the top of the +X arm's
+    upright, out over the corner in X and toward the wall in Y, to a plate in
+    the lever's own X band carrying the ear pin E. It sits below the lever and
+    link1, which pass over it."""
+    z0 = ear_z - ear_h / 2.0
+    p0 = (side_x, arm_root[0])
+    p1 = ((x_lev[0] + x_lev[1]) / 2.0, E0[0])
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    ln = math.hypot(dx, dy)
+    nx, ny = -dy / ln * ear_w / 2.0, dx / ln * ear_w / 2.0
+    quad = [v(p0[0] + nx, p0[1] + ny, z0), v(p1[0] + nx, p1[1] + ny, z0),
+            v(p1[0] - nx, p1[1] - ny, z0), v(p0[0] - nx, p0[1] - ny, z0)]
+    bridge = Part.Face(Part.makePolygon(quad + [quad[0]])).extrude(v(0, 0, ear_h))
+    plate = disc_yz(E0, act_boss_r + 0.5, x_lev[0], lever_t)
+    plate = plate.fuse(Part.makeBox(lever_t, 2 * (act_boss_r + 0.5), ear_h,
+                                    v(x_lev[0], E0[0] - act_boss_r - 0.5, z0)))
+    return bridge.fuse(plate)
 
 def make_carriage_arms(sd):
     """One upright of the carriage's 'H': a vertical bar at arm_root's Y, from
@@ -1131,17 +1023,6 @@ def make_carriage_arms(sd):
         part = part.fuse(bar_yz(corner, b, arm_w, x0, side_t))
         part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
     return part
-
-def make_trunnion():
-    """Push pin at the end of the horn: a length of the Ø5 rod the project
-    already buys, pressed through it. Not a printed boss — the load bends it
-    across the layers, which is the one direction FDM has none."""
-    # Starts flush with the horn's inner face: 1 mm of it standing proud on the
-    # inboard side is 1 mm inside the four-bar's lower link.
-    lo = side_x - horn_t / 2.0
-    return cyl(trunnion_d / 2.0, act_x + link_t / 2.0 + 0.5 - lo,
-               v(lo, R_push, push_z), X_AXIS)
-
 
 def make_carriage_bearing(y_face, sd):
     y_start = min(y_face, y_face + sd * brg_w)
@@ -1266,152 +1147,119 @@ def make_frame_bracket(zs):
                             v(sx, y_foot_in - 1, z_pin + fw_screw_z), Y_AXIS))
     return part
 
-def make_crank(st):
-    """Servo crank, dog-legged out to the actuation plane."""
-    x_web = crank_web_x
-    # The boss runs back to the servo's face: it wraps the spline and stands the
-    # web off it. Ø12, so it passes inside the tab screws at 8.15 mm radius.
-    hub = cyl(crank_hub_r, x_web + crank_web_t - servo_face_x,
-              v(servo_face_x, crank_hub[0], crank_hub[1]), X_AXIS)
-    # 6 wide, not 8: the web's own half-width is part of the crank's swept
-    # circle, and that circle is what holds the servo up off the floor.
-    web = bar_yz(crank_hub, st["pin"], 6.0, x_web, crank_web_t)
-    # Ø3, matching the 3.2 hole in the link. It was written as cyl(3.0, ...),
-    # which is a RADIUS — a Ø6 pin through a Ø3.2 hole, 101 mm3 of overlap.
-    # Outboard from inside the web, through the link and a little past it.
-    pin = cyl(1.5, link_t + 4.0, v(crank_web_x + 1.0,
-                                   st["pin"][0], st["pin"][1]), X_AXIS)
-    return hub.fuse(web).fuse(pin)
-
-
-def make_act_link(st):
-    """Telescopic link, pinned at both ends, with the springs inside. Drawn at
-    its ACTUAL length (pin → trunnion as the linkage puts them), so the
-    difference from act_link_len is the real spring compression — which is the
-    number the preload is set by, not any position."""
-    x0 = act_x - link_t / 2.0
-    pin_pt, tab_pt = st["pin"], st["tab"]
-    mid = ((pin_pt[0] + tab_pt[0]) / 2.0, (pin_pt[1] + tab_pt[1]) / 2.0)
-    body = bar_yz(pin_pt, mid, 9.0, x0, link_t).fuse(
-        bar_yz(mid, tab_pt, 5.0, x0, link_t))
-    body = body.cut(pin_x(pin_pt, 3.2, x0 - 1, link_t + 2))
-    body = body.cut(pin_x(tab_pt, trunnion_d + 0.4, x0 - 1, link_t + 2))
-    return body
-
-
 def servo_box():
-    """(x0, y0, z0, bx, by, bz) of the servo body. Its top face — the one the
-    shaft comes out of — is the HIGH-x face, at servo_face_x. The shaft sits
-    on the centre line of the case's thickness and a quarter of the way along
-    its length, as it does on an MG90.
-
-    The case runs OUTWARD in Y from the crank, toward the wall — rotated
-    180 deg about the shaft from where it used to sit. It used to run inward,
-    "under the corona": that corona is gone in this design (the drive is a
-    single Oldham now), and inward was ALSO where the four-bar's lower link
-    swept closest, which is what capped crank_hub_y at barely above where it
-    already sat. Outward, the case's own bulk is what's now closest to the
-    wall — see servo_wall_gap — not a bracket reaching a long way to it."""
+    """(x0, y0, z0, bx, by, bz) of the servo case, lying under the ceiling,
+    shaft face at sv_face_x pointing +X."""
     bx, by, bz = servo_body
-    return (servo_face_x - bx, crank_hub[0] - 0.25 * by,
-            crank_hub[1] - bz / 2.0, bx, by, bz)
+    return (sv_face_x - bx, sv_y0, sv_z0, bx, by, bz)
+
+
+def _tab_x():
+    """X band of the mounting tabs: a third of the way down the case from its
+    shaft face, as on an MG90."""
+    x1 = sv_face_x - servo_body[0] / 3.0
+    return (x1 - servo_tab_t, x1)
 
 
 def make_servo_body():
-    """MG90-class placeholder: body plus the two mounting tabs, which are what
-    it actually hangs from."""
+    """MG90-class placeholder: case plus its tab plate."""
     x0, y0, z0, bx, by, bz = servo_box()
     body = Part.makeBox(bx, by, bz, v(x0, y0, z0))
-    # The tabs reach past the case along its length and span its width, at the
-    # top face — which is the outboard end of the case.
-    tabs = Part.makeBox(servo_tab_t, by + 2 * servo_tab_out, bz,
-                        v(servo_face_x - servo_tab_t, y0 - servo_tab_out, z0))
-    body = body.fuse(tabs)
+    tx0, tx1 = _tab_x()
+    body = body.fuse(Part.makeBox(tx1 - tx0, by + 2 * servo_tab_out, bz,
+                                  v(tx0, y0 - servo_tab_out, z0)))
     for sy in servo_screw_ys():
-        body = body.cut(cyl(servo_screw_d / 2.0 + 0.1, servo_tab_t + 2,
-                            v(servo_face_x - servo_tab_t - 1, sy,
-                              crank_hub[1]), X_AXIS))
+        body = body.cut(cyl(servo_screw_d / 2.0 + 0.1, tx1 - tx0 + 2,
+                            v(tx0 - 1, sy, S_act[1]), X_AXIS))
+    # Output spline stub, so the spring has something to sit on.
+    body = body.fuse(cyl(2.5, spring_len + 0.2,
+                         v(sv_face_x - 0.1, S_act[0], S_act[1]), X_AXIS))
     return body
 
 
 def servo_screw_ys():
-    """Y of the two tab screws: an MG90's holes are 27.8 apart, along the case's
-    length, which runs along Y."""
     _, y0, _, _, by, _ = servo_box()
     return (y0 - servo_tab_out / 2.0, y0 + by + servo_tab_out / 2.0)
 
 
 def make_servo_bracket():
-    """What the servo hangs from: a plate across its two mounting tabs, on the
-    SHAFT side of them, reaching out to the wall.
-
-    Moved off the deck, at the user's request. The case itself was rotated
-    180 deg about its own shaft first (see servo_box) — it used to run
-    inboard, which is why a bracket alone once had to close a ~16 mm gap; now
-    the case's own bulk runs out toward the wall, and the far tab is only a
-    few mm short of it, same order as the frame pivots' own reach.
-
-    Shaft side, not case side, because the case side is where the four-bar's
-    lower link comes down. The crank's boss passes through the plate, so it
-    has a clearance hole — which is what limits the boss to Ø10: the servo's
-    own near tab screw is only 8.15 mm from the shaft, and the plate has to
-    keep some material between the two.
-
-    The reach to the wall keeps the plate's FULL height rather than tapering
-    to a thin foot: something has to carry the servo's own weight and
-    reaction torque across that span. It also JOGS in X, off to sw_foot_cx —
-    the bottom frame post's own foot already owns |x| <= fp_post_x over the
-    LAST stretch of wall (y_foot_in to wall_face_y), so the jog runs from the
-    far tab out to that boundary, at whatever X it needs, and only has to be
-    down to the foot's own narrow width by the time it gets there. Before
-    y_foot_in the frame post is only fp_lug_x wide (its own pivot post, not
-    its foot), which this plate already clears without jogging at all."""
-    x0, y0, z0, bx, by, bz = servo_box()
-    sy0, sy1 = servo_screw_ys()
-    y_plate0 = sy0 - foot_edge
-    y_foot_in = wall_face_y - foot_t   # same boundary the frame post's foot uses
-    rx0 = min(servo_face_x, sw_foot_cx - sw_foot_x)
-    rx1 = max(servo_face_x + servo_plate_t, sw_foot_cx + sw_foot_x)
-
-    part = Part.makeBox(servo_plate_t, sy1 - y_plate0, bz,
-                        v(servo_face_x, y_plate0, z0))
-    part = part.cut(cyl(crank_hub_r + 0.75, servo_plate_t + 2,
-                        v(servo_face_x - 1, crank_hub[0], crank_hub[1]),
-                        X_AXIS))
-    # The jog: full case height, widening from the plate's own X to the
-    # foot's, over whatever Y is left before the frame post's foot starts.
-    part = part.fuse(Part.makeBox(rx1 - rx0, y_foot_in - sy1, bz,
-                                  v(rx0, sy1, z0)))
-    # The foot: the jog's own width, from where the frame post's foot starts
-    # out to the wall — same band, offset in X, same as the frame post's own
-    # foot+screw convention.
-    part = part.fuse(Part.makeBox(2 * sw_foot_x, wall_face_y - y_foot_in, bz,
-                                  v(sw_foot_cx - sw_foot_x, y_foot_in, z0)))
-    # The bottom frame post's OWN screw reaches well past its post's narrow
-    # |x| <= fp_lug_x — its head is centred at fp_screw_x, and that x = 17
-    # sits inside this bracket's jog, which is wide there (rx0..rx1) exactly
-    # because that is what the jog is FOR. Clear its head's real reach,
-    # not just the post's own material.
-    part = part.cut(cyl((bolt_head_d + 0.6) / 2.0, foot_t + bolt_head_h + 2,
-                        v(fp_screw_x, wall_face_y - foot_t - bolt_head_h - 1,
-                          -fb_A[1]), Y_AXIS))
-    # Head clearance the whole foot band, not just foot_t of it: the head
-    # extends bolt_head_h inward past the seat, and unlike the frame post's
-    # narrow lug, this bracket is SOLID at the screw's own x the whole way
-    # in from the wall — nothing here is narrow enough to duck under it.
-    for sx in (sw_foot_cx - sw_screw_x, sw_foot_cx + sw_screw_x):
-        part = part.cut(cyl((bolt_head_d + 0.6) / 2.0,
-                            wall_face_y - y_foot_in + bolt_head_h + 2,
-                            v(sx, y_foot_in - bolt_head_h - 1, crank_hub[1]),
-                            Y_AXIS))
-    for sy in servo_screw_ys():
-        part = part.cut(cyl(servo_screw_d / 2.0 + 0.4, servo_plate_t + 2,
-                            v(servo_face_x - 1, sy, crank_hub[1]), X_AXIS))
+    """Two short posts down from the ceiling, one under each tab end, on the
+    case side of the tabs. Deck-mounted: the servo hangs from the ceiling it
+    lies against."""
+    tx0, _ = _tab_x()
+    _, y0, z0, _, by, bz = servo_box()
+    part = None
+    for ya, yb in ((y0 - servo_tab_out, y0), (y0 + by, y0 + by + servo_tab_out)):
+        post = Part.makeBox(3.0, yb - ya, cube_half - z0, v(tx0 - 3.0, ya, z0))
+        part = post if part is None else part.fuse(post)
+    # A bar along the ceiling tying the two posts into one part.
+    part = part.fuse(Part.makeBox(3.0, by + 2 * servo_tab_out, 1.0,
+                                  v(tx0 - 3.0, y0 - servo_tab_out, cube_half - 1.0)))
+    part = part.cut(Part.makeBox(servo_body[0], by, bz + 0.2,
+                                 v(sv_face_x - servo_body[0], y0, z0 - 0.1)))
     return part
 
-def servo_wall_screws():
-    """The subset of wall_screws() that belongs to the servo bracket."""
-    return [q for q in wall_screws() if abs(q[1] - crank_hub[1]) < 1e-6]
+
+def make_spring():
+    """Torsion spring round the servo's spline, between the case and the horn,
+    as its envelope."""
+    return cyl(spring_r, spring_len, v(x_spring[0], S_act[0], S_act[1]),
+               X_AXIS).cut(cyl(2.8, spring_len + 2,
+                               v(x_spring[0] - 1, S_act[0], S_act[1]), X_AXIS))
+
+
+def _plate_bar(pts, x_band, w):
+    """A flat bar through (y, z) points in an X band, holes at every point."""
+    body = None
+    for p, q in zip(pts, pts[1:]):
+        b = bar_yz(p, q, w, x_band[0], x_band[1] - x_band[0])
+        body = b if body is None else body.fuse(b)
+    for p in pts:
+        body = body.cut(pin_x(p, act_pin_d + 0.2, x_band[0] - 1,
+                              x_band[1] - x_band[0] + 2))
+    return body
+
+
+def make_act_horn(st):
+    """Horn on the spring: hub on the spline, arm out to H."""
+    hub = disc_yz(S_act, 4.0, x_horn[0], horn_t).cut(
+        disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
+    arm = bar_yz(S_act, st["H"], 2 * act_boss_r, x_horn[0], horn_t)
+    arm = arm.cut(disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
+    return hub.fuse(arm).cut(pin_x(st["H"], act_pin_d + 0.2, x_horn[0] - 1,
+                                   horn_t + 2))
+
+
+def make_lever_post():
+    """Post down from the ceiling to the lever pivot, in link1's X band (link1
+    is well inboard of it in Y)."""
+    w = 2 * act_boss_r + 1.0
+    post = Part.makeBox(lk_t, w, cube_half - lever_z,
+                        v(x_l1[0], P_act[0] - w / 2.0, lever_z))
+    post = post.fuse(disc_yz(P_act, act_boss_r + 0.5, x_l1[0], lk_t))
+    return post.cut(pin_x(P_act, act_pin_d + 0.2, x_l1[0] - 1, lk_t + 2))
+
+
+def act_moving_parts(st):
+    """Horn, links, lever and their pins at this pose."""
+    col, pc = (0.30, 0.55, 0.85), (0.45, 0.45, 0.50)
+    E, O, I, H = st["E"], st["O"], st["I"], st["H"]
+    if O is None or H is None:
+        return []
+    w = 2 * act_boss_r
+    out = [("Horn", make_act_horn(st), col, 0),
+           ("Link1", _plate_bar([H, I], x_l1, w), col, 0),
+           ("Lever", _plate_bar([I, P_act, O], x_lev, w), col, 0),
+           ("Link2", _plate_bar([O, E], x_l2, w), col, 0)]
+    r = act_pin_d / 2.0
+    for name, p, xa, xb in (("PinH", H, x_horn[0], x_l1[1]),
+                            ("PinI", I, x_l1[0], x_lev[1]),
+                            ("PinP", P_act, x_l1[0], x_lev[1]),
+                            ("PinO", O, x_lev[0], x_l2[1]),
+                            ("PinE", E, x_lev[0], x_l2[1])):
+        out.append((name, pin_x(p, act_pin_d, xa, xb - xa), pc, 0))
+    return out
+
 
 def both_hands(pts):
     """A screw pattern and its X mirror, without duplicates.
@@ -1635,7 +1483,6 @@ CARRIAGE_REST = [
     ("OutputCone",    make_output_cone(),                     (0.20, 0.80, 0.60), 0),
     ("OutputRubber",  make_output_rubber(),                   (0.15, 0.15, 0.18), 0),
     ("Carriage",      make_carriage(),                        (0.70, 0.70, 0.72), 0),
-    ("PushPin",       make_trunnion(),                        (0.60, 0.60, 0.60), 0),
     ("NeckBearing",   make_neck_bearing(),                    (0.30, 0.30, 0.32), 0),
 ]
 
@@ -1650,14 +1497,9 @@ FIXED_PARTS = [
     ("FramePostB",    make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
     ("ServoBracket",  make_servo_bracket(),                   (0.75, 0.75, 0.78), 0),
+    ("HornSpring",    make_spring(),                          (0.85, 0.85, 0.20), 0),
+    ("LeverPost",     make_lever_post(),                      (0.75, 0.75, 0.78), 0),
     ("Wall",          make_wall(),                            (0.45, 0.55, 0.75), 70),
-] + [
-    (f"ServoScrew{i}",
-     make_screw(v(servo_face_x - servo_tab_t, sy, crank_hub[1]),
-                v(1, 0, 0), servo_screw_d, servo_tab_t + servo_plate_t,
-                3.8, 2.0),
-     (0.45, 0.45, 0.50), 0)
-    for i, sy in enumerate(servo_screw_ys())
 ] + [
     (f"WallScrew{i}",
      make_screw(v(sx, _screw_seat_y(sx), sz), v(0, 1, 0), foot_screw_d,
@@ -1672,13 +1514,7 @@ FIXED_PARTS = [
                 _deck_seat_t(sx) + deck_boss_h + 1.5,
                 bolt_head_d, bolt_head_h),
      (0.45, 0.45, 0.50), 0)
-    # The servo's two only exist on the deck the servo is on. Its BOSS is in
-    # both decks — the two decks are one part — but a screw where there is no
-    # bracket is not a spare, it is a part standing in the next axis's way:
-    # alternate axes are turned over, so the neighbour's servo is against the
-    # other deck and its bracket lands exactly there.
     for zs in (1, -1) for i, (sx, sy) in enumerate(deck_screws())
-    if zs < 0 or abs(sx - servo_anchor_x) > 1e-6
 ]
 
 _LINK_COL = (0.90, 0.45, 0.20)
@@ -1709,8 +1545,7 @@ def moving_parts(st):
     out.append(("UJMid", uj_place(make_uj_mid(L_now), st), (0.90, 0.35, 0.20), 0))
     out.append(("UJRing", uj_place(make_uj_ring(L_now), st), (0.50, 0.45, 0.85), 0))
     out.append(("UJCross", uj_place(make_uj_cross(), st), (0.50, 0.45, 0.85), 0))
-    out.append(("Crank", make_crank(st), _ACT_COL, 0))
-    out.append(("ActLink", make_act_link(st), _ACT_COL, 0))
+    out += act_moving_parts(st)
     return out
 
 
@@ -1718,8 +1553,6 @@ STATE = pose_state(phi)
 AXIS_PARTS = moving_parts(STATE) + FIXED_PARTS
 BY_NAME = {n: sh for n, sh, c, t in AXIS_PARTS}
 
-act_len_now = math.dist(STATE["pin"], STATE["tab"])
-spring_comp = act_link_len - act_len_now
 
 AXES = [("PosY", 0.0), ("NegX", 90.0), ("NegY", 180.0), ("PosX", 270.0)]
 
@@ -1962,29 +1795,36 @@ for _k in range(-4, 5):
             _uj_gap = _d
             _uj_who = f"{_an} x {_bn} at {math.degrees(_st_k['phi']):+.1f} deg"
 
-# What the actuator actually pulls against. R_push is the moment arm of a
-# VERTICAL push, and the link is not vertical: it comes up off the floor at
-# 25 deg. The arm of any force is the perpendicular distance from the apex to
-# its LINE of action, so measure that instead of assuming.
-#
-# It comes out at essentially R_push anyway, and not by luck: the push point
-# sits 30 mm below the axis, so the link's large Y component earns its own
-# moment about the apex — 27 mm of the 49 — and very nearly makes up for the
-# small Z one. Pulling the servo inboard along the floor costs the lever almost
-# nothing, which is why it could be pulled inboard at all.
-def push_lever(phi_t):
-    """Perpendicular distance, apex to the actuation link's line of action."""
-    st = pose_state(phi_t)
-    (py, pz), (qy, qz) = st["pin"], st["tab"]
-    dy, dz = qy - py, qz - pz
-    return abs(py * dz - pz * dy) / math.hypot(dy, dz)
+# The actuation chain over the whole stroke: it must assemble everywhere, the
+# horn must swing about what the sweep split was designed for, and no joint may
+# go near dead centre (a link nearly in line with its arm transmits nothing
+# useful and multiplies slop).
+def _trans(a, b, c):
+    """Angle at b between b->a and b->c, folded to 0..90 (90 = best)."""
+    u = (a[0] - b[0], a[1] - b[1])
+    w = (c[0] - b[0], c[1] - b[1])
+    cosang = (u[0] * w[0] + u[1] * w[1]) / (math.hypot(*u) * math.hypot(*w))
+    ang = math.degrees(math.acos(max(-1.0, min(1.0, cosang))))
+    return min(ang, 180.0 - ang)
 
 
-_lever = [push_lever(_s) for _s in (0.0, -phi_c, -phi_preload,
-                                    phi_c, phi_preload)]
-# Two things matter about it: that it is not small (it IS the output torque,
-# newton for newton) and that it does not move much over the stroke, or the
-# preload force would depend on where in the sweep the servo happens to stop.
+_act_fail = 0
+_trans_min = 90.0
+for _k in range(-8, 9):
+    _st_k = pose_state(phi_preload * _k / 8.0)
+    if _st_k["O"] is None or _st_k["H"] is None:
+        _act_fail += 1
+        continue
+    _trans_min = min(_trans_min,
+                     _trans(P_act, _st_k["O"], _st_k["E"]),
+                     _trans(P_act, _st_k["I"], _st_k["H"]),
+                     _trans(S_act, _st_k["H"], _st_k["I"]))
+_st_c = pose_state(phi_c)
+_horn_contact = (abs(math.degrees(_st_c["horn_a"]))
+                 if _st_c["horn_a"] is not None else float("nan"))
+_st_p = pose_state(phi_preload)
+_horn_preload = (abs(math.degrees(_st_p["horn_a"]))
+                 if _st_p["horn_a"] is not None else float("nan"))
 
 
 # Every other axis, not just the next one. The four of them share one box.
@@ -1999,23 +1839,11 @@ for _n, _s, _c, _t in AXIS_PARTS:
 def axis_shape(k):
     """Axis k of the pinwheel, as one shape.
 
-    ALTERNATE AXES ARE TURNED OVER — 180 deg about their own Y. That is a
-    rotation, not a mirror, so it is the same printed parts assembled the other
-    way up, and the motor cones it meshes with are symmetric in Z, so nothing
-    about the drive changes. What it buys is the floor: the actuation (servo,
-    crank, link, horn) all lives against one deck, and two neighbouring axes
-    that both wanted the same corner of it now use opposite ends of the box.
-    Without it the servo cases overlap by a cubic centimetre and there is no
-    arrangement of this box that avoids it — the case is 29 mm along the shaft
-    and the crank has to sit beside the horn, so it reaches across the middle.
-
-    The WALL is not turned with the mechanism: the four walls interlock in a
-    pinwheel and only fit one way up. The decks and walls therefore carry both
-    hands of every bracket's screw pattern, see both_hands()."""
-    mech = _mech.copy()
-    if k % 2:
-        mech.rotate(ORIGIN, Y_AXIS, 180.0)
-    shape = mech.fuse(_wall_shape)
+    All four axes are the SAME, rotated about Z — nothing is turned over any
+    more. Each axis' servo sits in its own (+X) corner of the pinwheel, so no
+    two want the same one. (Turning alternate axes over was only ever there
+    for two servos lying on the same floor.)"""
+    shape = _mech.copy().fuse(_wall_shape)
     shape.rotate(ORIGIN, Z_AXIS, 90.0 * k)
     return shape
 
@@ -2030,16 +1858,6 @@ for _k in (1, 2, 3):
 
 # Output cone tip vs the motor shaft it points at.
 _tip_clr = out_tip_y - shaft_d / 2.0
-
-# Can the crank and link actually reach every stop? Swept rather than checked at
-# the three stops alone, because it is the ENDS of the stroke that fail first.
-# A silent fallback here once hid a linkage that could not reach its own travel.
-_reach = []
-for _k in range(41):
-    _z = -act_amp + 2.0 * act_amp * _k / 40.0
-    _d = math.dist(crank_hub, (R_push, push_z + _z))
-    _reach.append(min(act_link_len + crank_r - _d, _d - (act_link_len - crank_r)))
-_reach_margin = min(_reach)
 
 # Every shape in the tree is a valid solid. A boolean that half-failed leaves a
 # shape that still draws and still has a volume, so this is not free.
@@ -2072,12 +1890,14 @@ checks = [
      nb_y0 - out_base_y, "> 1.0", nb_y0 - out_base_y > 1.0),
     ("output cone tip clears the motor shaft  (mm)",
      _tip_clr, "> 1.0", _tip_clr > 1.0),
-    ("actuation lever about the apex, smallest of every stop  (mm)",
-     min(_lever), "> 35", min(_lever) > 35.0),
-    ("...and how much it MOVES over the stroke  (mm)",
-     max(_lever) - min(_lever), "< 3", max(_lever) - min(_lever) < 3.0),
-    ("crank + link reach the whole stroke  (mm to dead centre)",
-     _reach_margin, "> 0.1", _reach_margin > 0.1 and not _UNREACHABLE),
+    ("actuation chain assembles at every tilt of the stroke  (poses failed)",
+     _act_fail, "== 0", _act_fail == 0),
+    ("horn swing, free -> contact  (deg, designed "
+     f"{sv_theta_c:.0f})",
+     _horn_contact, f"{sv_theta_c-5:.0f}..{sv_theta_c+5:.0f}",
+     abs(_horn_contact - sv_theta_c) < 5.0),
+    ("worst transmission angle in the chain  (deg from dead centre)",
+     _trans_min, "> 40", _trans_min > 40.0),
     ("FREE: rubber clear of both motor cones  (mm)",
      _free_gap, "> 0.10", _free_gap > 0.10),
     ("plastic never touches plastic  (mm3)",
@@ -2099,7 +1919,7 @@ checks = [
      len(_invalid), "== 0", not _invalid),
     (f"every part is ONE connected solid  {_loose if _loose else ''}",
      len(_loose), "== 0", not _loose),
-    (f"every other axis, alternate ones turned over [worst: {_adj_worst*90}"
+    (f"every other axis, all identical and rotated [worst: {_adj_worst*90}"
      f" deg]  (mm3)",
      _adj_overlap, "== 0", _adj_overlap < 1e-6),
 ]
@@ -2163,10 +1983,9 @@ print("-" * 72)
 print("  STOPS (tilt from the middle; free is the middle, both ways)")
 print(f"    free    phi = 0.000 deg")
 print(f"    contact phi = {math.degrees(phi_c):.3f} deg"
-      f"   push point travel {contact_travel:.3f} mm")
+      f"   servo {sv_theta_c:.0f} deg")
 print(f"    preload phi = {math.degrees(phi_preload):.3f} deg"
-      f"   servo-side travel {act_amp:.2f} mm,"
-      f" split 1:{spring_split-1:.1f}")
+      f"   servo {sv_theta_max:.0f} deg, split 1:{spring_split-1:.1f}")
 print(f"  Rendering '{CARRIAGE_STOP}' "
       f"{'up' if CARRIAGE_DIR > 0 else 'down'}  ->  phi = {math.degrees(phi):+.3f} deg")
 print("-" * 72)
@@ -2227,59 +2046,29 @@ print(f"    output shaft: 2x MR105ZZ, inner boss y {cube_half-brg_w:.1f}..{cube_
       f" and wall seat; reaches {cube_half - brg_w - (uj_cross_y + uj_fork_back):.1f}"
       f" mm in from the inner bearing to the fork")
 print("-" * 72)
-print("  ACTUATION (placeholder until the rubber stiffness is measured)")
-print(f"    push point at R = {R_push:.1f} mm; crank r {crank_r:.2f} at"
-      f" (y {crank_hub[0]:.1f}, z {crank_hub[1]:.1f}), link {act_link_len:.1f} mm")
-print(f"    servo side {STATE['zc']:+.3f} mm,"
-      f" crank angle {math.degrees(STATE['psi']):.1f} deg,"
-      f" link now {act_len_now:.3f} mm -> spring compressed {spring_comp:+.3f} mm")
-print(f"    {_reach_margin:.2f} mm from dead centre at the ends of the stroke —"
-      f" that IS the toggle (force")
-print(f"    multiplied, travel nearly free), and it is also why the last"
-      f" fraction of a mm of")
-print(f"    push costs most of the servo's sweep")
-def _crank_tilt(phi_t):
-    """Degrees the crank arm sits BELOW horizontal at this stop (negative =
-    above). The arm follows the engaged cone: down for the lower one, up for
-    the upper — but only near the ends of the stroke, because contact happens
-    in the first few degrees of the sweep."""
-    return abs(math.degrees(actuator(phi_t)[1])) - 90.0
-
-
-print(f"    crank arm vs horizontal: {_crank_tilt(-phi_preload):+.0f} deg at"
-      f" preload DOWN (lower cone), {_crank_tilt(phi_preload):+.0f} deg at preload"
-      f" UP, and only")
-print(f"    {_crank_tilt(-phi_c):+.0f} deg at contact — positive is downward."
-      f" It looks nearly horizontal at the 'contact' stop because")
-print(f"    contact is reached in the first eighth of the sweep; the rest of"
-      f" the sweep is preload")
-# The "lever" is NOT a torque multiplier, and reading it as one is a trap.
-# Moments about the apex give  F*lever = INTEGRAL n(s)*s ds, and the output
-# torque is  mu * INTEGRAL n(s)*(s*sin beta) ds  =  mu*sin(beta)*F*lever:
-# the contact's position cancels out exactly. That is the same property of the
-# apex pivot that matches the surface speeds — every quantity scales with s.
-# What lever/s_bar really gives is the total NORMAL force, which is what has
-# to be developed inside the available squeeze (open question 1), not torque.
-#
-# `lever`, not R_push. R_push would be the arm if the push were vertical, and
-# this one is not: it arrives along the link.
+print("  ACTUATION: servo -> torsion spring -> horn -> lever 2:1 -> link -> ear")
+print("  (spring and forces are placeholders until the rubber stiffness is measured)")
+print(f"    servo shaft at (y {S_act[0]:.1f}, z {S_act[1]:.1f}), horn r {horn_r:.2f}"
+      f" (derived), lever {lever_in:.0f}/{lever_out:.0f} about"
+      f" (y {P_act[0]:.1f}, z {P_act[1]:.1f}), ear at (y {E0[0]:.1f}, z {E0[1]:.1f})")
+print(f"    links: link1 {link1_len:.1f} mm, link2 {link2_len:.1f} mm;"
+      f" X stack horn {x_horn[0]:.1f}..{x_horn[1]:.1f}, link1 {x_l1[0]:.1f}..,"
+      f" lever {x_lev[0]:.1f}.., link2 {x_l2[0]:.1f}..{x_l2[1]:.1f}")
+print(f"    horn swing: {_horn_contact:.1f} deg to contact, {_horn_preload:.1f} deg"
+      f" at full preload; servo spline {sv_theta_max:.0f} deg — the difference"
+      f" winds the spring")
+_tau = sv_use * sv_stall
+_k_spring = _tau / math.radians(sv_theta_max - sv_theta_c)
+_F_ear = _tau / (horn_r / 1000.0) * (lever_in / lever_out)
+_M = _F_ear * E0[0] / 1000.0
 _mu_ref = 1.3
-print(f"    the LINK's lever about the apex is {min(_lever):.1f}..{max(_lever):.1f}"
-      f" mm, against R_push = {R_push:.1f}. The link comes up off the floor at a"
-      f" shallow angle, but the push point is {abs(push_z):.0f} mm below the"
-      f" axis, so the link's Y component earns a moment of its own and very"
-      f" nearly makes up for what its Z component gives up.")
-print(f"    normal force per newton of actuator force: lever / s_bar ="
-      f" {min(_lever) / _sq_sbar:.2f}"
-      f"  (s_bar = {_sq_sbar:.1f} mm, the squeeze's own centroid, not the"
-      f" band's midpoint)")
-print(f"    output torque per newton: mu*sin(beta)*lever (1:1 now) ="
-      f" {_mu_ref * math.sin(beta) * min(_lever) / 1000.0:.4f} Nm/N"
-      f" at mu = {_mu_ref}")
-print(f"    — and that does NOT depend on where along the generatrix the"
-      f" contact sits: more radius buys")
-print(f"      more friction torque and costs exactly as much normal force."
-      f" Only F and the lever move it.")
+print(f"    spring: {_k_spring:.3f} Nm/rad = {_k_spring*1000*math.pi/180:.2f} N.mm/deg,"
+      f" {_tau:.3f} Nm after {sv_theta_max - sv_theta_c:.0f} deg of wind"
+      f" ({sv_use*100:.0f}% of an MG90's stall)")
+print(f"    at full preload: {_F_ear:.0f} N on the ear, {_M:.2f} Nm about the apex,"
+      f" normal force {_M*1000/_sq_sbar:.0f} N (s_bar {_sq_sbar:.1f} mm)")
+print(f"    output torque ceiling: mu*sin(beta)*M = {_mu_ref*math.sin(beta)*_M:.2f} Nm"
+      f" at mu = {_mu_ref} — IF the rubber takes that force within its squeeze")
 print("-" * 72)
 for label, value, target, ok in checks:
     print(f"  [{'OK ' if ok else 'FAIL'}] {label}:  {value:.3f}  ({target})")
@@ -2297,24 +2086,20 @@ print(f"  CUBE side {2 * cube_out:.1f} mm"
 print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
 print("           Carriage (one piece),")
 print("           UJMid, UJRing, UJCross, UJFork, FramePost x2,")
-print("           Link x2 (each carries both its arms), Crank, ActLink,"
-      " ServoBracket")
-print("  ASSEMBLY: alternate axes go in TURNED OVER \u2014 the same parts, rotated")
-print("            180 deg about their own radius, so their servo, crank and horn")
-print("            lie against the other deck. Two neighbours both wanting the same")
-print("            corner of the same floor is the one thing this box cannot fit.")
+print("           Link x2 (each carries both its arms), Horn, Link1, Lever,"
+      " Link2, LeverPost, ServoBracket")
+print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
+print("            its own corner under the ceiling.")
 print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
       f" ({shaft_flat_d:.1f} mm across);")
 print("  Filing the flat is the one manual step here.")
 print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
-print("             Ø5 rod (output shaft, push pin),")
+print("             Ø5 rod (output shaft),")
 print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
-_fp_wall_screws = [q for q in wall_screws() if abs(q[1] - crank_hub[1]) > 1e-6]
-print(f"             {len(_fp_wall_screws) * 2}x M3x10 into the wall,"
+print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
       " into the frame posts,")
-print(f"             {len(servo_wall_screws())}x M3x10 into the wall,"
-      " into the servo bracket,")
-print("             2x M2x6 for the servo tabs, rubber sheet, springs, servo.")
+print("             Ø3 pin stock (5 actuation pins), 1 torsion spring,")
+print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
 print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
       f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
 print("=" * 72)
