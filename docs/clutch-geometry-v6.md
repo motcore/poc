@@ -3,7 +3,7 @@
 Status: **active design**, settled 2026-09-12, repacked 2026-09-15, drive and
 actuation rebuilt 2026-09-17 (branch `v7-cardan-zigzag`). Supersedes v5
 (vertical carriage). The macro is `cad/motcore_v6_apex_pivot.py`; it builds the
-assembly and self-checks it (24 numeric checks), and every number quoted below
+assembly and self-checks it (22 numeric checks, plus the rubber template's area), and every number quoted below
 that says "measured" comes from its own output.
 
 What changed on 2026-09-17, in one paragraph: the gear stage (pinion, idlers,
@@ -284,6 +284,27 @@ over the prism (its two pins, from outside the tube) → ring into the tube's he
 → ring's X pins from outside through the neck wall and the tube's windows →
 6805 over the neck, trapping them → output shaft in through the wall, the ring's
 bore and into the fork's D.
+
+### Printing the carriage
+
+The bearing seat (Ø37, along Y) and the pivot and ear holes (along X) are
+perpendicular, so one of them prints lying down. The seat is the one that must
+come out round, so the carriage prints **with its wall-side face on the bed**,
+seat vertical:
+
+- the 45° jogs out to the pivots B rise off the ring unsupported, and the ear's
+  bridge climbs at ~27° from vertical;
+- the ring runs on toward the wall past the bearing, to the ear block's own far
+  face (y 45.9), so ring and ear stand on the bed together — and that extra
+  length **is the bearing's stop**: a solid flange (bore Ø32) from the bearing
+  down to the bed, not a lip hanging in the air;
+- the bearing goes into the carriage **from the cone side** against that flange;
+  then carriage and bearing slide onto the cone's neck together. The neck's
+  shoulder holds the inner race on the other side, so the 6805 is located both
+  ways;
+- the pivot and ear holes print lying down, slightly oval: drill them to size.
+  The round bosses round B have a small curved overhang underneath — the first
+  thing to look at when the part comes off.
 
 **Plan B for the ring**, if the printed one ovalises: a standard 10 × 14 mm
 sintered-bronze bushing (or steel spacer) cut to 5 mm, four radial Ø2 holes
