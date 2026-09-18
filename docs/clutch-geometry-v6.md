@@ -558,7 +558,20 @@ Notes as raised, not designs. Nothing here has been checked against the macro.
    ear is five pinned joints in series; their slop adds up and blurs how
    precisely servo angle sets the squeeze (torque control). Quantify it, and
    decide which joints need tight fits or preload.
-4. **How the chain's pins stay in without dragging.** Retention (clips, heads,
+4. **DONE (2026-09-18): how the pins stay in without dragging.** Every pin is
+   pressed into one part and runs in the other, so it turns in one bore only
+   and nothing clamps a joint. Four-bar: pressed into the middle part (lug at
+   A, link at B); the part straddling it cannot come off, so no clip at all.
+   Actuation chain (lap joints): pressed into link1 at H, the lever at I/P/O,
+   the ear at E; the running plate is held by a DIN 6799 RS 2.3 E-clip 0.1 mm
+   off its free face, side picked by a sweep (O's clip goes inboard). Found on
+   the way: the frame pins at A could not be fitted (the foot sat across
+   their path; now a channel through it); Ø3 running holes were modelled 3.2,
+   which this printer makes ~2.7 (now 3.6, press 3.3 — verify on a coupon);
+   the horn and link1 passed 0.21 mm under the ceiling unseen (decks now in
+   the chain's sweep; 1 mm relief in the ceiling). Pins need grooves for the
+   clips: buy grooved or cut them. Original note:
+   **How the chain's pins stay in without dragging.** Retention (clips, heads,
    press on one side, captive between plates) that does not add friction to
    the joint.
 5. **The torsion spring coupling at the servo: design it, or buy it?** Look for

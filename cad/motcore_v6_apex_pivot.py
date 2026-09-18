@@ -399,6 +399,10 @@ fw_screw_z    = 0.0    # mm — |Z| the wall screws sit off the pivot's own
                         #      version used.
 deck_t        = 4.0    # mm — floor / ceiling plate thickness
 deck_boss_h   = 5.0    # mm — how far their screw bosses stand proud, inward
+deck_pocket   = 1.0    # mm — relief in the CEILING's inner face over the horn's
+                        #      path: at full stroke the horn passed 0.21 mm under
+                        #      it (the chain's sweep never looked at the decks),
+                        #      and H's E-clip stands 0.5 over the horn's boss.
 
 foot_t        = 5.0    # mm — thickness of a bracket's foot. Was 3, which with
                         #      a Ø3.8 hole through it was not a joint, it was a
@@ -474,6 +478,25 @@ fdm_dowel_hole_d = 5.5  # mm — modelled Ø for the Ø5 trunnion dowel, INTERFE
                          #      (5.8 is the measured slip fit, so this is 0.3
                          #      tighter). Extrapolated, not measured — verify on
                          #      a coupon before relying on it.
+fdm_pin_press_d  = 4.3  # mm — Ø4 pin PRESSED (0.3 under the slip fit, same
+                         #      rule as the dowel). Extrapolated — verify.
+fdm_act_hole_d   = act_pin_d + 0.6   # mm — Ø3 pin RUNNING. Was act_pin_d + 0.2,
+                         #      which this printer makes ~2.7: the pin would not
+                         #      have gone in. +0.6 is the Ø4's measured-ish margin.
+fdm_act_press_d  = fdm_act_hole_d - 0.3   # mm — Ø3 pin PRESSED. Verify.
+
+# ── Pin retention: nothing clamps a joint ───────────────────────────────────
+# Every pin is PRESSED into one part and RUNS in the other, so it turns in one
+# bore only. Four-bar: pressed into the MIDDLE part (lug at A, link at B); the
+# part straddling it can't come off because it straddles, so no clip at all.
+# Actuation chain: lap joints, two plates, nothing straddles — the running
+# plate is held by an E-clip (DIN 6799 RS 2.3) on its free face, clip_gap off
+# it, so the clip never squeezes the joint. Sides chosen by a sweep: each is
+# the side with room for the clip all stroke long.
+clip_od    = 6.0      # mm — DIN 6799 RS 2.3 (shaft 3-4, groove Ø2.3)
+clip_t     = 0.6      # mm
+clip_gap   = 0.1      # mm — axial free play left under the clip
+clip_tail  = 0.3      # mm — pin past the clip (the groove's far shoulder)
 
 # ═══════════════════════════════════════════════════════════════════
 # DERIVED
@@ -1085,7 +1108,7 @@ def make_carriage():
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
                               2 * (side_x + side_t / 2.0 + 2.0)))
-    body = body.cut(pin_x(E0, act_pin_d + 0.2, x_ear[1] - 12.0, 13.0))
+    body = body.cut(pin_x(E0, fdm_act_press_d, x_ear[1] - 12.0, 13.0))
     return body
 
 
@@ -1195,8 +1218,9 @@ def make_link(A, B):
     body = body.fuse(make_link_knuckle(A, B))
 
     reach = link_x + link_t / 2.0 + 2.0
-    for q in (A, B):
-        body = body.cut(pin_x(q, fdm_pin_hole_d, -reach, 2 * reach))
+    # Runs on the lug's pin at A; the pin at B is pressed in HERE (see clip_od).
+    for q, d in ((A, fdm_pin_hole_d), (B, fdm_pin_press_d)):
+        body = body.cut(pin_x(q, d, -reach, 2 * reach))
     return body
 
 
@@ -1257,8 +1281,17 @@ def make_frame_bracket(zs):
     part = foot.fuse(post)
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
-    part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_hole_d,
+    part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_press_d,
                           -fp_lug_x - 1, 2 * fp_lug_x + 2))
+    # The pin goes in along X, from outside the foot: the foot's walls beyond
+    # the links sat right across its path (30 mm3 each side) — it could not
+    # be fitted. A channel through both walls, outboard of the links only so
+    # the lug keeps its press fit; also how the pin is pushed out again.
+    _x_out = link_x + link_t / 2.0
+    for xs in (1, -1):
+        part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_hole_d,
+                              _x_out if xs > 0 else -(fp_post_x + 1.0),
+                              fp_post_x + 1.0 - _x_out))
     # The pin ITSELF (not just its hole) reaches to link_x+link_t/2+1 in X —
     # the same steel length that also passes through both link arms — and
     # the foot now shares that pin's own (Y, Z) neighbourhood, which the deck
@@ -1340,14 +1373,16 @@ def make_spring():
                                v(x_spring[0] - 1, S_act[0], S_act[1]), X_AXIS))
 
 
-def _plate_bar(pts, x_band, w):
-    """A flat bar through (y, z) points in an X band, holes at every point."""
+def _plate_bar(pts, x_band, w, press=()):
+    """A flat bar through (y, z) points in an X band, holes at every point:
+    press fit at the indices in `press`, running fit elsewhere."""
     body = None
     for p, q in zip(pts, pts[1:]):
         b = bar_yz(p, q, w, x_band[0], x_band[1] - x_band[0])
         body = b if body is None else body.fuse(b)
-    for p in pts:
-        body = body.cut(pin_x(p, act_pin_d + 0.2, x_band[0] - 1,
+    for i, p in enumerate(pts):
+        d = fdm_act_press_d if i in press else fdm_act_hole_d
+        body = body.cut(pin_x(p, d, x_band[0] - 1,
                               x_band[1] - x_band[0] + 2))
     return body
 
@@ -1358,7 +1393,7 @@ def make_act_horn(st):
         disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
     arm = bar_yz(S_act, st["H"], 2 * act_boss_r, x_horn[0], horn_t)
     arm = arm.cut(disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
-    return hub.fuse(arm).cut(pin_x(st["H"], act_pin_d + 0.2, x_horn[0] - 1,
+    return hub.fuse(arm).cut(pin_x(st["H"], fdm_act_hole_d, x_horn[0] - 1,
                                    horn_t + 2))
 
 
@@ -1368,7 +1403,7 @@ def make_lever_post():
     post = Part.makeBox(lk_t, w, cube_half - lever_z,
                         v(x_post[0], P_act[0] - w / 2.0, lever_z))
     post = post.fuse(disc_yz(P_act, act_boss_r + 0.5, x_post[0], lk_t))
-    return post.cut(pin_x(P_act, act_pin_d + 0.2, x_post[0] - 1, lk_t + 2))
+    return post.cut(pin_x(P_act, fdm_act_hole_d, x_post[0] - 1, lk_t + 2))
 
 
 def act_moving_parts(st):
@@ -1379,17 +1414,34 @@ def act_moving_parts(st):
         return []
     w = 2 * act_boss_r
     out = [("Horn", make_act_horn(st), col, 0),
-           ("Link1", _plate_bar([H, I], x_l1, w), col, 0),
-           ("Lever", _plate_bar([I, P_act, O], x_lev, w), col, 0),
+           ("Link1", _plate_bar([H, I], x_l1, w, press=(0,)), col, 0),
+           ("Lever", _plate_bar([I, P_act, O], x_lev, w, press=(0, 1, 2)), col, 0),
            ("Link2", _plate_bar([O, E], x_l2, w), col, 0)]
-    r = act_pin_d / 2.0
-    for name, p, xa, xb in (("PinH", H, x_l1[0], x_horn[1]),
-                            ("PinI", I, x_lev[0], x_l1[1]),
-                            ("PinP", P_act, x_lev[0], x_post[1]),
-                            ("PinO", O, x_l2[0], x_lev[1]),
-                            ("PinE", E, x_ear[0], x_l2[1])):
-        out.append((name, pin_x(p, act_pin_d, xa, xb - xa), pc, 0))
+    for name, p, xa, xb, side in ACT_CLIPS(st):
+        ext = clip_gap + clip_t + clip_tail
+        if side > 0:
+            xb_pin, xc = xb + ext, xb + clip_gap
+        else:
+            xa, xc = xa - ext, xa - clip_gap - clip_t
+            xb_pin = xb
+        out.append((name, pin_x(p, act_pin_d, xa, xb_pin - xa), pc, 0))
+        ring = cyl(clip_od / 2.0, clip_t, v(xc, p[0], p[1]), X_AXIS)
+        ring = ring.cut(cyl(act_pin_d / 2.0, clip_t + 2, v(xc - 1, p[0], p[1]), X_AXIS))
+        out.append(("PinClip" + name[3:], ring, pc, 0))
     return out
+
+
+def ACT_CLIPS(st):
+    """Each actuation pin: (name, centre, x from, x to across its two plates,
+    clip side). Pressed into: Link1 at H, the Lever at I/P/O, the ear at E.
+    Clip on the running plate's free face, on whichever side the sweep found
+    room: horn outside, link1 outside, post outside, link2 INSIDE at O (its
+    outer face there looks at the post), link2 outside at E."""
+    return (("PinH", st["H"], x_l1[0], x_horn[1], 1),
+            ("PinI", st["I"], x_lev[0], x_l1[1], 1),
+            ("PinP", P_act, x_lev[0], x_post[1], 1),
+            ("PinO", st["O"], x_l2[0], x_lev[1], -1),
+            ("PinE", st["E"], x_ear[0], x_l2[1], 1))
 
 
 def both_hands(pts):
@@ -1439,6 +1491,21 @@ def make_deck(zs):
                                  v(0, 0, zs)))
             deck = deck.cut(cyl(foot_tap_d / 2.0, deck_boss_h + 2.0, base,
                                 v(0, 0, zs)))
+    if zs > 0:
+        # Box round every position H takes, grown by the clip's radius and a
+        # running gap, over link1's and the horn's X bands (both carry H's
+        # boss up there) out to the clip's tail.
+        hs = [pose_state(phi_preload * k / 8.0)["H"] for k in range(-8, 9)]
+        hs = [h for h in hs if h is not None]
+        r = clip_od / 2.0 + run_clr
+        y0, y1 = min(h[0] for h in hs) - r, max(h[0] for h in hs) + r
+        x0 = x_l1[0] - run_clr
+        x1 = x_horn[1] + clip_gap + clip_t + clip_tail + run_clr
+        for _, rot in AXES:
+            pk = Part.makeBox(x1 - x0, y1 - y0, deck_pocket + 0.01,
+                              v(x0, y0, cube_half - 0.01))
+            pk.rotate(ORIGIN, Z_AXIS, rot)
+            deck = deck.cut(pk)
     return deck
 
 
@@ -1867,8 +1934,9 @@ if RUN_CHECKS:
     # Parts shared by every axis: they are built once, so they are not in
     # AXIS_PARTS and the all-pairs loop never sees them. The decks landed here too —
     # the same blind spot the wall was in.
+    _deck_top, _deck_bot = make_deck(1), make_deck(-1)
     _SHARED = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
-               ("DeckTop", make_deck(1)), ("DeckBottom", make_deck(-1))]
+               ("DeckTop", _deck_top), ("DeckBottom", _deck_bot)]
     _carr_mot_who = "-"
     _pair_ov, _pair_who = 0.0, "-"
     _carr_mot_ov = 0.0
@@ -1993,10 +2061,13 @@ if RUN_CHECKS:
                                           ("Horn", "HornSpring"),
                                           ("Horn", "ServoBody"))}  # on its spline
     _ACT_AGAINST = ("ServoBody", "ServoBracket", "HornSpring", "LeverPost",
-                    "FramePostT", "FramePostB", "Wall")
+                    "FramePostT", "FramePostB", "Wall", "DeckTop", "DeckBottom")
     _act_gap, _act_who = 1e9, "-"
     _act_tight = {}
     _fixed_act = {n: s for n, s, c, t in FIXED_PARTS if n in _ACT_AGAINST}
+    # The decks are shared, not in FIXED_PARTS: that is how the horn got to
+    # 0.21 mm under the ceiling unseen.
+    _fixed_act.update({n: s for n, s in _SHARED if n in _ACT_AGAINST})
     for _k in range(-4, 5):
         _st_k = pose_state(phi_preload * _k / 4.0)
         _mov = {n: s for n, s, c, t in act_moving_parts(_st_k)
@@ -2070,6 +2141,34 @@ if RUN_CHECKS:
                     or not _x_stop(_st0[_mn], _fl, _sg * (shim_gap + 0.02))):
                 _x_bad.append(f"{_mn}{'+' if _sg > 0 else '-'}")
     _x_slip = x_play_max / L_line
+
+    # Pins have to GO IN: the four-bar's frame pins slide in along X from
+    # outside the foot. Their path, both ways, must be empty.
+    _ins_ov = 0.0
+    for _zs, _A in ((1, A1), (-1, A2)):
+        _fp = _st0["FramePostT" if _zs > 0 else "FramePostB"]
+        _xo = link_x + link_t / 2.0
+        for _x0 in (_xo, -(_xo + 30.0)):
+            _ins_ov += pin_x(_A, pin_d, _x0, 30.0).common(_fp).Volume
+
+    # The E-clips, SWEPT: each against everything but its own joint's plates.
+    _CLIP_OWN = {"H": ("Link1", "Horn"), "I": ("Lever", "Link1"),
+                 "P": ("Lever", "LeverPost"), "O": ("Link2", "Lever"),
+                 "E": ("Carriage", "Link2")}
+    _clip_gap_min, _clip_who = 1e9, "-"
+    for _k in range(-4, 5):
+        _st_k = pose_state(phi_preload * _k / 4.0)
+        _all = {n: sh for n, sh, c, t in moving_parts(_st_k) + FIXED_PARTS}
+        _all.update({"DeckTop": _deck_top, "DeckBottom": _deck_bot})
+        for _j, _own in _CLIP_OWN.items():
+            _c = _all["PinClip" + _j]
+            for _n, _sh in _all.items():
+                if _n in _own or _n.startswith(("Pin", "Shim")):
+                    continue
+                _d = _c.distToShape(_sh)[0]
+                if _d < _clip_gap_min:
+                    _clip_gap_min = _d
+                    _clip_who = f"clip {_j} x {_n} at {math.degrees(_st_k['phi']):+.1f} deg"
 
     # Output cone tip vs the motor shaft it points at.
     _tip_clr = out_tip_y - shaft_d / 2.0
@@ -2150,6 +2249,10 @@ if RUN_CHECKS:
         (f"carriage X play is the shims' to fill: stops at shim_gap"
          f" {shim_gap:.1f} each way  {_x_bad if _x_bad else ''}",
          len(_x_bad), "== 0", not _x_bad),
+        ("four-bar frame pins can be pushed in from outside the foot  (mm3)",
+         _ins_ov, "== 0", _ins_ov < 1e-6),
+        (f"E-clip running clearance, SWEPT [{_clip_who}]  (mm)",
+         _clip_gap_min, "> 0.5", _clip_gap_min > 0.5),
         (f"slip from {x_play_max:.2f} mm of X play left after shimming  (%)",
          _x_slip * 100, f"<= four-bar's {slip_fourbar*100:.2f}",
          _x_slip <= slip_fourbar),
