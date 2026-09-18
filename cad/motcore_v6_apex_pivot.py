@@ -171,6 +171,23 @@ link_knuckle_d = 14.5 # mm — (v7-cardan-zigzag: ON B. The 14.5 link is too
                        #      Swept in the checks below, not assumed.
 pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 
+# ── Locating the carriage in X ──────────────────────────────────────────────
+# The four-bar only holds the carriage in the Y-Z plane. Along X it is held by
+# nothing but the side faces of its joints: carriage arm against link at B,
+# link against the frame lug at A, two joints in series, top AND bottom (with
+# only one chain tight the carriage rocks about it). Whatever play is left
+# there moves the cone's apex off the motor's by the same amount, and an apex
+# offset across the contact plane slips exactly like the four-bar's own drift
+# along it (slip velocity w x offset, same magnitude either way): delta / L.
+# Every one of those faces is printed shim_gap short and filled with shim
+# washers at assembly — the printer's +-0.2 cannot be trusted to hit a
+# tenth-of-a-millimetre fit on its own.
+shim_gap   = 0.3      # mm — printed gap at each thrust face, nominal
+shim_od    = 8.0      # mm — DIN 988 4x8 shim washer (0.1 / 0.2 / 0.3 / 0.5)
+shim_id    = 4.1      # mm — modelled a hair over the pin so they do not overlap
+x_play_max = 0.10     # mm — carriage X play allowed after shimming: its slip,
+                       #      x_play_max / L_line, must not beat the four-bar's
+
 # ── Actuation: servo → torsion spring → horn → lever 2:1 → link → ear ───────
 # Everything lives in ONE vertical plane per part (Y-Z), stacked in X, in the
 # band between the carriage's top and the ceiling, in this axis' own corner of
@@ -355,8 +372,9 @@ shaft_flat_d  = 4.0    # mm — the Ø5 shafts are filed to a flat, leaving this
 shaft_flat_clr = 0.25  # mm — how much the printed D is relieved off the flat
 
 # ── Frame ────────────────────────────────────────────────────────────────────
-fp_lug_x      = 6.0    # mm — frame-pivot lug half-width in X (the links sit
-                        #      just outboard of it)
+fp_lug_x      = link_x - link_t / 2.0 - shim_gap   # DERIVED — frame-pivot lug
+                        #      half-width in X; the links sit just outboard of
+                        #      it, a shim's width away (was 6.0, 0.5 of play)
 fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
                         #      foot_edge margin, so the screws don't sit at the
                         #      block's own free edge
@@ -1121,6 +1139,13 @@ def make_carriage_arms(sd):
         corner = (arm_root[0], zs * z_corner)
         part = part.fuse(bar_yz(corner, b, arm_w, x0, side_t))
         part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
+        # Thrust boss on the arm's INNER face, standing out to a shim's width
+        # off the link's outer face (1.5 mm of X play before).
+        x_in = link_x + link_t / 2.0 + shim_gap
+        x_arm_in = side_x - side_t / 2.0
+        part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5,
+                                 sd * x_in if sd > 0 else -x_arm_in,
+                                 x_arm_in - x_in))
     return part
 
 def make_carriage_bearing(y_face, sd):
@@ -1184,14 +1209,22 @@ def _link_swept_envelope(A, Bkey):
     further than link_w/2 from A in a straight line (its own along-the-bar
     offset adds in quadrature). Real geometry, not a hand-fitted
     approximation — the same lesson as the link-vs-cone gap earlier: routing
-    an edge around a diagonal member by eye undercounts it."""
+    an edge around a diagonal member by eye undercounts it.
+
+    Grown in X too: inward by shim_gap, so the shim reaches the lug (the ONE
+    thrust face at A), outward by run_clr. At link_t exactly the foot's slot
+    walls sat on both arm faces at zero clearance — rubbing, and a second,
+    unshimmable X stop fighting the lug."""
     env = None
     w = link_w + 2.0 * run_clr
+    t = link_t + shim_gap + run_clr
     for k in range(-4, 5):
         st = pose_state(phi_preload * k / 4.0)
         B = st[Bkey]
         for xs in (1, -1):
-            arm = bar_yz(A, B, w, xs * link_x - link_t / 2.0, link_t)
+            x_in = link_x - link_t / 2.0 - shim_gap
+            x0 = x_in if xs > 0 else -(x_in + t)
+            arm = bar_yz(A, B, w, x0, t)
             env = arm if env is None else env.fuse(arm)
     return env
 
@@ -1636,6 +1669,16 @@ def moving_parts(st):
         out.append((f"PinB{tag}",
                     pin_x(B, pin_d, -pin_reach_b, 2 * pin_reach_b),
                     _PIN_COL, 0))
+        # Shim washers, one at each thrust face: link outer face at B, link
+        # inner face at A (against the lug), both sides.
+        # Built at -x directly, not mirrored (see the FreeCAD gotchas).
+        for jn, q, xa in (("B", B, link_x + link_t / 2.0),
+                          ("A", A, link_x - link_t / 2.0 - shim_gap)):
+            for xs in (1, -1):
+                x0 = xa if xs > 0 else -(xa + shim_gap)
+                w = cyl(shim_od / 2.0, shim_gap, v(x0, q[0], q[1]), X_AXIS)
+                w = w.cut(cyl(shim_id / 2.0, shim_gap + 2, v(x0 - 1, q[0], q[1]), X_AXIS))
+                out.append((f"Shim{tag}{jn}{'+' if xs > 0 else '-'}", w, _PIN_COL, 0))
     # The cardan's moving parts, at the length and angle this pose gives the
     # intermediate. Drawn in the phase where the bend lies in the tilt plane:
     # both joints hinge on their X pins, the Z pins ride along.
@@ -2009,6 +2052,25 @@ if RUN_CHECKS:
         if _v > _adj_overlap:
             _adj_overlap, _adj_worst = _v, _k
 
+    # X location, MEASURED: nudge a part along X and see where it first hits
+    # its neighbour in the chain. Just under shim_gap must clear, just over
+    # must hit — both ways, top and bottom. That is the play the shims fill,
+    # found in the real solids rather than read back off the parameters.
+    def _x_stop(mov, fixed_list, d):
+        m = mov.copy()
+        m.translate(v(d, 0, 0))
+        return any(_bb_hit(m, f) and m.common(f).Volume > 1e-6 for f in fixed_list)
+    _st0 = {n: sh for n, sh, c, t in moving_parts(pose_state(0.0)) + FIXED_PARTS}
+    _x_bad = []
+    for _mn, _fn in (("Carriage", ("LinkT", "LinkB")),
+                     ("LinkT", ("FramePostT",)), ("LinkB", ("FramePostB",))):
+        _fl = [_st0[n] for n in _fn]
+        for _sg in (1, -1):
+            if (_x_stop(_st0[_mn], _fl, _sg * (shim_gap - 0.02))
+                    or not _x_stop(_st0[_mn], _fl, _sg * (shim_gap + 0.02))):
+                _x_bad.append(f"{_mn}{'+' if _sg > 0 else '-'}")
+    _x_slip = x_play_max / L_line
+
     # Output cone tip vs the motor shaft it points at.
     _tip_clr = out_tip_y - shaft_d / 2.0
 
@@ -2085,6 +2147,12 @@ if RUN_CHECKS:
         ("cardan intermediate length change, within its slotted holes  (mm)",
          uj_L_range[1] - uj_L_range[0], f"< {uj_slide:.1f}",
          uj_L_range[1] - uj_L_range[0] < uj_slide),
+        (f"carriage X play is the shims' to fill: stops at shim_gap"
+         f" {shim_gap:.1f} each way  {_x_bad if _x_bad else ''}",
+         len(_x_bad), "== 0", not _x_bad),
+        (f"slip from {x_play_max:.2f} mm of X play left after shimming  (%)",
+         _x_slip * 100, f"<= four-bar's {slip_fourbar*100:.2f}",
+         _x_slip <= slip_fourbar),
         (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
          len(_invalid), "== 0", not _invalid),
         (f"every part is ONE connected solid  {_loose if _loose else ''}",

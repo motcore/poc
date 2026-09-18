@@ -537,7 +537,16 @@ with a ~4–7 mm horn.
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
 
-1. **Stop the carriage sliding sideways (in X).** The four-bar only constrains
+1. **DONE (2026-09-18): stop the carriage sliding sideways (in X).** It had
+   ±2 mm (1.5 per side at B, 0.5 at A). An apex offset across the contact
+   plane slips exactly like the four-bar's drift along it: δ / L, so 2 mm was
+   ~8.7%, worse than v5. Now every thrust face (carriage arm boss at B, frame
+   lug at A, top and bottom) is printed `shim_gap` = 0.3 short and filled with
+   DIN 988 4×8 shims at assembly; target play ≤ 0.1 mm (0.43% slip, under the
+   four-bar's 0.60). The foot's slot no longer grips the link at zero X
+   clearance. Two checks: X play measured by nudging the solids, and its slip.
+   Original note:
+   **Stop the carriage sliding sideways (in X).** The four-bar only constrains
    the Y-Z plane; if the carriage can shift along the pivot pins, the cone's
    apex leaves the motor apex, and that is fatal to the whole geometry. Needs
    real axial location at the pins (shoulders, spacers, clips), not just
