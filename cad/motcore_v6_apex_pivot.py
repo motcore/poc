@@ -497,7 +497,15 @@ fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
                         #      block's own free edge
 fp_post_y     = 6.0    # mm — half-height (Z) the block adds above and below
                         #      the screw spread and the pivot lug
-fp_screw_x    = 17.0   # mm — |X| of its two wall screws. Was 14.5 (out past
+fp_screw_dz   = 4.0    # mm — its screws spread in Z now, not in X: the −X
+                        #      half of this wall is the actuation's column,
+                        #      and a symmetric foot ran straight into the
+                        #      servo's cradle and the spring cage. 4 and not
+                        #      more because the lower post's own boss, Ø11 on
+                        #      the wall, would otherwise reach through the
+                        #      floor.
+fp_screw_x    = 16.0   # mm — X of its two wall screws. Was 17, and before
+                        #      that 14.5 (out past
                         #      the LINKS' own arms, which reach 11.5) until the
                         #      pin itself turned out to reach further, to 12.5,
                         #      and the screw's own head — 5.5 wide — needs to
@@ -1027,14 +1035,13 @@ def _screw_seat_y(sx):
 
 
 def wall_screws():
-    """(x, z) of every screw through this axis's wall.
+    """(x, z) of every screw through this axis's wall: the four-bar's two
+    frame pivots, X-spread only (see fw_screw_z for why not four).
 
-    EMPTY since 2026-09-20: the frame pivots, the only thing that was screwed
-    to a wall, are printed as part of it now (user's call — brackets printed
-    with their host, not screwed to it). The hook stays for the next thing
-    that needs one, and both the wall and the bracket still read it, so they
-    cannot disagree."""
-    return []
+    The list stays the single source for both the wall's bosses and the
+    brackets' own holes, so the two cannot disagree."""
+    return [(fp_screw_x, zs * fb_A[1] + dz)
+            for zs in (1, -1) for dz in (-fp_screw_dz, fp_screw_dz)]
 
 
 _SHAPE_CACHE = {}
@@ -1417,10 +1424,16 @@ def _link_swept_envelope(A, Bkey):
 
 
 def make_frame_bracket(zs):
-    """The four-bar's frame pivot: a post standing off the WALL's inner face
-    in to the pivot. PRINTED AS PART OF THE WALL (user, 2026-09-20), so there
-    is no foot and no screws any more — the post simply grows out of the wall,
-    and the wall prints inner-face-up with the post standing off the bed.
+    """The four-bar's frame pivot: a foot against the wall's boss face and a
+    post reaching in to the pivot. PRINTED SEPARATELY and screwed on (user,
+    2026-09-20).
+
+    Its pin bore runs along X. Printed as part of the wall, with the wall flat
+    on the bed, that bore comes out horizontal — the one direction where an
+    FDM hole goes oval and rough. On its own the post can be laid with the
+    bore vertical, and it comes out round. That is the same rule that sends
+    the screw's and the rod's anchors to the ceiling, where THEIR bores are
+    the vertical ones.
 
     Moved back off the deck, at the user's request, so every support for this
     axis lives on the one part that comes off the machine: pull the wall and
@@ -1436,11 +1449,15 @@ def make_frame_bracket(zs):
     screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
     y_far = fb_A[0] - fp_lug_x
-    # Runs INTO the wall by bracket_weld, so the fuse is a solid joint and not
-    # two solids meeting on a face.
-    part = Part.makeBox(2 * fp_lug_x, cube_half + bracket_weld - y_far,
-                        2 * fp_post_y,
-                        v(-fp_lug_x, y_far, z_pin - fp_post_y))
+    y_foot_in = wall_face_y - foot_t
+    _fz = fp_screw_dz + foot_edge / 2.0
+    foot = Part.makeBox(fp_post_x - fp_lug_x, foot_t, 2 * _fz,
+                        v(fp_lug_x, y_foot_in, z_pin - _fz))
+    # The post runs THROUGH the foot's own Y band: stopping at its face left
+    # the two touching along a line, which fuses into two solids.
+    part = foot.fuse(Part.makeBox(2 * fp_lug_x, wall_face_y - y_far,
+                                  2 * fp_post_y,
+                                  v(-fp_lug_x, y_far, z_pin - fp_post_y)))
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
     part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_press_d,
@@ -1457,6 +1474,9 @@ def make_frame_bracket(zs):
     swept = cached(_link_swept_envelope,
                    A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
+    for dz in (-fp_screw_dz, fp_screw_dz):
+        part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
+                            v(fp_screw_x, y_foot_in - 1, z_pin + dz), Y_AXIS))
     return part
 
 def servo_box():
@@ -1502,32 +1522,31 @@ def servo_screw_xs():
 
 
 def make_servo_bracket():
-    """The servo's bracket, on the WALL (user, 2026-09-20): a plate against
-    it, two pads under the case's mounting tabs, and the foot the guide rod
-    stands in. PRINTED AS PART of the wall, like the four-bar's posts.
+    """The servo's cradle, on the FLOOR (user, 2026-09-20): a plate it stands
+    on and a post under each mounting tab. PRINTED AS PART of the floor.
 
-    The case's back sits a few millimetres off the wall, so the pads reach
-    forward that far and no further — it is a bracket, not a cantilever."""
+    Back on the floor rather than the wall because its tab screws run along
+    Z: on the floor, which prints flat, those come out as true holes, and
+    the same screws into a wall bracket would have been horizontal ones."""
     tz0, tz1 = _tab_z()
     x0, y0, z0, bx, by, bz = servo_box()
-    y_back = y0 + by
-    plate = Part.makeBox(bx + 2 * servo_tab_out,
-                         cube_half + bracket_weld - y_back, tz0 - z0,
-                         v(x0 - servo_tab_out, y_back, z0))
-    part = plate
+    part = Part.makeBox(bx + 2.0 * (servo_tab_out + 1.0), by,
+                        sv_stand + bracket_weld,
+                        v(x0 - servo_tab_out - 1.0, y0,
+                          z0 - sv_stand - bracket_weld))
     for sx, out in ((x0, -1.0), (x0 + bx, 1.0)):
-        pad = Part.makeBox(servo_tab_out, y_back - y0, 4.0,
-                           v(sx if out > 0 else sx - servo_tab_out, y0,
-                             tz0 - 4.0))
-        part = part.fuse(pad)
-        part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 5.0),
+        post = Part.makeBox(servo_tab_out + 1.0, by, tz0 - z0,
+                            v(sx if out > 0 else sx - servo_tab_out - 1.0,
+                              y0, z0))
+        part = part.fuse(post)
+    for sx in servo_screw_xs():
+        part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 4.0),
                             Z_AXIS))
-    # Trimmed to the cube: the plate is wider than the case, and the case is
+    # Trimmed to the cube: the cradle is wider than the case, and the case is
     # already out at the corner.
-    return part.cut(Part.makeBox(40.0, 60.0, 80.0,
+    return part.cut(Part.makeBox(40.0, 60.0, 60.0,
                                  v(-cube_half - 40.0 + run_clr, 0.0,
                                    -cube_half - 10.0)))
-
 
 def make_screw_shaft():
     """The lead screw itself: from the coupler on the servo's spline up past
@@ -1538,25 +1557,26 @@ def make_screw_shaft():
 
 
 def make_screw_top():
-    """The screw's top bearing AND the guide rod's top anchor, on a post off
-    the WALL — printed with it.
+    """The screw's top bearing AND the guide rod's top anchor, hanging from
+    the CEILING — printed with it (user, 2026-09-20).
+
+    Both bores run along Z, and the ceiling is printed flat, so on it they
+    come out as true round holes. On the wall the same bores would have been
+    horizontal, which is where FDM holes go oval.
 
     A screw pushes as hard as it pulls, and a servo's output bearing is not
     meant to take either, so the thrust is caught here and at the floor,
     never through the servo."""
     x0 = min(screw_x - nut_d / 2.0, screw_x + guide_dx - guide_d / 2.0 - 3.0)
     x1 = max(screw_x + nut_d / 2.0, screw_x + guide_dx + guide_d / 2.0 + 3.0)
-    post = Part.makeBox(x1 - x0, cube_half + bracket_weld - screw_y, 6.0,
-                        v(x0, screw_y, screw_top_z - 3.0))
-    post = post.fuse(cyl(screw_d / 2.0 + 3.0, 6.0,
-                         v(screw_x, screw_y, screw_top_z - 3.0), Z_AXIS))
-    post = post.fuse(cyl(guide_d / 2.0 + 3.0, 6.0,
-                         v(screw_x + guide_dx, screw_y, screw_top_z - 3.0),
-                         Z_AXIS))
-    post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 12.0,
-                        v(screw_x, screw_y, screw_top_z - 6.0), Z_AXIS))
-    return post.cut(cyl(fdm_pin_press_d / 2.0, 12.0,
-                        v(screw_x + guide_dx, screw_y, screw_top_z - 6.0),
+    y0 = screw_y - nut_d / 2.0
+    y1 = max(screw_y + nut_d / 2.0, screw_y + guide_d / 2.0 + 3.0)
+    post = Part.makeBox(x1 - x0, y1 - y0, cube_half + bracket_weld - screw_top_z,
+                        v(x0, y0, screw_top_z))
+    post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 30.0,
+                        v(screw_x, screw_y, screw_top_z - 1.0), Z_AXIS))
+    return post.cut(cyl(fdm_pin_press_d / 2.0, 30.0,
+                        v(screw_x + guide_dx, screw_y, screw_top_z - 1.0),
                         Z_AXIS))
 
 
@@ -1789,18 +1809,15 @@ def act_moving_parts(st):
 
 
 def both_hands(pts):
-    """A screw pattern and its X mirror, without duplicates.
+    """The screw pattern, as given.
 
-    The decks and the walls are ONE part each, used by all four axes, and
-    alternate axes are assembled turned over (see axis_shape) — which mirrors
-    their brackets in X. So each deck and each wall carries both hands of the
-    pattern. A boss nothing screws into costs a gram."""
-    out = list(pts)
-    for sx, sy in pts:
-        if all(abs(sx + qx) > 1e-6 or abs(sy - qy) > 1e-6 for qx, qy in out):
-            out.append((-sx, sy))
-    return out
-
+    It used to add the X mirror of every hole, because alternate axes were
+    assembled turned over and their brackets came out mirrored. Nothing is
+    turned over any more (invariant 7: identical rotated copies), so the
+    mirrored half was holes nobody used — and worse, on this wall they landed
+    in the actuation's own corner, where they ran into the servo's cradle and
+    the spring cage."""
+    return list(pts)
 
 def deck_screws():
     """(x, y) of the screws into one deck, for ONE axis. EMPTY: the frame
@@ -1835,6 +1852,16 @@ def make_deck(zs):
                                  v(0, 0, zs)))
             deck = deck.cut(cyl(foot_tap_d / 2.0, deck_boss_h + 2.0, base,
                                 v(0, 0, zs)))
+    if zs > 0:
+        # The screw's and the rod's top anchors: their bores run along Z, so
+        # the ceiling is the part they come out true on.
+        for _, rot in AXES:
+            deck = deck.fuse(place(cached(make_screw_top), rot))
+    if zs < 0:
+        # The servo stands on the floor, so its cradle is part of the floor —
+        # and its tab screws run along Z too.
+        for _, rot in AXES:
+            deck = deck.fuse(place(cached(make_servo_bracket), rot))
     return deck
 
 
@@ -1873,15 +1900,9 @@ def make_wall():
                              v(sx, wall_face_y, sz), Y_AXIS))
         wall = wall.cut(cyl(foot_tap_d / 2.0, wall_boss_h + 2.0,
                             v(sx, wall_face_y, sz), Y_AXIS))
-    # The four-bar's two frame posts are printed as part of the wall (user,
-    # 2026-09-20): pull the wall and the mechanism comes with it, with no
-    # screws and no foot joint to work loose.
-    for zs in (1, -1):
-        wall = wall.fuse(cached(make_frame_bracket, zs))
-    # And the screw's top bearing and the servo's own bracket, which both
-    # stand off this wall.
-    wall = wall.fuse(cached(make_screw_top))
-    wall = wall.fuse(cached(make_servo_bracket))
+    # And the guide rod's foot, which is the one anchor that has to come off
+    # this wall: it sits above the servo, where neither floor nor ceiling can
+    # reach it without passing through the case.
     wall = wall.fuse(cached(make_guide_foot))
     return wall
 
@@ -2132,8 +2153,7 @@ def place(shape, rot_deg):
 # because the checks need to see them as themselves — that they merge, that
 # they clear what they pass — but they are not DRAWN separately: their host
 # already contains them, and drawing both shows every one of them twice.
-WELDED_INTO = {"FramePostT": "Wall", "FramePostB": "Wall",
-               "ServoBracket": "Wall", "ScrewTop": "Wall",
+WELDED_INTO = {"ServoBracket": "DeckBottom", "ScrewTop": "DeckTop",
                "GuideFoot": "Wall"}
 
 for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
@@ -2268,8 +2288,7 @@ if RUN_CHECKS:
     _MESH_PAIRS = set()
 
 
-    _WELDED = [{"Wall", "FramePostT"}, {"Wall", "FramePostB"},
-               {"Wall", "ScrewTop"}, {"Wall", "ServoBracket"},
+    _WELDED = [{"DeckTop", "ScrewTop"}, {"DeckBottom", "ServoBracket"},
                {"Wall", "GuideFoot"}]
 
 
@@ -2569,12 +2588,14 @@ if RUN_CHECKS:
 
     # Pins have to GO IN: the four-bar's frame pins slide in along X from
     # outside the foot. Their path, both ways, must be empty.
+    # ONE clear way in is enough — the pin only goes in one way. With the
+    # foot on the +X side only, that way is from −X.
     _ins_ov = 0.0
     for _zs, _A in ((1, A1), (-1, A2)):
         _fp = _st0["FramePostT" if _zs > 0 else "FramePostB"]
         _xo = link_x + link_t / 2.0
-        for _x0 in (_xo, -(_xo + 30.0)):
-            _ins_ov += pin_x(_A, pin_d, _x0, 30.0).common(_fp).Volume
+        _ins_ov += min(pin_x(_A, pin_d, _xo, 30.0).common(_fp).Volume,
+                       pin_x(_A, pin_d, -(_xo + 30.0), 30.0).common(_fp).Volume)
 
     # The E-clips, SWEPT: each against everything but its own joint's plates.
     _CLIP_OWN = {}      # no clips: there are no pinned plates left
@@ -2624,12 +2645,24 @@ if RUN_CHECKS:
     # listed.
     _TOUCH_OK = {frozenset(q) for q in (
         # welded: printed as one part with their host
-        ("Wall", "FramePostT"), ("Wall", "FramePostB"), ("Wall", "ServoBracket"),
-        ("Wall", "ScrewTop"), ("Wall", "GuideFoot"),
+        ("Wall", "GuideFoot"),
+        # a screw in its own boss
+        ("Wall", "WallScrew0"), ("Wall", "WallScrew1"),
+        ("Wall", "WallScrew2"), ("Wall", "WallScrew3"),
+        # screwed on, so they sit on the wall's own bosses, and their
+        # screws pass through both
+        ("Wall", "FramePostT"), ("Wall", "FramePostB"),
+        ("FramePostT", "WallScrew0"), ("FramePostT", "WallScrew1"),
+        ("FramePostT", "WallScrew2"), ("FramePostT", "WallScrew3"),
+        ("FramePostB", "WallScrew0"), ("FramePostB", "WallScrew1"),
+        ("FramePostB", "WallScrew2"), ("FramePostB", "WallScrew3"),
+        ("DeckBottom", "ServoBracket"), ("DeckTop", "ScrewTop"),
         # assembled: pressed, seated, screwed or bolted together
         ("ServoBody", "ServoBracket"), ("ServoBody", "ScrewShaft"),
-        # the brackets ARE the wall, so anything they hold touches the wall
-        ("ServoBody", "Wall"), ("GuideRod", "Wall"), ("ScrewShaft", "Wall"),
+        # a bracket IS its host, so anything it holds touches that host
+        ("ServoBody", "DeckBottom"), ("GuideRod", "Wall"),
+        ("GuideRod", "DeckTop"), ("ScrewShaft", "DeckTop"),
+        ("ScrewNut", "DeckTop"), ("ScrewShaft", "Wall"),
         ("ScrewShaft", "ScrewTop"), ("GuideRod", "GuideFoot"),
         ("GuideRod", "ScrewTop"), ("OutputShaft", "UJFork"),
         ("OutputShaft", "BearingOutput"), ("OutputShaft", "BearingOutIn"),

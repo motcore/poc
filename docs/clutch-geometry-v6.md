@@ -645,6 +645,28 @@ cartridge lives round the guide rod instead.
 Open: whether to give the stacks a light preload (~0.2 mm) so the carrier
 does not rattle in free, and the actual catalogue part.
 
+### 12d.2 Where each bracket is printed (2026-09-20)
+
+The user's rule, and it is a better one than "everything on the wall":
+**each bore goes on the part where it prints round.**
+
+- The screw's top bearing and the guide rod's top anchor have **Z bores**, so
+  they hang from the CEILING, which prints flat — the holes come out true.
+- The servo's cradle has **Z screws** into its tabs, so it is part of the
+  FLOOR, which the servo stands on anyway.
+- The four-bar's frame posts have **X bores** for their pins. Printed with the
+  wall those would be horizontal holes, which is where FDM goes oval, so they
+  are printed SEPARATELY, laid bore-up, and screwed on.
+- Only the guide rod's foot stays on the wall: it sits above the servo, where
+  neither deck reaches it without passing through the case.
+
+Falling out of it: the frame posts' feet are on the +X side only, with their
+two screws spread in Z rather than X — the −X half of that wall is the
+actuation's column now, and a symmetric foot ran into the servo's cradle and
+the spring cage. And `both_hands()` stopped mirroring the screw pattern:
+nothing is turned over any more, and the mirrored half landed in that same
+column.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
