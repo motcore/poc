@@ -283,14 +283,22 @@ screw_eff     = 0.5    # — thread efficiency at that lead (steel on brass).
 nut_d         = 14.0   # mm — the brass nut's body
 nut_l         = 10.0   # mm — along the screw
 push_t        = 4.0    # mm — the pusher arm from the nut out to the ear
-push_w        = 12.0   # mm — wide enough to carry the guide bore as well
-                        #      as the pin
+push_w        = 14.0   # mm — the carrier's arm. It has to STRADDLE the
+                        #      screw: the rod is on one side of it and the ear
+                        #      on the other, so the arm carries a clearance
+                        #      hole for the screw and needs material round it.
 # The series spring lives at the END of the pusher, as a cartridge: the ear's
 # pin rides in a slot with a spring stack above it and another below, so the
 # nut can push the carriage BOTH ways through a spring. It has to be both
 # ways — free is the middle of the travel — which is why it is two stacks and
 # not one spring.
-spr_od        = 8.0    # mm — outside Ø of each stack
+spr_od        = 11.0   # mm — outside Ø of each stack. They sit round the
+                        #      GUIDE ROD, not round the screw: at the screw
+                        #      the wall is 7 mm away and the brass nut itself
+                        #      is 14 across, so nothing fits round it.
+spr_id        = 5.0    # mm — bore, over the Ø4 rod
+carrier_t     = 4.0    # mm — the floating carrier the pusher hangs off
+cage_t        = 3.0    # mm — each of the driver's two seat plates
 spr_h         = 3.0    # mm — its height, seated
 spr_clr       = 0.2    # mm — slack in the slot beyond the working stroke
 guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
@@ -307,7 +315,7 @@ guide_dx      = -10.0  # mm — the rod sits on the FAR side of the screw from
                         #      carriage's ring on the way up.
 guide_z0      = -8.0   # mm — where the rod starts: above the servo, below the
                         #      nut's travel, and outside the ring's rim
-screw_top_z   = 31.0   # mm — where the screw's top bearing sits, clear
+screw_top_z   = 43.0   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      chain's ratio now. It buys the ear an effective
@@ -1556,38 +1564,127 @@ def _guide_z0():
     return guide_z0
 
 
-def make_nut(st):
-    """The nut, and the pusher that carries the ear with it.
+def _nut_body_z(st):
+    """The brass nut sits ABOVE the cage, not level with the carrier: at the
+    carrier's own height the nut's 14 mm body is exactly where the carrier
+    has to be, and below the carrier are the guide rod's foot and the servo."""
+    return st["nut_z"] + (_cage_gap() / 2.0 + cage_t + nut_l / 2.0 + 1.0)
 
-    The pusher reaches out in X to the carriage's arm, so the nut sees a
-    moment as well as the thrust — which is exactly what its anti-rotation
-    guide is for, and why the guide is a real feature and not a detail."""
+
+def _cage_gap():
+    """Clear height between the driver's two seat plates: the carrier, its
+    two springs, and the stroke they have to give each way."""
+    return carrier_t + 2.0 * spr_h + 2.0 * (spring_stroke + spr_clr)
+
+
+def make_brass_nut(st):
+    """The nut itself: BOUGHT, brass, threaded on the screw. Drawn on its own
+    so it is not mistaken for something printed."""
+    z = _nut_body_z(st)
+    return cyl(nut_d / 2.0, nut_l, v(screw_x, screw_y, z - nut_l / 2.0),
+               Z_AXIS).cut(cyl(screw_d / 2.0 - 0.6, nut_l + 2,
+                               v(screw_x, screw_y, z - nut_l / 2.0 - 1),
+                               Z_AXIS))
+
+
+def make_nut(st):
+    """The CAGE, printed: it grips the brass nut and carries the two spring
+    seats out to the guide rod.
+
+    The spring cannot sit between the nut and the ear along the pusher —
+    there is no room beside the screw — so it sits round the GUIDE ROD,
+    which has space and is already the part that stops everything turning.
+    The nut pushes a plate, the plate pushes a spring, the spring pushes the
+    carrier: that is the series compliance, and it works both ways because
+    there is a plate, a spring and a seat on each side."""
     z = st["nut_z"]
-    body = cyl(nut_d / 2.0, nut_l, v(screw_x, screw_y, z - nut_l / 2.0), Z_AXIS)
-    _x_face = _x_face_push()
-    arm = Part.makeBox(_x_face - screw_x, push_w, push_t,
-                       v(screw_x, screw_y - push_w / 2.0, z - push_t / 2.0))
+    zn = _nut_body_z(st)
+    # A collar round the brass nut, open toward the wall (there is no room
+    # that way) — the web up the motor side closes it.
+    body = cyl(nut_d / 2.0 + 2.0, nut_l, v(screw_x, screw_y, zn - nut_l / 2.0),
+               Z_AXIS)
+    body = body.cut(Part.makeBox(60.0, 30.0, 60.0,
+                                 v(screw_x - 30.0, cube_half - run_clr,
+                                   z - 30.0)))
+    g = _cage_gap()
+    gx = screw_x + guide_dx
+    for side in (1, -1):
+        z_plate = z + side * (g / 2.0) if side > 0 else z - g / 2.0 - cage_t
+        plate = Part.makeBox(screw_x - (gx - 8.0) + nut_d / 2.0, push_w,
+                             cage_t,
+                             v(gx - 8.0, screw_y - push_w / 2.0, z_plate))
+        body = body.fuse(plate)
+    # A web down the nut's INBOARD side ties the two plates to it. It cannot
+    # be a sleeve round the nut: at this Y the wall is 7 mm away and the nut
+    # is already 14 across, so the cage has to grow toward the motor, not
+    # round.
+    web_t = 9.0
+    web_y1 = screw_y - push_w / 2.0 + 3.5      # overlapping the seat plates
+    _z_bot = z - g / 2.0 - cage_t
+    _z_top = zn + nut_l / 2.0
+    # A spine BEYOND the rod ties the two seat plates together. It cannot run
+    # up the motor side: that is where the carrier's own arm passes, and the
+    # cage has to let it move.
+    body = body.fuse(Part.makeBox(2.5, push_w, z + g / 2.0 + cage_t - _z_bot,
+                                  v(gx - 8.0, screw_y - push_w / 2.0, _z_bot)))
+    # Narrow enough in X to keep off the springs, which stand round the
+    # guide rod a few millimetres away.
+    _web_x0 = (gx + spr_od / 2.0 + 0.5 if guide_dx < 0
+               else screw_x - nut_d / 2.0)
+    body = body.fuse(Part.makeBox(screw_x + nut_d / 2.0 - _web_x0, web_t,
+                                  _z_top - _z_bot,
+                                  v(_web_x0, web_y1 - web_t, _z_bot)))
+    # Bores LAST: every fuse above would fill an earlier hole back in.
+    # The web runs past the carrier's own height, so it is slotted there —
+    # that slot is what lets the carrier float between the springs.
+    _slot_h = carrier_t + 2.0 * (spring_stroke + spr_clr) + 0.6
+    body = body.cut(Part.makeBox(nut_d + 4.0, 20.0, _slot_h,
+                                 v(screw_x - nut_d / 2.0 - 3.0, web_y1 - 15.0,
+                                   z - _slot_h / 2.0)))
+    _h = _z_top - _z_bot + 2.0
+    # The brass nut's own pocket, cut LAST like every other bore: the web is
+    # fused after the collar and would otherwise fill it straight back in.
+    body = body.cut(cyl(nut_d / 2.0 + 0.15, nut_l + 0.4,
+                        v(screw_x, screw_y, zn - nut_l / 2.0 - 0.2), Z_AXIS))
+    body = body.cut(cyl(screw_d / 2.0 + 0.2, _h, v(screw_x, screw_y,
+                                                   _z_bot - 1), Z_AXIS))
+    return body.cut(cyl(guide_d / 2.0 + 0.25, _h,
+                        v(gx, screw_y, _z_bot - 1), Z_AXIS))
+
+
+def make_carrier(st):
+    """The floating carrier: it slides on the guide rod between the two
+    springs, and its arm is what actually reaches the ear."""
+    z = st["nut_z"]
+    gx = screw_x + guide_dx
+    body = Part.makeBox(guide_d + 5.0, push_w, carrier_t,
+                        v(gx - (guide_d + 5.0) / 2.0, screw_y - push_w / 2.0,
+                          z - carrier_t / 2.0))
+    arm = Part.makeBox(_x_face_push() - gx, push_w, carrier_t,
+                       v(gx, screw_y - push_w / 2.0, z - carrier_t / 2.0))
     body = body.fuse(arm)
-    # A stub the other way, carrying the guide bore — the rod cannot ride on
-    # the pusher side (see guide_dx).
-    tail_x0 = screw_x + guide_dx - guide_d / 2.0 - 2.0
-    body = body.fuse(Part.makeBox(screw_x - tail_x0, push_w, push_t,
-                                  v(tail_x0, screw_y - push_w / 2.0,
-                                    z - push_t / 2.0)))
-    # Bore LAST: the arm starts at the screw's own axis, so fusing it after
-    # the bore would fill the bore straight back in.
-    body = body.cut(cyl(screw_d / 2.0 + 0.2, nut_l + 2,
-                        v(screw_x, screw_y, z - nut_l / 2.0 - 1), Z_AXIS))
-    # And the bore that rides the guide rod, through the pusher itself.
-    body = body.cut(cyl(guide_d / 2.0 + 0.25, push_t + 2,
-                        v(screw_x + guide_dx, screw_y, z - push_t / 2.0 - 1),
-                        Z_AXIS))
-    # NOTE (2026-09-20): the spring cartridge does NOT belong at the pusher's
-    # end. Built there it lands on the screw itself: between the screw's own
-    # Ø8 and the carriage's ring there are 2.2 mm, and a spring bore wants
-    # twelve. The room for it is round the NUT, coaxial with the screw.
+    body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_t + 2,
+                        v(gx, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
+    # It clears the screw: the arm passes beside it, not through it.
+    body = body.cut(cyl(screw_d / 2.0 + run_clr, carrier_t + 2,
+                        v(screw_x, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
     return body.cut(pin_x((ear_y, z), fdm_act_hole_d,
                           ear_sx * side_x - 2.0, 4.0))
+
+
+def make_spring_stack(st, side):
+    """One of the two stacks, as its envelope: seated on a plate of the
+    driver's cage at one end and on the carrier at the other.
+
+    Its rate and stroke are the screw's, not a catalogue's: spring_rate over
+    spring_stroke. At ~140 N/mm over 0.4 mm that is die-spring or Belleville
+    territory — a plain coil spring this short cannot do it."""
+    z = st["nut_z"] + side * (carrier_t / 2.0)
+    z0 = z if side > 0 else z - spr_h
+    return cyl(spr_od / 2.0, spr_h,
+               v(screw_x + guide_dx, screw_y, z0), Z_AXIS).cut(
+        cyl(spr_id / 2.0, spr_h + 2,
+            v(screw_x + guide_dx, screw_y, z0 - 1), Z_AXIS))
 
 
 def _plate_bar(pts, x_band, w, press=(), holes=None):
@@ -1616,7 +1713,11 @@ def _x_face_push():
 def act_moving_parts(st):
     """The nut and its pusher. The screw turns but does not move, so it is a
     fixed part; the servo likewise."""
-    return [("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0)]
+    return [("ScrewNut", make_brass_nut(st), (0.72, 0.55, 0.30), 0),
+            ("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
+            ("SpringCarrier", make_carrier(st), (0.30, 0.55, 0.85), 0),
+            ("SpringUp", make_spring_stack(st, 1), (0.85, 0.85, 0.20), 0),
+            ("SpringDown", make_spring_stack(st, -1), (0.85, 0.85, 0.20), 0)]
 
 
 def both_hands(pts):
@@ -2122,6 +2223,10 @@ if RUN_CHECKS:
         # merge (and merge into ONE solid) is its own check.
         if {na, nb} in _WELDED:
             return True
+        # A nut on its own thread: the bore is the thread, so it shares metal
+        # with the screw by definition.
+        if {na, nb} == {"ScrewNut", "ScrewShaft"}:
+            return True
         return False
 
 
@@ -2271,7 +2376,20 @@ if RUN_CHECKS:
     # case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
     # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
     # designed gap between neighbouring plates, not a running clearance.
-    _ACT_PINNED = {frozenset(p) for p in (("ActNut", "Carriage"),
+    _ACT_PINNED = {frozenset(p) for p in (("ScrewNut", "ActNut"),
+                                          ("ScrewNut", "ScrewShaft"),
+                                          ("ScrewNut", "SpringUp"),
+                                          ("ScrewNut", "SpringDown"),
+                                          ("SpringCarrier", "Carriage"),
+                                          ("SpringCarrier", "GuideRod"),
+                                          ("SpringCarrier", "SpringUp"),
+                                          ("SpringCarrier", "SpringDown"),
+                                          ("ActNut", "SpringUp"),
+                                          ("ActNut", "SpringDown"),
+                                          ("ActNut", "SpringCarrier"),
+                                          ("SpringUp", "GuideRod"),
+                                          ("SpringDown", "GuideRod"),
+                                          ("ActNut", "Carriage"),
                                           ("ActNut", "ScrewShaft"),
                                           ("ActNut", "GuideRod"),
                                           ("GuideRod", "ScrewTop"),

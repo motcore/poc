@@ -619,6 +619,32 @@ its pins are parallel to X, and a screw does not care.
 Not yet done: the nut's anti-rotation guide, the coupler from spline to
 screw, and the spring's own seats.
 
+### 12d.1 The spring cartridge (2026-09-20)
+
+The series spring sits between the nut and the ear, and it has to push BOTH
+ways, so it is two stacks with the moving part between them:
+
+- The brass nut (bought) is gripped by a printed **cage**: a collar round it,
+  a web down its motor side, and two **seat plates** reaching out to the guide
+  rod, one above and one below.
+- A **carrier** floats between those plates, sliding on the guide rod, and its
+  arm reaches out to the ear's pin. It straddles the screw through a clearance
+  hole — the rod is on one side of the screw and the ear on the other.
+- A **spring stack** sits round the rod between each plate and the carrier.
+  Push up and the top one is squeezed; push down, the bottom one.
+- The web is **slotted** where the carrier passes, and that slot is what lets
+  the carrier float; the plates are tied together by a spine beyond the rod,
+  because the motor side is where the carrier's own arm runs.
+
+Numbers: **0.40 mm of stroke, ~140 N/mm per stack, 57 N at the end of it**.
+That is die-spring or Belleville territory; a plain coil spring that short
+cannot reach the rate. Around the SCREW there is no room for any of this —
+the wall is 7 mm away and the nut is 14 across — which is why the whole
+cartridge lives round the guide rod instead.
+
+Open: whether to give the stacks a light preload (~0.2 mm) so the carrier
+does not rattle in free, and the actual catalogue part.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
