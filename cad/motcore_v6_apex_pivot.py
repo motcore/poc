@@ -217,20 +217,22 @@ spring_ratio  = 15.0   # —   — rubber stiffness / spring stiffness, both see
                         #       servo-side angle past contact. Invented (doc
                         #       §10.2): it only sets how far past contact the
                         #       carriage still creeps, i.e. phi_preload.
-servo_body    = (32.2, 22.4, 12.5)   # mm — MG90D, off its own datasheet
-                        #      (user, 2026-09-20): the shaft direction first
-                        #      (to the top of the spline), then the case's
-                        #      length and its thickness. Was (29, 22.8, 12.2):
-                        #      3 mm short, and the thickness confused with the
-                        #      shaft's own offset below.
+servo_body    = (28.2, 22.4, 12.5)   # mm — MG90D, off its own datasheet
+                        #      (user, 2026-09-20): the shaft direction first,
+                        #      then the case's length and its thickness. The
+                        #      CASE only: the datasheet's 32.2 runs to the top
+                        #      of the spline, and the spline is the last 4.
+sv_spline_h   = 4.0    # mm — the splined shaft standing off the case
 sv_shaft_end  = 6.25   # mm — the shaft sits this far from the case's SIDE,
                         #      measured on the body alone, tabs not counted
                         #      (user, 2026-09-20). On a 22.4 case that is
                         #      4.95 off the centreline, not the 1.5 read off
                         #      the drawing before.
 sv_shaft_off  = servo_body[1] / 2.0 - sv_shaft_end   # DERIVED
-sv_tab_from_face = 14.2  # mm — from the shaft end back to the tab plate
-                        #      (datasheet: 32.2 tall, tabs at 18.0).
+sv_tab_from_base = 18.0  # mm — from the case's base UP to the tab plate
+                        #      (datasheet). Measured from the base now, not
+                        #      from the shaft end, because the base is what
+                        #      the bracket holds.
 _servo_body_old = (29.0, 22.8, 12.2)   # mm — MG90-class: X along the shaft,
                         #      then the case's LENGTH and its thickness.
                         #      2026-09-20: the servo lies against the WALL, not
@@ -269,7 +271,7 @@ spring_r      = 5.5    # mm — its outer radius
 sv_stand      = 2.0    # mm — how far the cradle lifts the servo off the
                         #      floor: the plate it stands on
 screw_x       = -27.7  # mm ┐ the lead screw's axis: up the empty column
-screw_y       = 39.5   # mm ┘ beside the carriage's arm, clear of its ring
+screw_y       = 40.5   # mm ┘ beside the carriage's arm, clear of its ring
 screw_d       = 8.0    # mm — T8 lead screw (the 3D-printer standard part)
 screw_lead    = 8.0    # mm per turn — T8 is 4-start, so a turn is 8 mm. This
                         #      is what makes a ±80 deg servo enough: 160 deg
@@ -1422,10 +1424,9 @@ def servo_box():
 
 
 def _tab_z():
-    """Z band of the mounting tabs, sv_tab_from_face down from the shaft end
-    (datasheet). Upright, they are a shelf, and the posts they screw to stand
-    on the floor with the servo."""
-    z1 = -cube_half + servo_body[0] - sv_tab_from_face
+    """Z band of the mounting tabs, sv_tab_from_base up from the case's base
+    (datasheet). Upright, they are a shelf, and the bracket holds them."""
+    z1 = servo_box()[2] + sv_tab_from_base
     return (z1 - servo_tab_t, z1)
 
 
@@ -1440,8 +1441,10 @@ def make_servo_body():
     for sx in servo_screw_xs():
         body = body.cut(cyl(servo_screw_d / 2.0 + 0.1, tz1 - tz0 + 2,
                             v(sx, screw_y, tz0 - 1), Z_AXIS))
-    # Spline stub, where the coupler to the screw sits.
-    body = body.fuse(cyl(2.5, 4.0, v(screw_x, screw_y, z0 + bz), Z_AXIS))
+    # Spline stub, where the coupler to the screw sits: the last 4 mm of
+    # the datasheet's 32.2.
+    body = body.fuse(cyl(2.5, sv_spline_h, v(screw_x, screw_y, z0 + bz),
+                         Z_AXIS))
     return body
 
 
@@ -1482,7 +1485,7 @@ def make_screw_shaft():
     """The lead screw itself: from the coupler on the servo's spline up past
     the nut's whole travel to its top bearing."""
     _, _, z0s, _, _, bz = servo_box()
-    z0 = z0s + bz + 5.0          # just clear of the spline stub and its coupler
+    z0 = z0s + bz + sv_spline_h + 1.0   # clear of the spline and its coupler
     return cyl(screw_d / 2.0, screw_top_z - z0, v(screw_x, screw_y, z0), Z_AXIS)
 
 
