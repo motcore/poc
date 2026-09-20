@@ -1582,30 +1582,12 @@ def make_nut(st):
     body = body.cut(cyl(guide_d / 2.0 + 0.25, push_t + 2,
                         v(screw_x + guide_dx, screw_y, z - push_t / 2.0 - 1),
                         Z_AXIS))
-    # The cartridge at the pusher's end: a block with a bore for the two
-    # spring stacks and a SLOT for the ear's pin between them. The pin's
-    # freedom in that slot is the spring's whole working stroke, twice over
-    # — once for each direction of engagement.
-    _slot = act_pin_d + 2.0 * (spring_stroke + spr_clr)
-    blk_h = _slot + 2.0 * spr_h + 4.0
-    # OUTBOARD of the carriage's ring, not against the arm: the cartridge is
-    # a block, and anywhere inside hous_ro it would dip into the ring's own
-    # cylinder. The ear's pin spans the gap instead — it is Ø3 steel over
-    # 6 mm, which that load does not notice.
-    _x_cart = -(hous_ro + 0.5) if ear_sx < 0 else (hous_ro + 0.5)
-    blk = Part.makeBox(push_t, spr_od + 4.0, blk_h,
-                       v(_x_cart - push_t, screw_y - (spr_od + 4.0) / 2.0,
-                         z - blk_h / 2.0))
-    body = body.fuse(blk)
-    body = body.cut(cyl(spr_od / 2.0 + 0.2, _slot + 2.0 * spr_h,
-                        v(_x_cart - push_t / 2.0, screw_y,
-                          z - (_slot / 2.0 + spr_h)), Z_AXIS))
-    # The pin's slot: a hole through, stretched in Z by the stroke.
-    body = body.cut(Part.makeBox(push_t + 2.0, fdm_act_hole_d, _slot,
-                                 v(_x_cart - push_t - 1.0,
-                                   ear_y - fdm_act_hole_d / 2.0,
-                                   z - _slot / 2.0)))
-    return body
+    # NOTE (2026-09-20): the spring cartridge does NOT belong at the pusher's
+    # end. Built there it lands on the screw itself: between the screw's own
+    # Ø8 and the carriage's ring there are 2.2 mm, and a spring bore wants
+    # twelve. The room for it is round the NUT, coaxial with the screw.
+    return body.cut(pin_x((ear_y, z), fdm_act_hole_d,
+                          ear_sx * side_x - 2.0, 4.0))
 
 
 def _plate_bar(pts, x_band, w, press=(), holes=None):
@@ -1625,19 +1607,6 @@ def _plate_bar(pts, x_band, w, press=(), holes=None):
     return body
 
 
-def make_spring_stack(st, side):
-    """One of the two spring stacks in the cartridge, as its envelope.
-
-    Rate and stroke come out of the screw, not out of a catalogue: the lead
-    fixes how much travel is left after contact, and the servo's stall torque
-    fixes the force at the end of it. What the catalogue has to match is
-    spring_rate over spring_stroke — see the report."""
-    z = st["nut_z"] + side * (act_pin_d / 2.0 + spring_stroke + spr_clr)
-    z0 = z if side > 0 else z - spr_h
-    return cyl(spr_od / 2.0, spr_h, v(_x_face_push() - push_t / 2.0,
-                                      screw_y, z0), Z_AXIS)
-
-
 def _x_face_push():
     """X of the pusher's outboard face: just short of the carriage's ring,
     where its spring cartridge can stand clear of it."""
@@ -1647,9 +1616,7 @@ def _x_face_push():
 def act_moving_parts(st):
     """The nut and its pusher. The screw turns but does not move, so it is a
     fixed part; the servo likewise."""
-    return [("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
-            ("SpringUp", make_spring_stack(st, 1), (0.85, 0.85, 0.20), 0),
-            ("SpringDown", make_spring_stack(st, -1), (0.85, 0.85, 0.20), 0)]
+    return [("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0)]
 
 
 def both_hands(pts):
@@ -2305,10 +2272,6 @@ if RUN_CHECKS:
     # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
     # designed gap between neighbouring plates, not a running clearance.
     _ACT_PINNED = {frozenset(p) for p in (("ActNut", "Carriage"),
-                                          ("ActNut", "SpringUp"),
-                                          ("ActNut", "SpringDown"),
-                                          ("SpringUp", "Carriage"),
-                                          ("SpringDown", "Carriage"),
                                           ("ActNut", "ScrewShaft"),
                                           ("ActNut", "GuideRod"),
                                           ("GuideRod", "ScrewTop"),
