@@ -587,6 +587,38 @@ and its base ends beside the four-bar's own pin at x −12.5.
   it deflects straight into the preload. First thing to size.
 - The cube is unchanged at 106.4, still set by the cardan.
 
+## 12d. A lead screw instead of a linkage (2026-09-20)
+
+The user's idea, and it holds up: the servo stands upright on the floor in the
+corner with its shaft UP, turning a T8 lead screw; the nut rides up the screw
+and pushes the ear on the carriage's arm. No crank, no link, no lever, no
+change of plane — the problem every linkage kept running into was that all
+its pins are parallel to X, and a screw does not care.
+
+- **Servo** upright on a cradle printed with the FLOOR, x −31.2, y 39.5.
+  **Screw** T8, lead 8 mm/turn, running up to a top bearing on a post printed
+  with the WALL: the thrust is caught at both ends, never through the servo.
+- **Ear at z +15**, high on the arm. Two things put it there: below z 14.4 the
+  pusher would have to reach through the carriage's own ring, and below
+  z −13 it would be inside the servo, which stands 32.2 mm tall.
+- **Force 57 N at the ear** (2·π·τ·η/lead, η ≈ 0.5), against 34 from the crank
+  chain, so the torque ceiling goes from 0.97 to **1.6 Nm**.
+- **The travel budget is the tight part.** The ear is 43 mm from the apex and
+  the free gap is 2°, so closing it eats 62° of the servo's 80. What is left
+  is **0.40 mm of spring squeeze**, which needs a ~140 N/mm compression
+  spring — stiff, and its tolerance is now what sets the preload. A coarser
+  lead would fix it; T8-8 is the coarsest standard one.
+- **The spring becomes a compression spring**, a catalogue part. That closes
+  §13's question 5 (torsion spring: buy or design?) by making it moot.
+- The ear's arc wanders **0.64 mm** off the nut's straight line over the
+  stroke, so the pin needs a slot, not a hole. (An earlier estimate of
+  0.04 mm was the departure from a straight line, not the Y component of the
+  arc — the macro measures the real thing.)
+- Carriage back to 43 mm in X, cube 106.1.
+
+Not yet done: the nut's anti-rotation guide, the coupler from spline to
+screw, and the spring's own seats.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
