@@ -223,8 +223,12 @@ servo_body    = (32.2, 22.4, 12.5)   # mm — MG90D, off its own datasheet
                         #      length and its thickness. Was (29, 22.8, 12.2):
                         #      3 mm short, and the thickness confused with the
                         #      shaft's own offset below.
-sv_shaft_off  = 1.5    # mm — the shaft is NOT on the case's centreline: it
-                        #      sits this far off it along the case's length.
+sv_shaft_end  = 6.25   # mm — the shaft sits this far from the case's SIDE,
+                        #      measured on the body alone, tabs not counted
+                        #      (user, 2026-09-20). On a 22.4 case that is
+                        #      4.95 off the centreline, not the 1.5 read off
+                        #      the drawing before.
+sv_shaft_off  = servo_body[1] / 2.0 - sv_shaft_end   # DERIVED
 sv_tab_from_face = 14.2  # mm — from the shaft end back to the tab plate
                         #      (datasheet: 32.2 tall, tabs at 18.0).
 _servo_body_old = (29.0, 22.8, 12.2)   # mm — MG90-class: X along the shaft,
@@ -264,7 +268,7 @@ spring_len    = 2.0    # mm — torsion spring envelope along X. Short: the
 spring_r      = 5.5    # mm — its outer radius
 sv_stand      = 2.0    # mm — how far the cradle lifts the servo off the
                         #      floor: the plate it stands on
-screw_x       = -31.2  # mm ┐ the lead screw's axis: up the empty column
+screw_x       = -27.7  # mm ┐ the lead screw's axis: up the empty column
 screw_y       = 39.5   # mm ┘ beside the carriage's arm, clear of its ring
 screw_d       = 8.0    # mm — T8 lead screw (the 3D-printer standard part)
 screw_lead    = 8.0    # mm per turn — T8 is 4-start, so a turn is 8 mm. This
@@ -277,7 +281,22 @@ screw_eff     = 0.5    # — thread efficiency at that lead (steel on brass).
 nut_d         = 14.0   # mm — the brass nut's body
 nut_l         = 10.0   # mm — along the screw
 push_t        = 4.0    # mm — the pusher arm from the nut out to the ear
-push_w        = 8.0    # mm
+push_w        = 12.0   # mm — wide enough to carry the guide bore as well
+                        #      as the pin
+guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
+                        #      screw, through a bore in the nut's own pusher.
+                        #      Without it the nut just turns with the screw;
+                        #      with it, it also takes the moment the pusher
+                        #      makes by reaching 15 mm out to the ear, which
+                        #      otherwise all lands on the ear's pin.
+guide_dx      = -10.0  # mm — the rod sits on the FAR side of the screw from
+                        #      the carriage, on a stub tail of the nut. On the
+                        #      near side it is trapped: it must be more than
+                        #      the nut's own 7 mm radius from the screw, and
+                        #      less than 7.2 to keep its own Ø4 clear of the
+                        #      carriage's ring on the way up.
+guide_z0      = -8.0   # mm — where the rod starts: above the servo, below the
+                        #      nut's travel, and outside the ring's rim
 screw_top_z   = 26.0   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
@@ -1432,30 +1451,29 @@ def servo_screw_xs():
 
 
 def make_servo_bracket():
-    """A cradle off the FLOOR: a post under each mounting tab, tied by a plate
-    the case sits on. PRINTED AS PART of the floor, the way the four-bar's
-    posts are part of the wall.
+    """The servo's bracket, on the WALL (user, 2026-09-20): a plate against
+    it, two pads under the case's mounting tabs, and the foot the guide rod
+    stands in. PRINTED AS PART of the wall, like the four-bar's posts.
 
-    One piece, not two posts: two solids fused across thin air look right,
-    weigh right, and are not a part."""
+    The case's back sits a few millimetres off the wall, so the pads reach
+    forward that far and no further — it is a bracket, not a cantilever."""
     tz0, tz1 = _tab_z()
     x0, y0, z0, bx, by, bz = servo_box()
-    part = Part.makeBox(bx + 2 * (servo_tab_out + 1.0), by,
-                        sv_stand + bracket_weld,
-                        v(x0 - servo_tab_out - 1.0, y0,
-                          z0 - sv_stand - bracket_weld))
+    y_back = y0 + by
+    plate = Part.makeBox(bx + 2 * servo_tab_out,
+                         cube_half + bracket_weld - y_back, tz0 - z0,
+                         v(x0 - servo_tab_out, y_back, z0))
+    part = plate
     for sx, out in ((x0, -1.0), (x0 + bx, 1.0)):
-        post = Part.makeBox(servo_tab_out + 1.0, by, tz0 - z0,
-                            v(sx if out > 0 else sx - servo_tab_out - 1.0,
-                              y0, z0))
-        part = part.fuse(post)
-    for sx in servo_screw_xs():
-        part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 4.0),
+        pad = Part.makeBox(servo_tab_out, y_back - y0, 4.0,
+                           v(sx if out > 0 else sx - servo_tab_out, y0,
+                             tz0 - 4.0))
+        part = part.fuse(pad)
+        part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 5.0),
                             Z_AXIS))
-    # Trimmed to the cube: the cradle is wider than the case and the case is
-    # already out at the corner, so its outer end would run into the
-    # neighbour's wall — which the four-axis check duly caught.
-    return part.cut(Part.makeBox(40.0, 60.0, 60.0,
+    # Trimmed to the cube: the plate is wider than the case, and the case is
+    # already out at the corner.
+    return part.cut(Part.makeBox(40.0, 60.0, 80.0,
                                  v(-cube_half - 40.0 + run_clr, 0.0,
                                    -cube_half - 10.0)))
 
@@ -1469,18 +1487,48 @@ def make_screw_shaft():
 
 
 def make_screw_top():
-    """The screw's top bearing, on a post off the WALL — printed with it.
+    """The screw's top bearing AND the guide rod's top anchor, on a post off
+    the WALL — printed with it.
 
     A screw pushes as hard as it pulls, and a servo's output bearing is not
     meant to take either, so the thrust is caught here and at the floor,
     never through the servo."""
-    y_in = screw_y
-    post = Part.makeBox(nut_d, cube_half + bracket_weld - y_in, 8.0,
-                        v(screw_x - nut_d / 2.0, y_in, screw_top_z - 4.0))
+    x0 = min(screw_x - nut_d / 2.0, screw_x + guide_dx - guide_d / 2.0 - 3.0)
+    x1 = max(screw_x + nut_d / 2.0, screw_x + guide_dx + guide_d / 2.0 + 3.0)
+    post = Part.makeBox(x1 - x0, cube_half + bracket_weld - screw_y, 8.0,
+                        v(x0, screw_y, screw_top_z - 4.0))
     post = post.fuse(cyl(screw_d / 2.0 + 3.0, 8.0,
                          v(screw_x, screw_y, screw_top_z - 4.0), Z_AXIS))
-    return post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 12.0,
+    post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 12.0,
                         v(screw_x, screw_y, screw_top_z - 6.0), Z_AXIS))
+    return post.cut(cyl(fdm_pin_press_d / 2.0, 12.0,
+                        v(screw_x + guide_dx, screw_y, screw_top_z - 6.0),
+                        Z_AXIS))
+
+
+def make_guide_foot():
+    """The guide rod's bottom anchor: a short arm off the WALL, printed with
+    it. It sits above the servo and below the nut's travel — the rod cannot
+    be footed on the servo's own bracket, because at that height the case
+    itself is in the way."""
+    r = guide_d / 2.0 + 3.0
+    arm = Part.makeBox(2 * r, cube_half + bracket_weld - screw_y, 2 * r,
+                       v(screw_x + guide_dx - r, screw_y, guide_z0 - r))
+    return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
+                       v(screw_x + guide_dx, screw_y, guide_z0 - r - 1),
+                       Z_AXIS))
+
+
+def make_guide_rod():
+    """The anti-rotation rod: Ø4, pressed into the wall bracket at the bottom
+    and the screw's top post above, with the nut's pusher sliding on it."""
+    z0 = _guide_z0()
+    return cyl(guide_d / 2.0, screw_top_z - z0,
+               v(screw_x + guide_dx, screw_y, z0), Z_AXIS)
+
+
+def _guide_z0():
+    return guide_z0
 
 
 def make_nut(st):
@@ -1495,10 +1543,20 @@ def make_nut(st):
     arm = Part.makeBox(_x_face - screw_x, push_w, push_t,
                        v(screw_x, screw_y - push_w / 2.0, z - push_t / 2.0))
     body = body.fuse(arm)
+    # A stub the other way, carrying the guide bore — the rod cannot ride on
+    # the pusher side (see guide_dx).
+    tail_x0 = screw_x + guide_dx - guide_d / 2.0 - 2.0
+    body = body.fuse(Part.makeBox(screw_x - tail_x0, push_w, push_t,
+                                  v(tail_x0, screw_y - push_w / 2.0,
+                                    z - push_t / 2.0)))
     # Bore LAST: the arm starts at the screw's own axis, so fusing it after
     # the bore would fill the bore straight back in.
     body = body.cut(cyl(screw_d / 2.0 + 0.2, nut_l + 2,
                         v(screw_x, screw_y, z - nut_l / 2.0 - 1), Z_AXIS))
+    # And the bore that rides the guide rod, through the pusher itself.
+    body = body.cut(cyl(guide_d / 2.0 + 0.25, push_t + 2,
+                        v(screw_x + guide_dx, screw_y, z - push_t / 2.0 - 1),
+                        Z_AXIS))
     return body.cut(pin_x((ear_y, z), fdm_act_hole_d,
                           ear_sx * side_x - 2.0, 4.0))
 
@@ -1573,11 +1631,6 @@ def make_deck(zs):
                                  v(0, 0, zs)))
             deck = deck.cut(cyl(foot_tap_d / 2.0, deck_boss_h + 2.0, base,
                                 v(0, 0, zs)))
-    if zs < 0:
-        # The servo stands on the floor, so its two posts are part of the
-        # floor — the same rule as the four-bar's posts and the wall.
-        for _, rot in AXES:
-            deck = deck.fuse(place(cached(make_servo_bracket), rot))
     return deck
 
 
@@ -1621,8 +1674,11 @@ def make_wall():
     # screws and no foot joint to work loose.
     for zs in (1, -1):
         wall = wall.fuse(cached(make_frame_bracket, zs))
-    # And the screw's top bearing, which stands off this wall.
+    # And the screw's top bearing and the servo's own bracket, which both
+    # stand off this wall.
     wall = wall.fuse(cached(make_screw_top))
+    wall = wall.fuse(cached(make_servo_bracket))
+    wall = wall.fuse(cached(make_guide_foot))
     return wall
 
 
@@ -1775,6 +1831,8 @@ FIXED_PARTS = [
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
     ("ServoBracket",  cached(make_servo_bracket),             (0.75, 0.75, 0.78), 0),
     ("ScrewShaft",    cached(make_screw_shaft),               (0.60, 0.60, 0.60), 0),
+    ("GuideRod",      cached(make_guide_rod),                 (0.45, 0.45, 0.50), 0),
+    ("GuideFoot",     cached(make_guide_foot),                (0.75, 0.75, 0.78), 0),
     ("ScrewTop",      cached(make_screw_top),                 (0.75, 0.75, 0.78), 0),
     ("Wall",          make_wall(),                            (0.45, 0.55, 0.75), 70),
 ] + [
@@ -1997,7 +2055,8 @@ if RUN_CHECKS:
 
 
     _WELDED = [{"Wall", "FramePostT"}, {"Wall", "FramePostB"},
-               {"Wall", "ScrewTop"}, {"DeckBottom", "ServoBracket"}]
+               {"Wall", "ScrewTop"}, {"Wall", "ServoBracket"},
+               {"Wall", "GuideFoot"}]
 
 
     def _exempt(na, nb):
@@ -2169,11 +2228,16 @@ if RUN_CHECKS:
     # designed gap between neighbouring plates, not a running clearance.
     _ACT_PINNED = {frozenset(p) for p in (("ActNut", "Carriage"),
                                           ("ActNut", "ScrewShaft"),
+                                          ("ActNut", "GuideRod"),
+                                          ("GuideRod", "ScrewTop"),
+                                          ("GuideRod", "GuideFoot"),
+                                          ("GuideRod", "Wall"),
                                           ("ScrewShaft", "ServoBody"),
                                           ("ScrewShaft", "ScrewTop"),
                                           ("ScrewShaft", "Wall"),
                                           ("ScrewShaft", "DeckBottom"))}
     _ACT_AGAINST = ("ServoBody", "ServoBracket", "ScrewShaft", "ScrewTop",
+                    "GuideRod", "GuideFoot",
                     "FramePostT", "FramePostB", "Wall", "DeckTop", "DeckBottom")
     _act_gap, _act_who = 1e9, "-"
     _act_tight = {}
@@ -2579,10 +2643,9 @@ if RUN_CHECKS:
     print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
     print("           Carriage (one piece),")
     print("           UJMid, UJRing, UJCross, UJFork,")
-    print("           Link x2 (each carries both its arms), Crank, ActLink")
-    print("           WITH THE WALL: the two frame posts."
-          "   WITH THE CEILING: the servo")
-    print("           bracket and the lever post (x4, one set per axis).")
+    print("           Link x2 (each carries both its arms), the nut's pusher")
+    print("           WITH THE WALL: the two frame posts, the servo's bracket,")
+    print("           the screw's top bearing and the guide rod's foot.")
     print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
     print("            its own corner under the ceiling.")
     print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
@@ -2591,9 +2654,12 @@ if RUN_CHECKS:
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
     print("             Ø5 rod (output shaft),")
     print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
-    print("             Ø3 pin stock (2 actuation pins), 2 E-clips DIN 6799 RS 2.3,")
+    print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
+          f" {screw_top_z - (-cube_half + servo_body[0]):.0f} mm of it) + its nut,")
+    print(f"             Ø{guide_d:.0f} rod for the guide, Ø3 pin stock (1 ear pin),")
     print(f"             8 shim washers 4x8 (0.1-0.5) for the four-bar's thrust faces,")
-    print("             1 torsion spring,")
+    print(f"             1 compression spring ~{_k_lin:.0f} N/mm,"
+          f" 1 coupler spline-to-screw,")
     print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
     print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
           f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
