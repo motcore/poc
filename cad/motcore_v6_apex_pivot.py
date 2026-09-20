@@ -327,7 +327,11 @@ horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      angle worsening at both ends (best near 7).
 ear_sx        = -1     # — which of the carriage's two arms carries the ear:
                         #      the one the servo is on
-ear_y         = 40.0   # mm — Y of the ear pin at rest. Was where the lever's
+ear_y         = 38.0   # mm — Y of the ear pin at rest. Its boss is a disc of
+                        #      act_boss_r + 1.5, and at 40 that disc stood 2 mm
+                        #      proud of the ring's outer face — which is the
+                        #      face the carriage is PRINTED on. At 38 the whole
+                        #      part sits flat on the bed. Was where the lever's
 ear_z         = 15.0   # mm — on the carriage's arm, HIGH. Two things push
                         #      it there: below z 14.4 the pusher would have to
                         #      reach through the carriage's own ring to get to
@@ -1660,7 +1664,11 @@ def make_carrier(st):
     body = Part.makeBox(guide_d + 5.0, push_w, carrier_t,
                         v(gx - (guide_d + 5.0) / 2.0, screw_y - push_w / 2.0,
                           z - carrier_t / 2.0))
-    arm = Part.makeBox(_x_face_push() - gx, push_w, carrier_t,
+    # Right up to the carriage's arm: at the ear's own height the ring's
+    # silhouette ends at |x| 15.4, so the last few millimetres are free and
+    # the pin between them can be short.
+    _x_end = ear_sx * side_x - side_t / 2.0 - act_gap
+    arm = Part.makeBox(_x_end - gx, push_w, carrier_t,
                        v(gx, screw_y - push_w / 2.0, z - carrier_t / 2.0))
     body = body.fuse(arm)
     body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_t + 2,
@@ -1668,8 +1676,24 @@ def make_carrier(st):
     # It clears the screw: the arm passes beside it, not through it.
     body = body.cut(cyl(screw_d / 2.0 + run_clr, carrier_t + 2,
                         v(screw_x, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
-    return body.cut(pin_x((ear_y, z), fdm_act_hole_d,
-                          ear_sx * side_x - 2.0, 4.0))
+    # A SLOT, not a hole: the ear swings on its arc while the carrier goes
+    # straight up, and the difference — 0.64 mm over the stroke — has to go
+    # somewhere. It goes here.
+    _sl = fdm_act_hole_d + 1.6
+    return body.cut(Part.makeBox(carrier_t + 5.0, _sl, fdm_act_hole_d,
+                                 v(_x_end - carrier_t - 3.0,
+                                   ear_y - _sl / 2.0,
+                                   st["E"][1] - fdm_act_hole_d / 2.0)))
+
+
+def make_ear_pin(st):
+    """The one pin left in the whole actuation: it joins the carrier's arm to
+    the ear on the carriage, pressed into the ear and running in the arm."""
+    x0 = ear_sx * side_x + side_t / 2.0
+    x1 = ear_sx * side_x - side_t / 2.0 - act_gap - carrier_t - 1.0
+    # At the EAR's own place, which moves with the carriage: the pin is
+    # pressed into the ear and it is the carrier that slides on it.
+    return pin_x(st["E"], act_pin_d, min(x0, x1), abs(x1 - x0))
 
 
 def make_spring_stack(st, side):
@@ -1716,6 +1740,7 @@ def act_moving_parts(st):
     return [("ScrewNut", make_brass_nut(st), (0.72, 0.55, 0.30), 0),
             ("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
             ("SpringCarrier", make_carrier(st), (0.30, 0.55, 0.85), 0),
+            ("EarPin", make_ear_pin(st), (0.45, 0.45, 0.50), 0),
             ("SpringUp", make_spring_stack(st, 1), (0.85, 0.85, 0.20), 0),
             ("SpringDown", make_spring_stack(st, -1), (0.85, 0.85, 0.20), 0)]
 
@@ -2376,7 +2401,9 @@ if RUN_CHECKS:
     # case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
     # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
     # designed gap between neighbouring plates, not a running clearance.
-    _ACT_PINNED = {frozenset(p) for p in (("ScrewNut", "ActNut"),
+    _ACT_PINNED = {frozenset(p) for p in (("EarPin", "Carriage"),
+                                          ("EarPin", "SpringCarrier"),
+                                          ("ScrewNut", "ActNut"),
                                           ("ScrewNut", "ScrewShaft"),
                                           ("ScrewNut", "SpringUp"),
                                           ("ScrewNut", "SpringDown"),
