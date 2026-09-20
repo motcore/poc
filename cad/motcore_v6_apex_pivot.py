@@ -271,7 +271,7 @@ spring_r      = 5.5    # mm — its outer radius
 sv_stand      = 2.0    # mm — how far the cradle lifts the servo off the
                         #      floor: the plate it stands on
 screw_x       = -27.7  # mm ┐ the lead screw's axis: up the empty column
-screw_y       = 40.5   # mm ┘ beside the carriage's arm, clear of its ring
+screw_y       = 41.5   # mm ┘ beside the carriage's arm, clear of its ring
 screw_d       = 8.0    # mm — T8 lead screw (the 3D-printer standard part)
 screw_lead    = 8.0    # mm per turn — T8 is 4-start, so a turn is 8 mm. This
                         #      is what makes a ±80 deg servo enough: 160 deg
