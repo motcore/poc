@@ -551,7 +551,15 @@ Notes as raised, not designs. Nothing here has been checked against the macro.
    apex leaves the motor apex, and that is fatal to the whole geometry. Needs
    real axial location at the pins (shoulders, spacers, clips), not just
    clearance fits.
-2. **Brackets: screwed to the wall, or printed as part of it?** Frame posts,
+2. **DONE (2026-09-20): printed as part of their host, all three.** The user's
+   call. The two frame posts are printed with the WALL (no foot, no screws —
+   `wall_screws()` is empty now); the servo bracket and the lever post with the
+   CEILING, one set per axis. Each runs `bracket_weld` = 1 mm into its host, so
+   the fuse is a solid joint and not two solids sharing a face — checked, along
+   with the host still being one solid and the ceiling's horn relief not eating
+   a bracket. With the foot gone, the frame pins at A have a clear insertion
+   path on their own. Original note:
+   **Brackets: screwed to the wall, or printed as part of it?** Frame posts,
    servo bracket, lever post. Printing them on the wall saves screws and play;
    screwing them keeps the wall simple to print and the parts replaceable.
 3. **Accumulated play in the actuation chain.** Horn → link1 → lever → link2 →

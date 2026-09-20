@@ -421,6 +421,9 @@ wall_boss_h   = 5.0    # mm — how far the wall's screw bosses stand proud of i
 wall_boss_d   = 11.0   # mm — boss Ø: foot_tap_d plus a real wall all round
 foot_flange   = 9.0    # mm — how far a frame-bracket foot turns inboard to give
                         #      its screws something to pass through
+bracket_weld  = 1.0    # mm — how far a bracket printed as part of its host
+                        #      runs INTO it, so the fuse is a solid joint and
+                        #      not two solids sharing a face
 wall_thick     = 4.0   # mm — cube wall thickness
 wall_gap       = 2.0   # mm — RUNNING clearance, corona back plate → wall. It
                         #      was 6, which is a lot of air for a disc facing a
@@ -867,16 +870,14 @@ def _screw_seat_y(sx):
 
 
 def wall_screws():
-    """(x, z) of every screw through this axis's wall — the four-bar's two
-    frame pivots (X-spread only — see fw_screw_z for why not four) and the
-    servo bracket's two. The list stays so the wall and the brackets cannot
-    disagree.
+    """(x, z) of every screw through this axis's wall.
 
-    The servo's spare boss lands on the OTHER Z sign, same harmless-spare
-    precedent the deck version had ("the servo's only exists on the bottom
-    deck; putting it in both is harmless") — both_hands() cannot tell this
-    pair apart from the frame pivots' genuinely symmetric ones."""
-    return [(fp_screw_x, zs * fb_A[1] + fw_screw_z) for zs in (1, -1)]
+    EMPTY since 2026-09-20: the frame pivots, the only thing that was screwed
+    to a wall, are printed as part of it now (user's call — brackets printed
+    with their host, not screwed to it). The hook stays for the next thing
+    that needs one, and both the wall and the bracket still read it, so they
+    cannot disagree."""
+    return []
 
 
 def place_carriage(shape, st):
@@ -1254,8 +1255,10 @@ def _link_swept_envelope(A, Bkey):
 
 
 def make_frame_bracket(zs):
-    """The four-bar's frame pivot, on the WALL — a foot pressed against the
-    wall's own boss face, and a post reaching from it in to the pivot.
+    """The four-bar's frame pivot: a post standing off the WALL's inner face
+    in to the pivot. PRINTED AS PART OF THE WALL (user, 2026-09-20), so there
+    is no foot and no screws any more — the post simply grows out of the wall,
+    and the wall prints inner-face-up with the post standing off the bed.
 
     Moved back off the deck, at the user's request, so every support for this
     axis lives on the one part that comes off the machine: pull the wall and
@@ -1270,46 +1273,27 @@ def make_frame_bracket(zs):
     swept path (see fw_screw_z), which is the real reason this stayed at two
     screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
-    hz = fp_post_y
-    y_foot_in = wall_face_y - foot_t
     y_far = fb_A[0] - fp_lug_x
-
-    foot = Part.makeBox(2 * fp_post_x, foot_t, 2 * hz,
-                        v(-fp_post_x, y_foot_in, z_pin - hz))
-    post = Part.makeBox(2 * fp_lug_x, y_foot_in - y_far, 2 * fp_post_y,
+    # Runs INTO the wall by bracket_weld, so the fuse is a solid joint and not
+    # two solids meeting on a face.
+    part = Part.makeBox(2 * fp_lug_x, cube_half + bracket_weld - y_far,
+                        2 * fp_post_y,
                         v(-fp_lug_x, y_far, z_pin - fp_post_y))
-    part = foot.fuse(post)
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
     part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_press_d,
                           -fp_lug_x - 1, 2 * fp_lug_x + 2))
-    # The pin goes in along X, from outside the foot: the foot's walls beyond
-    # the links sat right across its path (30 mm3 each side) — it could not
-    # be fitted. A channel through both walls, outboard of the links only so
-    # the lug keeps its press fit; also how the pin is pushed out again.
-    _x_out = link_x + link_t / 2.0
-    for xs in (1, -1):
-        part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_hole_d,
-                              _x_out if xs > 0 else -(fp_post_x + 1.0),
-                              fp_post_x + 1.0 - _x_out))
-    # The pin ITSELF (not just its hole) reaches to link_x+link_t/2+1 in X —
-    # the same steel length that also passes through both link arms — and
-    # the foot now shares that pin's own (Y, Z) neighbourhood, which the deck
-    # foot never did. Clear the pin's full reach, not just the lug's width.
+    # The pin reaches past the lug on both sides (the same steel that passes
+    # through both link arms), so clear its full reach, not just the lug's
+    # width. With the foot gone nothing else stands in its insertion path.
     _pin_reach = link_x + link_t / 2.0 + 1.0
     part = part.cut(pin_x((fb_A[0], z_pin), pin_d + 2.0 * run_clr,
                           -_pin_reach, 2.0 * _pin_reach))
-    # The foot is wide enough (it has to be, for the screw spread) to reach
-    # past the lug's own safe width and into the link's own two arms, whose
-    # round ends at A sit right where the foot's material is, at |x| in
-    # [link_x-link_t/2, link_x+link_t/2]. A disc centred on A undercounts
-    # the swept clearance (see _link_swept_envelope), so cut the link's own
-    # swept, oversized envelope instead of trying to route round it by eye.
+    # Where the post meets the wall it is as wide as the links themselves, so
+    # cut the link's own swept, oversized envelope out of it — a disc centred
+    # on A undercounts that sweep (see _link_swept_envelope).
     swept = _link_swept_envelope(A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
-    for sx in (-fp_screw_x, fp_screw_x):
-        part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
-                            v(sx, y_foot_in - 1, z_pin + fw_screw_z), Y_AXIS))
     return part
 
 def servo_box():
@@ -1349,16 +1333,18 @@ def servo_screw_ys():
 
 def make_servo_bracket():
     """Two short posts down from the ceiling, one under each tab end, on the
-    case side of the tabs. Deck-mounted: the servo hangs from the ceiling it
-    lies against."""
+    case side of the tabs. The servo hangs from the ceiling it lies against,
+    and the posts are PRINTED AS PART of that ceiling (user, 2026-09-20)."""
     tx0, _ = _tab_x()
     _, y0, z0, _, by, bz = servo_box()
     part = None
     for ya, yb in ((y0 - servo_tab_out, y0), (y0 + by, y0 + by + servo_tab_out)):
-        post = Part.makeBox(3.0, yb - ya, cube_half - z0, v(tx0 - 3.0, ya, z0))
+        post = Part.makeBox(3.0, yb - ya, cube_half + bracket_weld - z0,
+                            v(tx0 - 3.0, ya, z0))
         part = post if part is None else part.fuse(post)
     # A bar along the ceiling tying the two posts into one part.
-    part = part.fuse(Part.makeBox(3.0, by + 2 * servo_tab_out, 1.0,
+    part = part.fuse(Part.makeBox(3.0, by + 2 * servo_tab_out,
+                                  1.0 + bracket_weld,
                                   v(tx0 - 3.0, y0 - servo_tab_out, cube_half - 1.0)))
     part = part.cut(Part.makeBox(servo_body[0], by, bz + 0.2,
                                  v(sv_face_x - servo_body[0], y0, z0 - 0.1)))
@@ -1398,9 +1384,10 @@ def make_act_horn(st):
 
 
 def make_lever_post():
-    """Post down from the ceiling to the lever pivot, OUTBOARD of the lever."""
+    """Post down from the ceiling to the lever pivot, OUTBOARD of the lever.
+    Printed as part of the ceiling, like the servo's own bracket."""
     w = 2 * act_boss_r + 1.0
-    post = Part.makeBox(lk_t, w, cube_half - lever_z,
+    post = Part.makeBox(lk_t, w, cube_half + bracket_weld - lever_z,
                         v(x_post[0], P_act[0] - w / 2.0, lever_z))
     post = post.fuse(disc_yz(P_act, act_boss_r + 0.5, x_post[0], lk_t))
     return post.cut(pin_x(P_act, fdm_act_hole_d, x_post[0] - 1, lk_t + 2))
@@ -1466,6 +1453,9 @@ def deck_screws():
     return []
 
 
+DECK_POCKETS = []   # filled by make_deck: the ceiling reliefs, for the checks
+
+
 def make_deck(zs):
     """Floor or ceiling. Nothing is bolted to it any more — the frame pivots
     and the servo both moved to the wall (deck_screws() is empty) — so it is
@@ -1495,6 +1485,7 @@ def make_deck(zs):
         # Box round every position H takes, grown by the clip's radius and a
         # running gap, over link1's and the horn's X bands (both carry H's
         # boss up there) out to the clip's tail.
+        DECK_POCKETS.clear()
         hs = [pose_state(phi_preload * k / 8.0)["H"] for k in range(-8, 9)]
         hs = [h for h in hs if h is not None]
         r = clip_od / 2.0 + run_clr
@@ -1505,7 +1496,15 @@ def make_deck(zs):
             pk = Part.makeBox(x1 - x0, y1 - y0, deck_pocket + 0.01,
                               v(x0, y0, cube_half - 0.01))
             pk.rotate(ORIGIN, Z_AXIS, rot)
+            DECK_POCKETS.append(pk)
             deck = deck.cut(pk)
+        # The servo's bracket and the lever's post are printed as part of THIS
+        # part (user, 2026-09-20), one set per axis — the ceiling is shared by
+        # all four. Fused after the relief is cut, so a pocket cannot eat a
+        # bracket; that they never overlap is checked, not assumed.
+        for _, rot in AXES:
+            for mk in (make_servo_bracket, make_lever_post):
+                deck = deck.fuse(place(mk(), rot))
     return deck
 
 
@@ -1544,6 +1543,11 @@ def make_wall():
                              v(sx, wall_face_y, sz), Y_AXIS))
         wall = wall.cut(cyl(foot_tap_d / 2.0, wall_boss_h + 2.0,
                             v(sx, wall_face_y, sz), Y_AXIS))
+    # The four-bar's two frame posts are printed as part of the wall (user,
+    # 2026-09-20): pull the wall and the mechanism comes with it, with no
+    # screws and no foot joint to work loose.
+    for zs in (1, -1):
+        wall = wall.fuse(make_frame_bracket(zs))
     return wall
 
 
@@ -1908,6 +1912,10 @@ if RUN_CHECKS:
     _MESH_PAIRS = set()
 
 
+    _WELDED = [{"Wall", "FramePostT"}, {"Wall", "FramePostB"},
+               {"DeckTop", "ServoBracket"}, {"DeckTop", "LeverPost"}]
+
+
     def _exempt(na, nb):
         """Pairs that are MEANT to share volume.
 
@@ -1921,6 +1929,11 @@ if RUN_CHECKS:
                             ("DeckBottom", "DeckScrewB")):
             if {na, nb} == {host} | {n for n in (na, nb) if n.startswith(screw)}:
                 return True
+        # A bracket printed as part of its host IS its host: they are meant to
+        # share the bracket_weld millimetres where they merge. That they really
+        # merge (and merge into ONE solid) is its own check.
+        if {na, nb} in _WELDED:
+            return True
         return False
 
 
@@ -2058,6 +2071,11 @@ if RUN_CHECKS:
     _ACT_PINNED = {frozenset(p) for p in (("Horn", "Link1"), ("Link1", "Lever"),
                                           ("Lever", "Link2"), ("Link2", "Carriage"),
                                           ("Lever", "LeverPost"),
+                                          # the post IS the ceiling now: this
+                                          # pair is the lever on its own pivot,
+                                          # not the lever near the roof (the
+                                          # rest of it is 14 mm below it)
+                                          ("Lever", "DeckTop"),
                                           ("Horn", "HornSpring"),
                                           ("Horn", "ServoBody"))}  # on its spline
     _ACT_AGAINST = ("ServoBody", "ServoBracket", "HornSpring", "LeverPost",
@@ -2153,7 +2171,7 @@ if RUN_CHECKS:
 
     # The E-clips, SWEPT: each against everything but its own joint's plates.
     _CLIP_OWN = {"H": ("Link1", "Horn"), "I": ("Lever", "Link1"),
-                 "P": ("Lever", "LeverPost"), "O": ("Link2", "Lever"),
+                 "P": ("Lever", "LeverPost", "DeckTop"), "O": ("Link2", "Lever"),
                  "E": ("Carriage", "Link2")}
     _clip_gap_min, _clip_who = 1e9, "-"
     for _k in range(-4, 5):
@@ -2183,8 +2201,30 @@ if RUN_CHECKS:
     # nothing between them (the web that now joins them did not exist).
     _loose = [n for n, sh, c, t in AXIS_PARTS if len(sh.Solids) != 1]
     _loose += [n for n, sh in (("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
-                               ("MotorRubberLower", _mr_lo), ("MotorRubberUpper", _mr_up))
+                               ("MotorRubberLower", _mr_lo), ("MotorRubberUpper", _mr_up),
+                               ("DeckTop", _deck_top), ("DeckBottom", _deck_bot))
                if len(sh.Solids) != 1]
+
+    # Brackets printed as part of their host: each has to really MERGE with it
+    # (share bracket_weld's worth of material), not just touch its face — two
+    # solids meeting on a face fuse into something that draws fine and is not
+    # a part. The host being ONE solid afterwards is the check above.
+    _weld_min, _weld_who = 1e9, "-"
+    _all_named = {n: sh for n, sh, c, t in AXIS_PARTS}
+    _all_named.update({"DeckTop": _deck_top, "DeckBottom": _deck_bot})
+    for _pair in _WELDED:
+        _hn, _bn = sorted(_pair, key=lambda n: n.startswith(("Wall", "Deck")),
+                          reverse=True)
+        _vol = _all_named[_hn].common(_all_named[_bn]).Volume
+        if _vol < _weld_min:
+            _weld_min, _weld_who = _vol, f"{_bn} into {_hn}"
+
+    # And no ceiling relief may eat into a bracket standing on that ceiling.
+    _pocket_ov = 0.0
+    for _pk in DECK_POCKETS:
+        for _bn in ("ServoBracket", "LeverPost"):
+            for _, _rot in AXES:
+                _pocket_ov += _pk.common(place(_all_named[_bn], _rot)).Volume
 
     checks = [
         # Informational, and NOT below 1: at 1:1 the cube is an overdrive, the
@@ -2256,6 +2296,10 @@ if RUN_CHECKS:
         (f"slip from {x_play_max:.2f} mm of X play left after shimming  (%)",
          _x_slip * 100, f"<= four-bar's {slip_fourbar*100:.2f}",
          _x_slip <= slip_fourbar),
+        (f"brackets really merge into their host [worst: {_weld_who}]  (mm3)",
+         _weld_min, "> 1", _weld_min > 1.0),
+        ("ceiling relief clear of the brackets printed on it  (mm3)",
+         _pocket_ov, "== 0", _pocket_ov < 1e-6),
         (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
          len(_invalid), "== 0", not _invalid),
         (f"every part is ONE connected solid  {_loose if _loose else ''}",
@@ -2421,9 +2465,11 @@ if RUN_CHECKS:
           f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
     print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
     print("           Carriage (one piece),")
-    print("           UJMid, UJRing, UJCross, UJFork, FramePost x2,")
-    print("           Link x2 (each carries both its arms), Horn, Link1, Lever,"
-          " Link2, LeverPost, ServoBracket")
+    print("           UJMid, UJRing, UJCross, UJFork,")
+    print("           Link x2 (each carries both its arms), Horn, Link1, Lever, Link2")
+    print("           WITH THE WALL: the two frame posts."
+          "   WITH THE CEILING: the servo")
+    print("           bracket and the lever post (x4, one set per axis).")
     print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
     print("            its own corner under the ceiling.")
     print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
@@ -2432,9 +2478,9 @@ if RUN_CHECKS:
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
     print("             Ø5 rod (output shaft),")
     print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
-    print(f"             {len(wall_screws()) * 2}x M3x10 into the wall,"
-          " into the frame posts,")
-    print("             Ø3 pin stock (5 actuation pins), 1 torsion spring,")
+    print("             Ø3 pin stock (5 actuation pins), 5 E-clips DIN 6799 RS 2.3,")
+    print(f"             8 shim washers 4x8 (0.1-0.5) for the four-bar's thrust faces,")
+    print("             1 torsion spring,")
     print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
     print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
           f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
