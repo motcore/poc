@@ -298,6 +298,9 @@ spr_od        = 11.0   # mm — outside Ø of each stack. They sit round the
                         #      is 14 across, so nothing fits round it.
 spr_id        = 5.0    # mm — bore, over the Ø4 rod
 carrier_t     = 4.0    # mm — the floating carrier the pusher hangs off
+pin_boss_t    = 8.0    # mm — it thickens to this round the ear pin's slot
+pin_boss_x    = 5.0    # mm — over this much of its length: short, so it
+                        #      stops before the screw the arm passes
 cage_t        = 3.0    # mm — each of the driver's two seat plates
 spr_h         = 3.0    # mm — its height, seated
 spr_clr       = 0.2    # mm — slack in the slot beyond the working stroke
@@ -315,7 +318,7 @@ guide_dx      = -10.0  # mm — the rod sits on the FAR side of the screw from
                         #      carriage's ring on the way up.
 guide_z0      = -8.0   # mm — where the rod starts: above the servo, below the
                         #      nut's travel, and outside the ring's rim
-screw_top_z   = 43.0   # mm — where the screw's top bearing sits, clear
+screw_top_z   = 44.6   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      chain's ratio now. It buys the ear an effective
@@ -332,11 +335,16 @@ ear_y         = 38.0   # mm — Y of the ear pin at rest. Its boss is a disc of
                         #      proud of the ring's outer face — which is the
                         #      face the carriage is PRINTED on. At 38 the whole
                         #      part sits flat on the bed. Was where the lever's
-ear_z         = 15.0   # mm — on the carriage's arm, HIGH. Two things push
+ear_z         = 19.0   # mm — on the carriage's arm, HIGH. Three things push
                         #      it there: below z 14.4 the pusher would have to
                         #      reach through the carriage's own ring to get to
-                        #      the arm, and below z -13 it would be inside the
-                        #      servo, which stands 32.2 mm off the floor.
+                        #      the arm, below z -13 it would be inside the
+                        #      servo, and the pin's boss on the carrier needs
+                        #      its own height clear of the ring's rim, which
+                        #      at that X reaches z 13.9.
+                        #      Raising it costs NOTHING in travel: what the
+                        #      screw has to push through is ear_y * phi, and
+                        #      the height does not enter.
                         #      carriage's own ear and its checks do not move.
 ear_w         = 5.0    # mm — ear bridge width
 ear_h         = 6.0    # mm — ear bridge height
@@ -1626,6 +1634,13 @@ def make_nut(st):
     web_y1 = screw_y - push_w / 2.0 + 3.5      # overlapping the seat plates
     _z_bot = z - g / 2.0 - cage_t
     _z_top = zn + nut_l / 2.0
+    # A roof over the carrier ties the spine to the web, so the cage is a
+    # frame and not two uprights (user's idea, 2026-09-20): whatever the
+    # springs push against, they push against the whole of it.
+    body = body.fuse(Part.makeBox(screw_x + nut_d / 2.0 - (gx - 8.0), push_w,
+                                  cage_t,
+                                  v(gx - 8.0, screw_y - push_w / 2.0,
+                                    z + g / 2.0)))
     # A spine BEYOND the rod ties the two seat plates together. It cannot run
     # up the motor side: that is where the carrier's own arm passes, and the
     # cage has to let it move.
@@ -1641,7 +1656,7 @@ def make_nut(st):
     # Bores LAST: every fuse above would fill an earlier hole back in.
     # The web runs past the carrier's own height, so it is slotted there —
     # that slot is what lets the carrier float between the springs.
-    _slot_h = carrier_t + 2.0 * (spring_stroke + spr_clr) + 0.6
+    _slot_h = pin_boss_t + 2.0 * (spring_stroke + spr_clr) + 0.6
     body = body.cut(Part.makeBox(nut_d + 4.0, 20.0, _slot_h,
                                  v(screw_x - nut_d / 2.0 - 3.0, web_y1 - 15.0,
                                    z - _slot_h / 2.0)))
@@ -1671,11 +1686,18 @@ def make_carrier(st):
     arm = Part.makeBox(_x_end - gx, push_w, carrier_t,
                        v(gx, screw_y - push_w / 2.0, z - carrier_t / 2.0))
     body = body.fuse(arm)
+    # A boss round the pin's own slot. The arm is carrier_t thick and the
+    # slot is fdm_act_hole_d deep, which left 0.2 mm of wall above and below
+    # it — nothing at all for the load the pin carries.
+    body = body.fuse(Part.makeBox(pin_boss_x, push_w, pin_boss_t,
+                                  v(_x_end - pin_boss_x,
+                                    screw_y - push_w / 2.0,
+                                    z - pin_boss_t / 2.0)))
     body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_t + 2,
                         v(gx, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
     # It clears the screw: the arm passes beside it, not through it.
-    body = body.cut(cyl(screw_d / 2.0 + run_clr, carrier_t + 2,
-                        v(screw_x, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
+    body = body.cut(cyl(screw_d / 2.0 + run_clr, pin_boss_t + 2,
+                        v(screw_x, screw_y, z - pin_boss_t / 2.0 - 1), Z_AXIS))
     # A SLOT, not a hole: the ear swings on its arc while the carrier goes
     # straight up, and the difference — 0.64 mm over the stroke — has to go
     # somewhere. It goes here.
