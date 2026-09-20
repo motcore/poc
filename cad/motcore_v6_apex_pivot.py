@@ -185,7 +185,7 @@ pin_d      = 4.0      # mm — pivot pin diameter (all four-bar pins)
 shim_gap   = 0.3      # mm — printed gap at each thrust face, nominal
 shim_od    = 8.0      # mm — DIN 988 4x8 shim washer (0.1 / 0.2 / 0.3 / 0.5)
 shim_id    = 4.1      # mm — modelled a hair over the pin so they do not overlap
-x_play_max = 0.10     # mm — carriage X play allowed after shimming: its slip,
+x_play_max = 0.08     # mm — carriage X play allowed after shimming: its slip,
                        #      x_play_max / L_line, must not beat the four-bar's
 
 # ── Actuation: servo → torsion spring → crank → ONE link → ear ─────────────
@@ -217,26 +217,42 @@ spring_ratio  = 15.0   # —   — rubber stiffness / spring stiffness, both see
                         #       servo-side angle past contact. Invented (doc
                         #       §10.2): it only sets how far past contact the
                         #       carriage still creeps, i.e. phi_preload.
-servo_body    = (29.0, 22.8, 12.2)   # mm (X along the shaft, Y length, Z
-                        #      width) — MG90-class. Lying under the ceiling,
-                        #      shaft pointing +X out of the case's top face.
-sv_face_x     = 29.0   # mm — X of the case's top (shaft) face; case runs to −X
-sv_y0         = 5.0    # mm — Y of the case's near end. Its shaft sits at the
-                        #      FAR quarter, nearer the carriage.
-sv_z0         = 36.5   # mm — case underside: clear of the four-bar's upper
-                        #      links, whose top edge reaches z = y + 5.7 at the
-                        #      case's far end
-sv_z_clr      = 0.5    # mm — case top to the ceiling
+servo_body    = (29.0, 22.8, 12.2)   # mm — MG90-class: X along the shaft,
+                        #      then the case's LENGTH and its thickness.
+                        #      2026-09-20: the servo lies against the WALL, not
+                        #      under the ceiling (user). So the length stands up
+                        #      the wall in Z and the thickness is what it takes
+                        #      out of the cube in Y; the shaft still points +X,
+                        #      so the crank still sweeps a Y-Z plane and the
+                        #      chain's kinematics are untouched.
+sv_face_x     = -42.0  # mm — X of the case's shaft face. The shaft points
+                        #      −X and the case runs +X from it, so its BASE
+                        #      ends up beside the four-bar (user, 2026-09-20)
+                        #      and the whole chain lives in the corner behind
+                        #      the shaft, with 8.3 mm of clear X to itself —
+                        #      instead of sharing 8.8 mm with the four-bar.
+                        #      of it. NEGATIVE: the servo lives in this axis'
+                        #      −X corner. It does not fit in the +X one — the
+                        #      carriage's own ring leaves 23.8 mm there against
+                        #      the case's 29, and the pinwheel makes the −X end
+                        #      of the same wall 4 mm deeper. The chain and the
+                        #      ear move to the carriage's −X arm with it.
+sv_z0         = -47.0  # mm — case bottom, down by the floor. STANDING: its
+                        #      22.8 length lies along Y, into the cube, and it
+                        #      is only 12.2 tall, so the carriage's own ear
+                        #      bridge passes clear OVER it.
+sv_wall_clr   = 0.5    # mm — case back to the wall
 servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
 servo_tab_out = 4.7    # mm — how far each tab reaches past the body
 servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
-horn_t        = 2.0    # mm ┐ X stack: spring and crank outboard of the
-act_gap       = 0.5    # mm │ servo's face; the link and the ear stacked back
-lk_t          = 2.0    # mm ┘ INBOARD under it — see x_link below
-spring_len    = 3.0    # mm — torsion spring envelope along X (also what keeps link1,
-                        #      inboard of the horn, off the case's corner)
+horn_t        = 1.8    # mm ┐ X stack: spring and crank outboard of the
+act_gap       = 0.4    # mm │ servo's face; the link and the ear stacked back
+lk_t          = 1.8    # mm ┘ INBOARD under it — see x_link below
+spring_len    = 2.0    # mm — torsion spring envelope along X. Short: the
+                        #      whole chain lives in the 7.8 mm between the
+                        #      shaft face and the neighbour's wall.
 spring_r      = 5.5    # mm — its outer radius
-horn_r        = 5.0    # mm — crank radius, the ONE number that sets the
+horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      chain's ratio now. It buys the ear an effective
                         #      radius of ~4.35 mm (measured below), matching
                         #      the 4.29 the old crank-and-lever gave, so the
@@ -244,8 +260,12 @@ horn_r        = 5.0    # mm — crank radius, the ONE number that sets the
                         #      Bigger is a lighter servo sweep and less force;
                         #      smaller is the reverse, with the transmission
                         #      angle worsening at both ends (best near 7).
-ear_y         = 42.9   # mm — Y of the ear pin at rest. Was where the lever's
-ear_z         = 27.5   # mm — output boss happened to land; kept, so the
+ear_sx        = -1     # — which of the carriage's two arms carries the ear:
+                        #      the one the servo is on
+ear_y         = 40.0   # mm — Y of the ear pin at rest. Was where the lever's
+ear_z         = -24.0  # mm — on the carriage's LOWER limb, over the servo.
+                        #      Not at -28: that is the four-bar's own pivot B,
+                        #      and the ear's root landed on the link there.
                         #      carriage's own ear and its checks do not move.
 ear_w         = 5.0    # mm — ear bridge width
 ear_h         = 6.0    # mm — ear bridge height
@@ -668,29 +688,20 @@ def apex_drift(phi):
 # Servo shaft S; crank tip H (crank level, pointing +Y at rest, so H moves in
 # Z); ONE link from H to the ear E on the carriage. Two pins, and the ratio is
 # the crank radius alone — see horn_r.
-S_act = (sv_y0 + 0.75 * servo_body[1], sv_z0 + servo_body[2] / 2.0)
 E0 = (ear_y, ear_z)
-# The crank stands PERPENDICULAR to the link at rest, not pointing at the ear.
-# Pointing at it puts crank and link nearly in line — dead centre, where the
-# chain loses its transmission and, at the far end of the stroke, cannot reach
-# the ear at all (the first try did exactly that). Perpendicular is the best
-# transmission there is, and the stroke is small enough to stay near it.
-# It leans +Z (up and out), away from the servo's own case.
-_horn_rest = math.atan2(E0[1] - S_act[1], E0[0] - S_act[0]) + math.pi / 2.0
-H0 = (S_act[0] + horn_r * math.cos(_horn_rest),
-      S_act[1] + horn_r * math.sin(_horn_rest))
-act_link_len = math.dist(H0, E0)   # NOT link_len: that is the four-bar's
-
-
 def act_chain(T):
     """Solve the chain backwards from the carriage: the ear is where the
     four-bar puts it, the crank follows through the link. None-valued if the
     circle-circle step has no solution (the chain cannot reach)."""
     E = T(E0)
     H = _circ_int(S_act, horn_r, E, act_link_len, H0)
-    horn_a = None if H is None else (
-        math.atan2(H[1] - S_act[1], H[0] - S_act[0])
-        - math.atan2(H0[1] - S_act[1], H0[0] - S_act[0]))
+    horn_a = None
+    if H is not None:
+        horn_a = (math.atan2(H[1] - S_act[1], H[0] - S_act[0])
+                  - math.atan2(H0[1] - S_act[1], H0[0] - S_act[0]))
+        # Wrapped into (-pi, pi]: a raw difference of two atan2s can come back
+        # a whole turn out, and then the sweep to contact reads as 340 deg.
+        horn_a = (horn_a + math.pi) % (2.0 * math.pi) - math.pi
     return {"E": E, "H": H, "horn_a": horn_a}
 
 
@@ -701,27 +712,6 @@ def horn_swing(phi_t):
     return None if a is None else abs(math.degrees(a))
 
 
-# The sweep to contact is DERIVED now, not chosen: with the lever gone, the
-# crank radius and where the ear sits are what set it. (It used to be the
-# input, and the crank radius came out of it through the lever's ratio.)
-sv_theta_c = horn_swing(phi_c)
-if sv_theta_c is None:
-    raise RuntimeError("the actuation chain cannot reach the contact stop")
-
-
-# ── Stop ladder. No mesh step: the gears never disengage (invariant 4) ───────
-# Before contact the carriage follows the servo at sv_theta_c per phi_c. After
-# it, of every further degree of servo sweep 1 part still reaches the carriage
-# (squeezing the rubber) and spring_ratio parts wind the spring.
-spring_split = 1.0 + spring_ratio
-phi_preload = phi_c + (math.radians(sv_theta_max - sv_theta_c)
-                       * (phi_c / math.radians(sv_theta_c)) / spring_split)
-STOPS = {"free": 0.0, "contact": phi_c, "preload": phi_preload}
-phi = CARRIAGE_DIR * STOPS[CARRIAGE_STOP] if CARRIAGE_STOP != "free" else 0.0
-
-drift_contact = apex_drift(phi_c)
-drift_preload = apex_drift(phi_preload)
-slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-slip
 
 
 def uj_geom(phi_t):
@@ -734,15 +724,94 @@ def uj_geom(phi_t):
     return math.hypot(dy, dz), math.atan2(dz, dy), R
 
 
-_uj_sweep = [(phi_preload * k / 8.0, uj_geom(phi_preload * k / 8.0))
-             for k in range(-8, 9)]
-uj_L_rest    = uj_ring_y - uj_cross_y
-uj_L_range   = (min(g[0] for _, g in _uj_sweep), max(g[0] for _, g in _uj_sweep))
-uj_bend_cross = max(abs(g[1]) for _, g in _uj_sweep)             # rad
-uj_bend_ring  = max(abs(g[1] - p) for p, g in _uj_sweep)         # rad
-# Furthest the intermediate's front corner reaches toward the wall.
-uj_front_y = max(uj_cross_y + (g[0] + uj_head_end) * math.cos(g[1])
-                 + uj_head_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
+_POSE_CACHE = {}   # pose_state's, declared here: the fixed point below has
+                    # to clear it between passes, and it runs first.
+
+
+# ── Cardan, cube and chain: a small fixed point ─────────────────────────────
+# These three need one another. The servo lies against the WALL, so where its
+# shaft sits depends on cube_half; cube_half is whatever reaches furthest,
+# today the cardan's intermediate, whose reach depends on the stroke; and the
+# stroke depends on the chain the servo drives. Two passes settle it to
+# microns. The loop asserts that it HAS settled rather than trusting it would,
+# and clears the pose cache each pass — a cached pose carries the chain's own
+# geometry with it, and that is exactly what moves between passes.
+phi_preload = phi_c * 1.2          # bootstrap, replaced on the first pass
+for _pass in range(8):
+    _POSE_CACHE.clear()
+    _uj_sweep = [(phi_preload * k / 8.0, uj_geom(phi_preload * k / 8.0))
+                 for k in range(-8, 9)]
+    uj_L_rest    = uj_ring_y - uj_cross_y
+    uj_L_range   = (min(g[0] for _, g in _uj_sweep), max(g[0] for _, g in _uj_sweep))
+    uj_bend_cross = max(abs(g[1]) for _, g in _uj_sweep)             # rad
+    uj_bend_ring  = max(abs(g[1] - p) for p, g in _uj_sweep)         # rad
+    # Furthest the intermediate's front corner reaches toward the wall.
+    uj_front_y = max(uj_cross_y + (g[0] + uj_head_end) * math.cos(g[1])
+                     + uj_head_ro * abs(math.sin(g[1])) for _, g in _uj_sweep)
+
+    # ── Cube ──────────────────────────────────────────────────────────────────────
+    # The cube is as small as the FURTHEST thing that must fit, in Y (to the wall)
+    # or in Z (to the ceiling) — it is a cube, so both are the same number.
+    cube_half_by = {
+        "cardan's intermediate + inner output bearing boss":
+            uj_front_y + run_clr + brg_w,
+        "four-bar frame post": fb_A[0] + fp_post_y + 1.0,
+        "servo case standing on the wall (its own Z)": abs(sv_z0) + run_clr,
+        "actuation ear boss (to the wall)":
+            E0[0] + act_boss_r + run_clr,
+    }
+    cube_half_driver = max(cube_half_by, key=cube_half_by.get)
+    cube_half = cube_half_by[cube_half_driver]
+    cube_out  = cube_half + wall_thick
+    # Brackets seat on the bosses, not on the wall itself.
+    wall_face_y = cube_half - wall_boss_h
+
+    _sv_y0 = cube_half - sv_wall_clr - servo_tab_out - servo_body[1]
+    S_act = (_sv_y0 + servo_body[1] / 2.0, sv_z0 + servo_body[2] / 2.0)
+    # The crank stands PERPENDICULAR to the link at rest, not pointing at the ear.
+    # Pointing at it puts crank and link nearly in line — dead centre, where the
+    # chain loses its transmission and, at the far end of the stroke, cannot reach
+    # the ear at all (the first try did exactly that). Perpendicular is the best
+    # transmission there is, and the stroke is small enough to stay near it.
+    # Of the two perpendiculars it takes the one leaning AWAY from the wall:
+    # with the servo lying on the wall the link is nearly vertical, so the
+    # crank is nearly horizontal — and the wall is a crank radius away.
+    _a_link = math.atan2(E0[1] - S_act[1], E0[0] - S_act[0])
+    _horn_rest = min((_a_link + math.pi / 2.0, _a_link - math.pi / 2.0),
+                     key=lambda a: S_act[0] + horn_r * math.cos(a))
+    H0 = (S_act[0] + horn_r * math.cos(_horn_rest),
+          S_act[1] + horn_r * math.sin(_horn_rest))
+    act_link_len = math.dist(H0, E0)   # NOT link_len: that is the four-bar's
+
+
+    # The sweep to contact is DERIVED now, not chosen: with the lever gone, the
+    # crank radius and where the ear sits are what set it. (It used to be the
+    # input, and the crank radius came out of it through the lever's ratio.)
+    sv_theta_c = horn_swing(phi_c)
+    if sv_theta_c is None:
+        raise RuntimeError("the actuation chain cannot reach the contact stop")
+
+
+    # ── Stop ladder. No mesh step: the gears never disengage (invariant 4) ───────
+    # Before contact the carriage follows the servo at sv_theta_c per phi_c. After
+    # it, of every further degree of servo sweep 1 part still reaches the carriage
+    # (squeezing the rubber) and spring_ratio parts wind the spring.
+    spring_split = 1.0 + spring_ratio
+    _phi_new = phi_c + (math.radians(sv_theta_max - sv_theta_c)
+                           * (phi_c / math.radians(sv_theta_c)) / spring_split)
+    _settled = abs(_phi_new - phi_preload) < 1e-9
+    phi_preload = _phi_new
+    if _settled:
+        break
+else:
+    raise RuntimeError("cardan, cube and chain did not settle")
+_POSE_CACHE.clear()
+STOPS = {"free": 0.0, "contact": phi_c, "preload": phi_preload}
+phi = CARRIAGE_DIR * STOPS[CARRIAGE_STOP] if CARRIAGE_STOP != "free" else 0.0
+
+drift_contact = apex_drift(phi_c)
+drift_preload = apex_drift(phi_preload)
+slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-slip
 
 # X stack, from the servo's face outward: spring, then the LINK, then the
 # crank outermost; the ear stacked back inboard of the link, under the
@@ -755,13 +824,15 @@ uj_front_y = max(uj_cross_y + (g[0] + uj_head_end) * math.cos(g[1])
 # so no shape of link gets round it. Stepping the band out costs the ear
 # 2.5 mm in X; growing the crank instead would have cost force at the ear in
 # the same proportion, which is the one thing the lever was there to buy.
-x_spring = (sv_face_x, sv_face_x + spring_len)
-# run_clr, not act_gap: what the link passes here is not a neighbouring
-# plate of the chain but the servo's own spline stub, end on.
-x_link = (x_spring[1] + run_clr, x_spring[1] + run_clr + lk_t)
-x_horn = (x_link[1] + act_gap, x_link[1] + act_gap + horn_t)
+# The shaft points −X, so every band is measured the other way: spring
+# first, then the link, then the crank furthest into the corner, with the ear
+# stacked back toward the case — in the spring's own band, but nowhere near it
+# in Z, because the ear rides over the case while the spring is on the shaft.
+x_spring = (sv_face_x - spring_len, sv_face_x)
+x_link = (x_spring[0] - run_clr - lk_t, x_spring[0] - run_clr)
+x_horn = (x_link[0] - act_gap - horn_t, x_link[0] - act_gap)
 ear_t = 3.0            # mm — ear plate thickness
-x_ear = (x_link[0] - act_gap - ear_t, x_link[0] - act_gap)
+x_ear = (x_link[1] + act_gap, x_link[1] + act_gap + ear_t)
 
 
 def _rot_about(p, c, a):
@@ -769,23 +840,6 @@ def _rot_about(p, c, a):
     dy, dz = p[0] - c[0], p[1] - c[1]
     return (c[0] + ca * dy - sa * dz, c[1] + sa * dy + ca * dz)
 
-
-# ── Cube ──────────────────────────────────────────────────────────────────────
-# The cube is as small as the FURTHEST thing that must fit, in Y (to the wall)
-# or in Z (to the ceiling) — it is a cube, so both are the same number.
-cube_half_by = {
-    "cardan's intermediate + inner output bearing boss":
-        uj_front_y + run_clr + brg_w,
-    "four-bar frame post": fb_A[0] + fp_post_y + 1.0,
-    "servo case under the ceiling": sv_z0 + servo_body[2] + sv_z_clr,
-    "actuation ear boss (to the wall)":
-        E0[0] + act_boss_r + run_clr,
-}
-cube_half_driver = max(cube_half_by, key=cube_half_by.get)
-cube_half = cube_half_by[cube_half_driver]
-cube_out  = cube_half + wall_thick
-# Brackets seat on the bosses, not on the wall itself.
-wall_face_y = cube_half - wall_boss_h
 
 # ═══════════════════════════════════════════════════════════════════
 # HELPERS
@@ -853,9 +907,6 @@ def box_yz(y0, y1, z0, z1, x0=0.0, thick=1.0):
 
 def pin_x(centre, d, x0, length):
     return cyl(d / 2.0, length, v(x0, centre[0], centre[1]), X_AXIS)
-
-
-_POSE_CACHE = {}
 
 
 def pose_state(phi_t):
@@ -1170,7 +1221,8 @@ def make_carriage():
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
                               2 * (side_x + side_t / 2.0 + 2.0)))
-    body = body.cut(pin_x(E0, fdm_act_press_d, x_ear[1] - 12.0, 13.0))
+    body = body.cut(pin_x(E0, fdm_act_hole_d, x_ear[0] - 1.0,
+                          x_ear[1] - x_ear[0] + 2.0))
     return body
 
 
@@ -1184,10 +1236,11 @@ def make_ear():
     corner the arm no longer has."""
     z0 = ear_z - ear_h / 2.0
     z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
+    _sx = ear_sx * side_x
     if ear_z >= z_corner:
-        p0 = (side_x, fb_B[0] + (fb_B[1] - ear_z))
+        p0 = (_sx, fb_B[0] + (fb_B[1] - ear_z))
     else:
-        p0 = (side_x, arm_root[0])
+        p0 = (_sx, arm_root[0])
     # The pin end is a BLOCK, not a thin plate: wide enough in X to swallow the
     # whole of the bridge's end over the block's own Y span, and the bridge is
     # cut flush with the block's faces. A diagonal bar meeting a thin plate
@@ -1199,13 +1252,15 @@ def make_ear():
     hy = act_boss_r + 0.5                       # block half-span in Y
     y_in = E0[0] - hy                           # the face the bridge enters
     x_centre_in = p0[0] + dx * (y_in - p0[1]) / dy
-    blk_x0 = min(x_ear[0], x_centre_in - abs(ear_w / 2.0 * ln / dy))
+    _half = abs(ear_w / 2.0 * ln / dy)
+    blk_x0 = min(x_ear[0], x_centre_in - _half)
+    blk_x1 = max(x_ear[1], x_centre_in + _half)
     quad = [v(p0[0] + nx, p0[1] + ny, z0), v(p1[0] + nx, p1[1] + ny, z0),
             v(p1[0] - nx, p1[1] - ny, z0), v(p0[0] - nx, p0[1] - ny, z0)]
     bridge = Part.Face(Part.makePolygon(quad + [quad[0]])).extrude(v(0, 0, ear_h))
-    blk = Part.makeBox(x_ear[1] - blk_x0, 2 * hy, ear_h,
+    blk = Part.makeBox(blk_x1 - blk_x0, 2 * hy, ear_h,
                        v(blk_x0, E0[0] - hy, z0))
-    bridge = bridge.cut(Part.makeBox(40.0, 40.0, ear_h + 2.0,
+    bridge = bridge.cut(Part.makeBox(blk_x1 - blk_x0 + 40.0, 40.0, ear_h + 2.0,
                                      v(blk_x0 - 20.0, y_in, z0 - 1.0)))
     return bridge.fuse(blk)
 
@@ -1359,21 +1414,25 @@ def make_frame_bracket(zs):
     return part
 
 def servo_box():
-    """(x0, y0, z0, bx, by, bz) of the servo case, lying under the ceiling,
-    shaft face at sv_face_x pointing +X."""
-    bx, by, bz = servo_body
-    return (sv_face_x - bx, sv_y0, sv_z0, bx, by, bz)
+    """(x0, y0, z0, bx, by, bz) of the servo case: STANDING, shaft face at
+    sv_face_x pointing −X, so the case runs +X from there. Its length goes
+    into the cube in Y (the far tab ends at the wall) and it stands only its
+    own thickness tall, which is what lets the ear bridge pass over it."""
+    bx, ln, th = servo_body
+    return (sv_face_x, cube_half - sv_wall_clr - servo_tab_out - ln, sv_z0,
+            bx, ln, th)
 
 
 def _tab_x():
     """X band of the mounting tabs: a third of the way down the case from its
-    shaft face, as on an MG90."""
-    x1 = sv_face_x - servo_body[0] / 3.0
-    return (x1 - servo_tab_t, x1)
+    shaft face, as on an MG90. The case runs +X from that face."""
+    x0 = sv_face_x + servo_body[0] / 3.0
+    return (x0, x0 + servo_tab_t)
 
 
 def make_servo_body():
-    """MG90-class placeholder: case plus its tab plate."""
+    """MG90-class placeholder: case plus its tab plate. Standing, so the tabs
+    run off its two ends in Y — the far one right at the wall."""
     x0, y0, z0, bx, by, bz = servo_box()
     body = Part.makeBox(bx, by, bz, v(x0, y0, z0))
     tx0, tx1 = _tab_x()
@@ -1382,9 +1441,9 @@ def make_servo_body():
     for sy in servo_screw_ys():
         body = body.cut(cyl(servo_screw_d / 2.0 + 0.1, tx1 - tx0 + 2,
                             v(tx0 - 1, sy, S_act[1]), X_AXIS))
-    # Output spline stub, so the spring has something to sit on.
+    # Output spline stub, so the spring has something to sit on. Points −X.
     body = body.fuse(cyl(2.5, spring_len,
-                         v(sv_face_x, S_act[0], S_act[1]), X_AXIS))
+                         v(sv_face_x - spring_len, S_act[0], S_act[1]), X_AXIS))
     return body
 
 
@@ -1394,22 +1453,25 @@ def servo_screw_ys():
 
 
 def make_servo_bracket():
-    """Two short posts down from the ceiling, one under each tab end, on the
-    case side of the tabs. The servo hangs from the ceiling it lies against,
-    and the posts are PRINTED AS PART of that ceiling (user, 2026-09-20)."""
-    tx0, _ = _tab_x()
+    """A fin standing off the WALL along the servo's tab plate: the case hangs
+    beside it and screws into it along X, at both tab ends. PRINTED AS PART of
+    the wall (user, 2026-09-20), like the four-bar's own posts."""
+    tx0, tx1 = _tab_x()
     _, y0, z0, _, by, bz = servo_box()
+    # One fin per tab ear, NOT one long one: between the ears is the case
+    # itself. The far ear is at the wall, so its fin is a stub; the near one
+    # reaches back to the wall along the case's side.
     part = None
-    for ya, yb in ((y0 - servo_tab_out, y0), (y0 + by, y0 + by + servo_tab_out)):
-        post = Part.makeBox(3.0, yb - ya, cube_half + bracket_weld - z0,
-                            v(tx0 - 3.0, ya, z0))
-        part = post if part is None else part.fuse(post)
-    # A bar along the ceiling tying the two posts into one part.
-    part = part.fuse(Part.makeBox(3.0, by + 2 * servo_tab_out,
-                                  1.0 + bracket_weld,
-                                  v(tx0 - 3.0, y0 - servo_tab_out, cube_half - 1.0)))
-    part = part.cut(Part.makeBox(servo_body[0], by, bz + 0.2,
-                                 v(sv_face_x - servo_body[0], y0, z0 - 0.1)))
+    for ya, yb in ((y0 - servo_tab_out, y0), (y0 + by, cube_half + bracket_weld)):
+        fin = Part.makeBox(3.0, yb - ya, bz, v(tx1, ya, z0))
+        part = fin if part is None else part.fuse(fin)
+    # The rib tying the near fin back to the wall runs UNDER the case, not
+    # along its side: the side is the case itself.
+    part = part.fuse(Part.makeBox(3.0, cube_half + bracket_weld - (y0 - servo_tab_out),
+                                  2.0, v(tx1, y0 - servo_tab_out, z0 - 2.0)))
+    for sy in servo_screw_ys():
+        part = part.cut(cyl(foot_tap_d / 2.0, 5.0,
+                            v(tx1 - 1.0, sy, S_act[1]), X_AXIS))
     return part
 
 
@@ -1444,7 +1506,8 @@ def make_act_horn(st):
         disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
     arm = bar_yz(S_act, st["H"], 2 * act_boss_r, x_horn[0], horn_t)
     arm = arm.cut(disc_yz(S_act, 2.8, x_horn[0] - 1, horn_t + 2))
-    return hub.fuse(arm).cut(pin_x(st["H"], fdm_act_hole_d, x_horn[0] - 1,
+    # The pin is PRESSED in here and runs in the link — see ACT_CLIPS.
+    return hub.fuse(arm).cut(pin_x(st["H"], fdm_act_press_d, x_horn[0] - 1,
                                    horn_t + 2))
 
 
@@ -1456,28 +1519,38 @@ def act_moving_parts(st):
         return []
     w = 2 * act_boss_r
     out = [("Horn", make_act_horn(st), col, 0),
-           ("ActLink", _plate_bar([H, E], x_link, w, press=(0,)), col, 0)]
+           ("ActLink", _plate_bar([H, E], x_link, w, press=(1,)), col, 0)]
     for name, p, xa, xb, side in ACT_CLIPS(st):
         ext = clip_gap + clip_t + clip_tail
+        xc = None
         if side > 0:
-            xb_pin, xc = xb + ext, xb + clip_gap
-        else:
+            xb, xc = xb + ext, xb + clip_gap
+        elif side < 0:
             xa, xc = xa - ext, xa - clip_gap - clip_t
-            xb_pin = xb
-        out.append((name, pin_x(p, act_pin_d, xa, xb_pin - xa), pc, 0))
-        ring = cyl(clip_od / 2.0, clip_t, v(xc, p[0], p[1]), X_AXIS)
-        ring = ring.cut(cyl(act_pin_d / 2.0, clip_t + 2, v(xc - 1, p[0], p[1]), X_AXIS))
-        out.append(("PinClip" + name[3:], ring, pc, 0))
+        out.append((name, pin_x(p, act_pin_d, xa, xb - xa), pc, 0))
+        if xc is not None:
+            ring = cyl(clip_od / 2.0, clip_t, v(xc, p[0], p[1]), X_AXIS)
+            ring = ring.cut(cyl(act_pin_d / 2.0, clip_t + 2,
+                                v(xc - 1, p[0], p[1]), X_AXIS))
+            out.append(("PinClip" + name[3:], ring, pc, 0))
     return out
 
 
 def ACT_CLIPS(st):
     """Each actuation pin: (name, centre, x from, x to across its two plates,
-    clip side). Pressed into the LINK at H and into the ear at E; the clip
-    goes on the running part's free face, both on the outboard side (the
-    sweep found room there and not inboard, where the servo case is)."""
-    return (("PinH", st["H"], x_link[0], x_horn[1], 1),
-            ("PinE", st["E"], x_ear[0], x_link[1], 1))
+    clip side; 0 = no clip). Pressed into the CRANK at H and into the ear at E.
+
+    NO CLIPS any more (2026-09-20). With the chain in the corner every plate
+    has a neighbour act_gap away — the crank has the link, the link has the
+    ear — and a plate cannot travel that 0.4 mm without still being pinned,
+    because each pin engages a whole plate thickness. The stack retains
+    itself, the same argument as the four-bar's straddled pins. It also has
+    to be that way: an E-clip needs clip_gap + clip_t = 0.7 of free face, and
+    the corner leaves 0.4 between plates and 0.26 to the neighbour's wall."""
+    return (("PinH", st["H"], min(x_link[0], x_horn[0]),
+             max(x_link[1], x_horn[1]), 0),
+            ("PinE", st["E"], min(x_ear[0], x_link[0]),
+             max(x_ear[1], x_link[1]), 0))
 
 
 def both_hands(pts):
@@ -1539,22 +1612,19 @@ def make_deck(zs):
         hs = [h for h in hs if h is not None]
         r = clip_od / 2.0 + run_clr
         y0, y1 = min(h[0] for h in hs) - r, max(h[0] for h in hs) + r
-        deck_pocket = max(deck_pocket_min,
-                          max(h[1] for h in hs) + r - cube_half)
+        deck_pocket = max(h[1] for h in hs) + r - cube_half
         x0 = x_link[0] - run_clr
         x1 = x_horn[1] + clip_gap + clip_t + clip_tail + run_clr
-        for _, rot in AXES:
-            pk = Part.makeBox(x1 - x0, y1 - y0, deck_pocket + 0.01,
-                              v(x0, y0, cube_half - 0.01))
-            pk.rotate(ORIGIN, Z_AXIS, rot)
-            DECK_POCKETS.append(pk)
-            deck = deck.cut(pk)
-        # The servo's bracket is printed as part of THIS part (user,
-        # 2026-09-20), one per axis — the ceiling is shared by all four. Fused
-        # after the relief is cut, so a pocket cannot eat a bracket; that they
-        # never overlap is checked, not assumed.
-        for _, rot in AXES:
-            deck = deck.fuse(place(cached(make_servo_bracket), rot))
+        # Only if the crank really reaches up there: with the servo on the
+        # wall it does not, and a pocket nothing needs is a hole in the roof.
+        if deck_pocket > 0.0:
+            deck_pocket = max(deck_pocket, deck_pocket_min)
+            for _, rot in AXES:
+                pk = Part.makeBox(x1 - x0, y1 - y0, deck_pocket + 0.01,
+                                  v(x0, y0, cube_half - 0.01))
+                pk.rotate(ORIGIN, Z_AXIS, rot)
+                DECK_POCKETS.append(pk)
+                deck = deck.cut(pk)
     return deck
 
 
@@ -1598,6 +1668,8 @@ def make_wall():
     # screws and no foot joint to work loose.
     for zs in (1, -1):
         wall = wall.fuse(cached(make_frame_bracket, zs))
+    # And the servo's own bracket, which came off the ceiling with the servo.
+    wall = wall.fuse(cached(make_servo_bracket))
     return wall
 
 
@@ -1971,7 +2043,7 @@ if RUN_CHECKS:
 
 
     _WELDED = [{"Wall", "FramePostT"}, {"Wall", "FramePostB"},
-               {"DeckTop", "ServoBracket"}]
+               {"Wall", "ServoBracket"}]
 
 
     def _exempt(na, nb):
@@ -2252,8 +2324,8 @@ if RUN_CHECKS:
             _ins_ov += pin_x(_A, pin_d, _x0, 30.0).common(_fp).Volume
 
     # The E-clips, SWEPT: each against everything but its own joint's plates.
-    _CLIP_OWN = {"H": ("ActLink", "Horn"), "E": ("Carriage", "ActLink")}
-    _clip_gap_min, _clip_who = 1e9, "-"
+    _CLIP_OWN = {j[0][3:]: () for j in ()}   # no clips in the chain any more
+    _clip_gap_min, _clip_who = (1e9, "-") if _CLIP_OWN else (9.99, "no clips")
     for _k in range(-4, 5):
         _st_k = pose_state(phi_preload * _k / 4.0)
         _all = {n: sh for n, sh, c, t in moving_parts(_st_k) + FIXED_PARTS}

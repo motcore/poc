@@ -561,6 +561,32 @@ simplification; nothing was given up for it.
 - **Gone with the lever**: its ceiling post (one of the three brackets), link1,
   three pins and three E-clips.
 
+## 12c. The servo stands in the corner (2026-09-20)
+
+The user's layout, and it works: the servo STANDS (its 22.8 length into the
+cube in Y, only 12.2 tall) down by the floor, turned so its shaft points −X
+and its base ends beside the four-bar's own pin at x −12.5.
+
+- **The chain gets a corner to itself.** Behind the shaft face there are
+  7.8 mm to the neighbour's wall, and nothing else wants them: spring, link
+  and crank fit with 0.26 to spare. Before, the same chain had to share
+  8.8 mm with the four-bar's links, which is what left three 0.5 mm conflicts.
+- **The ear rides over the servo.** Standing, the case is only 12.2 tall, so
+  the carriage's ear bridge passes clear above it, out from the lower limb at
+  z −24 to the link's plane at x −44.6.
+- **No clips in the chain.** Every plate has a neighbour act_gap = 0.4 away
+  and each pin engages a full plate thickness, so nothing can slide off — the
+  stack retains itself, like the four-bar's straddled pins. Which is just as
+  well: an E-clip needs 0.7 mm of free face and the corner has 0.4.
+- Crank r 4.3, link 18.9, effective radius at the ear 4.19 mm (the old
+  crank-and-lever gave 4.29): 34 N at the ear, 0.97 Nm ceiling — unchanged.
+  Worst transmission angle 52.4°, against 44.9 before and 41.7 with the lever.
+- **What it costs: the carriage is 66 mm wide in X**, against 43 with the
+  servo lying under the wall, because the ear now reaches into the corner.
+  That bridge is a 28 mm cantilever and NOTHING has checked its stiffness —
+  it deflects straight into the preload. First thing to size.
+- The cube is unchanged at 106.4, still set by the cardan.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
