@@ -2388,6 +2388,46 @@ if RUN_CHECKS:
                                ("DeckTop", _deck_top), ("DeckBottom", _deck_bot))
                if len(sh.Solids) != 1]
 
+    # Fixed parts against fixed parts, as DISTANCES.
+    #
+    # Everything else here asks "do they overlap". That passes a servo tab
+    # 0.07 mm off the carriage arm, a guide rod held by half a bore, a
+    # bracket rib grazing a case — three faults in one afternoon, every one
+    # of them found by LOOKING at the model, none by the checks. Parts that
+    # never move relative to each other still have to be printed, put in
+    # past one another and live with the printer's own error, so they get a
+    # real gap or they are a designed contact, and the designed ones are
+    # listed.
+    _TOUCH_OK = {frozenset(q) for q in (
+        # welded: printed as one part with their host
+        ("Wall", "FramePostT"), ("Wall", "FramePostB"), ("Wall", "ServoBracket"),
+        ("Wall", "ScrewTop"), ("Wall", "GuideFoot"),
+        # assembled: pressed, seated, screwed or bolted together
+        ("ServoBody", "ServoBracket"), ("ServoBody", "ScrewShaft"),
+        # the brackets ARE the wall, so anything they hold touches the wall
+        ("ServoBody", "Wall"), ("GuideRod", "Wall"), ("ScrewShaft", "Wall"),
+        ("ScrewShaft", "ScrewTop"), ("GuideRod", "GuideFoot"),
+        ("GuideRod", "ScrewTop"), ("OutputShaft", "UJFork"),
+        ("OutputShaft", "BearingOutput"), ("OutputShaft", "BearingOutIn"),
+        ("Wall", "BearingOutput"), ("Wall", "BearingOutIn"),
+        ("Wall", "OutputShaft"), ("DeckTop", "Wall"), ("DeckBottom", "Wall"),
+    )}
+    _fx = [(n, sh) for n, sh, c, t in FIXED_PARTS] + [
+        ("DeckTop", _deck_top), ("DeckBottom", _deck_bot),
+        ("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up)]
+    _fix_gap, _fix_who = 1e9, "-"
+    for _i in range(len(_fx)):
+        for _j in range(_i + 1, len(_fx)):
+            _na, _sa = _fx[_i]
+            _nb, _sb = _fx[_j]
+            if frozenset((_na, _nb)) in _TOUCH_OK:
+                continue
+            if bb_gap(_sa, _sb) >= _fix_gap:
+                continue
+            _d = _sa.distToShape(_sb)[0]
+            if _d < _fix_gap:
+                _fix_gap, _fix_who = _d, f"{_na} x {_nb}"
+
     # Brackets printed as part of their host: each has to really MERGE with it
     # (share bracket_weld's worth of material), not just touch its face — two
     # solids meeting on a face fuse into something that draws fine and is not
@@ -2477,6 +2517,8 @@ if RUN_CHECKS:
         (f"slip from {x_play_max:.2f} mm of X play left after shimming  (%)",
          _x_slip * 100, f"<= four-bar's {slip_fourbar*100:.2f}",
          _x_slip <= slip_fourbar),
+        (f"fixed parts clear each other [{_fix_who}]  (mm)",
+         _fix_gap, "> 0.5", _fix_gap > 0.5),
         (f"brackets really merge into their host [worst: {_weld_who}]  (mm3)",
          _weld_min, "> 1", _weld_min > 1.0),
         (f"every built shape is a valid solid  {_invalid if _invalid else ''}",
