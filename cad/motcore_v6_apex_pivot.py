@@ -270,7 +270,7 @@ spring_len    = 2.0    # mm — torsion spring envelope along X. Short: the
 spring_r      = 5.5    # mm — its outer radius
 sv_stand      = 2.0    # mm — how far the cradle lifts the servo off the
                         #      floor: the plate it stands on
-screw_x       = -27.7  # mm ┐ the lead screw's axis: up the empty column
+screw_x       = -37.7  # mm ┐ the lead screw's axis: up the empty column
 screw_y       = 41.5   # mm ┘ beside the carriage's arm, clear of its ring
 screw_d       = 8.0    # mm — T8 lead screw (the 3D-printer standard part)
 screw_lead    = 8.0    # mm per turn — T8 is 4-start, so a turn is 8 mm. This
@@ -297,12 +297,21 @@ spr_od        = 11.0   # mm — outside Ø of each stack. They sit round the
                         #      the wall is 7 mm away and the brass nut itself
                         #      is 14 across, so nothing fits round it.
 spr_id        = 5.0    # mm — bore, over the Ø4 rod
-carrier_t     = 4.0    # mm — the floating carrier the pusher hangs off
+carrier_t     = 6.0    # mm — the floating carrier's arm. At 4 it was a
+                        #      21 mm cantilever at 32 MPa, which printed PLA
+                        #      does not have to give; at 6 it is 14.
+carrier_bush  = 12.0   # mm — and its bush on the guide rod is this long. The
+                        #      rod is what reacts the moment the arm makes
+                        #      (57 N over 21 mm), and a 4 mm bush would have
+                        #      seen 112 MPa of edge pressure doing it; 12 mm
+                        #      brings that to 12.
 pin_boss_t    = 8.0    # mm — it thickens to this round the ear pin's slot
 pin_boss_x    = 5.0    # mm — over this much of its length: short, so it
                         #      stops before the screw the arm passes
-cage_t        = 3.0    # mm — each of the driver's two seat plates
-spr_h         = 3.0    # mm — its height, seated
+cage_t        = 2.5    # mm — each of the driver's two seat plates
+spr_h         = 1.8    # mm — its height, seated. Short, because the cage
+                        #      has to hold bush, springs and stroke between
+                        #      the nut above and the ring below.
 spr_clr       = 0.2    # mm — slack in the slot beyond the working stroke
 guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
                         #      screw, through a bore in the nut's own pusher.
@@ -310,15 +319,15 @@ guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
                         #      with it, it also takes the moment the pusher
                         #      makes by reaching 15 mm out to the ear, which
                         #      otherwise all lands on the ear's pin.
-guide_dx      = -10.0  # mm — the rod sits on the FAR side of the screw from
-                        #      the carriage, on a stub tail of the nut. On the
-                        #      near side it is trapped: it must be more than
-                        #      the nut's own 7 mm radius from the screw, and
-                        #      less than 7.2 to keep its own Ø4 clear of the
-                        #      carriage's ring on the way up.
+guide_dx      = 10.5   # mm — the rod sits between the screw and the ear
+                        #      (user, 2026-09-20), which is the right way
+                        #      round: the carrier's arm then runs 11 mm from
+                        #      its bush to the pin instead of 21, and never
+                        #      has to cross the screw. The screw goes out into
+                        #      the corner and takes the servo with it.
 guide_z0      = -8.0   # mm — where the rod starts: above the servo, below the
                         #      nut's travel, and outside the ring's rim
-screw_top_z   = 44.6   # mm — where the screw's top bearing sits, clear
+screw_top_z   = 45.3   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      chain's ratio now. It buys the ear an effective
@@ -1455,7 +1464,10 @@ def servo_box():
     its shaft pointing UP (+Z) along the screw. Its 32.2 is the shaft
     direction, so that is its height here; length in X, thickness in Y."""
     ht, ln, th = servo_body
-    return (screw_x - ln / 2.0 - sv_shaft_off, screw_y - th / 2.0,
+    # The shaft is sv_shaft_end from the case's own end, and that end is the
+    # one in the corner: the case then runs back toward the carriage, which
+    # is where the room is.
+    return (screw_x - sv_shaft_end, screw_y - th / 2.0,
             -cube_half + sv_stand, ln, th, ht)
 
 
@@ -1580,13 +1592,16 @@ def _nut_body_z(st):
     """The brass nut sits ABOVE the cage, not level with the carrier: at the
     carrier's own height the nut's 14 mm body is exactly where the carrier
     has to be, and below the carrier are the guide rod's foot and the servo."""
-    return st["nut_z"] + (_cage_gap() / 2.0 + cage_t + nut_l / 2.0 + 1.0)
+    # Sitting straight on the upper seat plate: the 1 mm that used to be
+    # left between them was a gap bridged by nothing but the web, and the
+    # user spotted it as a hole that made no sense.
+    return st["nut_z"] + (_cage_gap() / 2.0 + cage_t + nut_l / 2.0)
 
 
 def _cage_gap():
     """Clear height between the driver's two seat plates: the carrier, its
     two springs, and the stroke they have to give each way."""
-    return carrier_t + 2.0 * spr_h + 2.0 * (spring_stroke + spr_clr)
+    return carrier_bush + 2.0 * spr_h + 2.0 * (spring_stroke + spr_clr)
 
 
 def make_brass_nut(st):
@@ -1622,9 +1637,10 @@ def make_nut(st):
     gx = screw_x + guide_dx
     for side in (1, -1):
         z_plate = z + side * (g / 2.0) if side > 0 else z - g / 2.0 - cage_t
-        plate = Part.makeBox(screw_x - (gx - 8.0) + nut_d / 2.0, push_w,
-                             cage_t,
-                             v(gx - 8.0, screw_y - push_w / 2.0, z_plate))
+        _p0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
+        _p1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
+        plate = Part.makeBox(_p1 - _p0, push_w, cage_t,
+                             v(_p0, screw_y - push_w / 2.0, z_plate))
         body = body.fuse(plate)
     # A web down the nut's INBOARD side ties the two plates to it. It cannot
     # be a sleeve round the nut: at this Y the wall is 7 mm away and the nut
@@ -1634,23 +1650,22 @@ def make_nut(st):
     web_y1 = screw_y - push_w / 2.0 + 3.5      # overlapping the seat plates
     _z_bot = z - g / 2.0 - cage_t
     _z_top = zn + nut_l / 2.0
-    # A roof over the carrier ties the spine to the web, so the cage is a
-    # frame and not two uprights (user's idea, 2026-09-20): whatever the
-    # springs push against, they push against the whole of it.
-    body = body.fuse(Part.makeBox(screw_x + nut_d / 2.0 - (gx - 8.0), push_w,
-                                  cage_t,
-                                  v(gx - 8.0, screw_y - push_w / 2.0,
-                                    z + g / 2.0)))
     # A spine BEYOND the rod ties the two seat plates together. It cannot run
     # up the motor side: that is where the carrier's own arm passes, and the
     # cage has to let it move.
+    # The spine ties the seat plates together on the far side of the NUT,
+    # away from the carrier's own arm.
+    _sp = (screw_x - nut_d / 2.0 - 3.0 if guide_dx > 0
+           else screw_x + nut_d / 2.0 + 0.5)
     body = body.fuse(Part.makeBox(2.5, push_w, z + g / 2.0 + cage_t - _z_bot,
-                                  v(gx - 8.0, screw_y - push_w / 2.0, _z_bot)))
+                                  v(_sp, screw_y - push_w / 2.0, _z_bot)))
     # Narrow enough in X to keep off the springs, which stand round the
     # guide rod a few millimetres away.
     _web_x0 = (gx + spr_od / 2.0 + 0.5 if guide_dx < 0
-               else screw_x - nut_d / 2.0)
-    body = body.fuse(Part.makeBox(screw_x + nut_d / 2.0 - _web_x0, web_t,
+               else screw_x - nut_d / 2.0 - 3.0)
+    _web_x1 = (screw_x + nut_d / 2.0 if guide_dx < 0
+               else gx - spr_od / 2.0 - 0.5)
+    body = body.fuse(Part.makeBox(_web_x1 - _web_x0, web_t,
                                   _z_top - _z_bot,
                                   v(_web_x0, web_y1 - web_t, _z_bot)))
     # Bores LAST: every fuse above would fill an earlier hole back in.
@@ -1676,9 +1691,10 @@ def make_carrier(st):
     springs, and its arm is what actually reaches the ear."""
     z = st["nut_z"]
     gx = screw_x + guide_dx
-    body = Part.makeBox(guide_d + 5.0, push_w, carrier_t,
-                        v(gx - (guide_d + 5.0) / 2.0, screw_y - push_w / 2.0,
-                          z - carrier_t / 2.0))
+    # A BUSH on the rod, not a plate with a hole: the rod takes the moment
+    # the arm makes, and it takes it on this length.
+    body = cyl(guide_d / 2.0 + 3.0, carrier_bush,
+               v(gx, screw_y, z - carrier_bush / 2.0), Z_AXIS)
     # Right up to the carriage's arm: at the ear's own height the ring's
     # silhouette ends at |x| 15.4, so the last few millimetres are free and
     # the pin between them can be short.
@@ -1693,26 +1709,31 @@ def make_carrier(st):
                                   v(_x_end - pin_boss_x,
                                     screw_y - push_w / 2.0,
                                     z - pin_boss_t / 2.0)))
-    body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_t + 2,
-                        v(gx, screw_y, z - carrier_t / 2.0 - 1), Z_AXIS))
+    body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_bush + 2,
+                        v(gx, screw_y, z - carrier_bush / 2.0 - 1), Z_AXIS))
     # It clears the screw: the arm passes beside it, not through it.
     body = body.cut(cyl(screw_d / 2.0 + run_clr, pin_boss_t + 2,
                         v(screw_x, screw_y, z - pin_boss_t / 2.0 - 1), Z_AXIS))
     # A SLOT, not a hole: the ear swings on its arc while the carrier goes
     # straight up, and the difference — 0.64 mm over the stroke — has to go
     # somewhere. It goes here.
-    _sl = fdm_act_hole_d + 1.6
-    return body.cut(Part.makeBox(carrier_t + 5.0, _sl, fdm_act_hole_d,
+    # Free in Y, TIGHT in Z. The ear's arc has to be swallowed, and that
+    # arc is in Y; in Z the slot is the load path, and 0.6 mm of slop there
+    # is more than the spring's whole working stroke — the actuation would
+    # spend its travel taking up its own slack.
+    _sl_y = fdm_act_hole_d + 1.6
+    _sl_z = act_pin_d + 0.2
+    return body.cut(Part.makeBox(carrier_t + 5.0, _sl_y, _sl_z,
                                  v(_x_end - carrier_t - 3.0,
-                                   ear_y - _sl / 2.0,
-                                   st["E"][1] - fdm_act_hole_d / 2.0)))
+                                   ear_y - _sl_y / 2.0,
+                                   st["E"][1] - _sl_z / 2.0)))
 
 
 def make_ear_pin(st):
     """The one pin left in the whole actuation: it joins the carrier's arm to
     the ear on the carriage, pressed into the ear and running in the arm."""
     x0 = ear_sx * side_x + side_t / 2.0
-    x1 = ear_sx * side_x - side_t / 2.0 - act_gap - carrier_t - 1.0
+    x1 = ear_sx * side_x - side_t / 2.0 - act_gap - carrier_t - 0.5
     # At the EAR's own place, which moves with the carriage: the pin is
     # pressed into the ear and it is the carrier that slides on it.
     return pin_x(st["E"], act_pin_d, min(x0, x1), abs(x1 - x0))
@@ -1725,7 +1746,7 @@ def make_spring_stack(st, side):
     Its rate and stroke are the screw's, not a catalogue's: spring_rate over
     spring_stroke. At ~140 N/mm over 0.4 mm that is die-spring or Belleville
     territory — a plain coil spring this short cannot do it."""
-    z = st["nut_z"] + side * (carrier_t / 2.0)
+    z = st["nut_z"] + side * (carrier_bush / 2.0)
     z0 = z if side > 0 else z - spr_h
     return cyl(spr_od / 2.0, spr_h,
                v(screw_x + guide_dx, screw_y, z0), Z_AXIS).cut(
