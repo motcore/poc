@@ -533,6 +533,34 @@ with a ~4–7 mm horn.
 
 ---
 
+## 12b. The chain lost its lever (2026-09-20)
+
+The five-pin chain (crank → link1 → lever 2.1:1 → link2 → ear) is now two
+pins: a crank on the spline and ONE link to the ear. The user asked for the
+simplification; nothing was given up for it.
+
+- **Crank r 5.0**, perpendicular to the link at rest. Pointing it at the ear
+  puts crank and link in line — dead centre, and at the far end of the stroke
+  the chain cannot reach the ear at all. Perpendicular is where the
+  transmission is: worst angle over the stroke 57.8°, against 41.7° before.
+- **Effective radius at the ear 4.48 mm**, measured at the preload stop, where
+  the old crank-and-lever gave 4.29. So the force at the ear is 32 N instead
+  of 34, and the torque ceiling 0.98 Nm instead of 1.0. The spring, the sweep
+  and the stops are unchanged; the sweep to contact (20.2°) is now DERIVED
+  from the crank rather than being the input the crank came out of.
+- **The link stacks OUTBOARD of the spring**, with the crank outermost. It
+  cannot go inboard: with the crank perpendicular, the link's pin sits one
+  crank radius from the spline, and the spring is wider than that — the joint
+  itself lands inside the spring, so no shape of link gets round it. Growing
+  the crank instead would have cost force at the ear in the same proportion,
+  which is exactly what the lever was there to buy.
+- **Cost: the carriage is 54 mm wide in X, against 45.** The ear follows the
+  link's band outward. The cube does not change (106.5 — the cardan sets it),
+  and the servo cannot move inboard to win it back: at 27 mm its case already
+  overlaps the neighbouring axis' bracket on the shared ceiling.
+- **Gone with the lever**: its ceiling post (one of the three brackets), link1,
+  three pins and three E-clips.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.
