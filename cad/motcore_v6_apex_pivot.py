@@ -1499,6 +1499,9 @@ def make_screw_top():
                         v(x0, screw_y, screw_top_z - 4.0))
     post = post.fuse(cyl(screw_d / 2.0 + 3.0, 8.0,
                          v(screw_x, screw_y, screw_top_z - 4.0), Z_AXIS))
+    post = post.fuse(cyl(guide_d / 2.0 + 3.0, 8.0,
+                         v(screw_x + guide_dx, screw_y, screw_top_z - 4.0),
+                         Z_AXIS))
     post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 12.0,
                         v(screw_x, screw_y, screw_top_z - 6.0), Z_AXIS))
     return post.cut(cyl(fdm_pin_press_d / 2.0, 12.0,
@@ -1512,8 +1515,11 @@ def make_guide_foot():
     be footed on the servo's own bracket, because at that height the case
     itself is in the way."""
     r = guide_d / 2.0 + 3.0
-    arm = Part.makeBox(2 * r, cube_half + bracket_weld - screw_y, 2 * r,
-                       v(screw_x + guide_dx - r, screw_y, guide_z0 - r))
+    # From r IN FRONT of the rod's axis, not from the axis itself: a box that
+    # starts on the axis leaves the bore half open, and half a bore holds
+    # half a rod.
+    arm = Part.makeBox(2 * r, cube_half + bracket_weld - (screw_y - r), 2 * r,
+                       v(screw_x + guide_dx - r, screw_y - r, guide_z0 - r))
     return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
                        v(screw_x + guide_dx, screw_y, guide_z0 - r - 1),
                        Z_AXIS))
