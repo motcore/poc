@@ -855,15 +855,25 @@ def pin_x(centre, d, x0, length):
     return cyl(d / 2.0, length, v(x0, centre[0], centre[1]), X_AXIS)
 
 
+_POSE_CACHE = {}
+
+
 def pose_state(phi_t):
     """Everything that depends on the tilt, in one dict, so that any pose can
     be built and checked rather than only the rendered one. The first version
     of this macro baked the rendered pose into module globals, and the links
     and the actuation train were consequently never checked against anything —
     which is exactly where two real collisions were hiding."""
+    key = round(phi_t, 12)
+    st = _POSE_CACHE.get(key)
+    if st is not None:
+        return st
     T, pose = carriage_transform(phi_t)
     st = {"phi": phi_t, "T": T, "B1": pose[0], "B2": pose[1]}
     st.update(act_chain(T))
+    # Cached: every sweep asks for the same handful of poses, and each one
+    # costs a bisection through the four-bar. Read-only, like cached().
+    _POSE_CACHE[key] = st
     return st
 
 
@@ -900,6 +910,35 @@ def wall_screws():
     that needs one, and both the wall and the bracket still read it, so they
     cannot disagree."""
     return []
+
+
+_SHAPE_CACHE = {}
+
+
+def cached(fn, *args):
+    """Build a shape once and hand the same one out afterwards.
+
+    Every sweep rebuilds the same solids at every pose — the carriage nine
+    times over, the frame brackets (whose swept-envelope cut is expensive)
+    four times per run. Nothing may MUTATE what comes back: Shape.rotate and
+    .translate work in place, so callers copy first (place, place_carriage,
+    uj_place all do)."""
+    key = (fn.__name__,) + args
+    if key not in _SHAPE_CACHE:
+        _SHAPE_CACHE[key] = fn(*args)
+    return _SHAPE_CACHE[key]
+
+
+def bb_gap(a, b):
+    """Lower bound on the distance between two shapes, from their bounding
+    boxes alone. Cheap, and a true lower bound, so a sweep looking for the
+    SMALLEST distance can skip any pair whose boxes are already further apart
+    than the best it has found — same answer, far fewer boolean solves."""
+    A, B = a.BoundBox, b.BoundBox
+    dx = max(0.0, A.XMin - B.XMax, B.XMin - A.XMax)
+    dy = max(0.0, A.YMin - B.YMax, B.YMin - A.YMax)
+    dz = max(0.0, A.ZMin - B.ZMax, B.ZMin - A.ZMax)
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 def place_carriage(shape, st):
@@ -1314,7 +1353,8 @@ def make_frame_bracket(zs):
     # Where the post meets the wall it is as wide as the links themselves, so
     # cut the link's own swept, oversized envelope out of it — a disc centred
     # on A undercounts that sweep (see _link_swept_envelope).
-    swept = _link_swept_envelope(A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
+    swept = cached(_link_swept_envelope,
+                   A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
     return part
 
@@ -1514,7 +1554,7 @@ def make_deck(zs):
         # after the relief is cut, so a pocket cannot eat a bracket; that they
         # never overlap is checked, not assumed.
         for _, rot in AXES:
-            deck = deck.fuse(place(make_servo_bracket(), rot))
+            deck = deck.fuse(place(cached(make_servo_bracket), rot))
     return deck
 
 
@@ -1557,7 +1597,7 @@ def make_wall():
     # 2026-09-20): pull the wall and the mechanism comes with it, with no
     # screws and no foot joint to work loose.
     for zs in (1, -1):
-        wall = wall.fuse(make_frame_bracket(zs))
+        wall = wall.fuse(cached(make_frame_bracket, zs))
     return wall
 
 
@@ -1705,10 +1745,10 @@ FIXED_PARTS = [
     ("BearingOutput", make_carriage_bearing(cube_half + out_brg_len, -1),
                                                               (0.30, 0.30, 0.32), 0),
     ("BearingOutIn",  make_carriage_bearing(cube_half, -1),   (0.30, 0.30, 0.32), 0),
-    ("FramePostT",    make_frame_bracket(1),                  (0.75, 0.75, 0.78), 0),
-    ("FramePostB",    make_frame_bracket(-1),                 (0.75, 0.75, 0.78), 0),
+    ("FramePostT",    cached(make_frame_bracket, 1),           (0.75, 0.75, 0.78), 0),
+    ("FramePostB",    cached(make_frame_bracket, -1),          (0.75, 0.75, 0.78), 0),
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
-    ("ServoBracket",  make_servo_bracket(),                   (0.75, 0.75, 0.78), 0),
+    ("ServoBracket",  cached(make_servo_bracket),             (0.75, 0.75, 0.78), 0),
     ("HornSpring",    make_spring(),                          (0.85, 0.85, 0.20), 0),
     ("Wall",          make_wall(),                            (0.45, 0.55, 0.75), 70),
 ] + [
@@ -1733,9 +1773,17 @@ _PIN_COL = (0.45, 0.45, 0.50)
 _ACT_COL = (0.30, 0.55, 0.85)
 
 
+_MOVING_CACHE = {}
+
+
 def moving_parts(st):
     """Every part whose position depends on the tilt: the carriage, the four
-    links with their pins, and the actuation train."""
+    links with their pins, and the actuation train. Cached per pose (the
+    sweeps ask for the same ones over and over); nothing may mutate what
+    comes back — see cached()."""
+    key = round(st["phi"], 12)
+    if key in _MOVING_CACHE:
+        return _MOVING_CACHE[key]
     out = [(n, place_carriage(sh, st), c, t) for n, sh, c, t in CARRIAGE_REST]
     pin_reach = link_x + link_t / 2.0 + 1.0
     pin_reach_b = side_x + side_t / 2.0 + 1.0
@@ -1767,6 +1815,7 @@ def moving_parts(st):
     out.append(("UJRing", uj_place(make_uj_ring(L_now), st), (0.50, 0.45, 0.85), 0))
     out.append(("UJCross", uj_place(make_uj_cross(), st), (0.50, 0.45, 0.85), 0))
     out += act_moving_parts(st)
+    _MOVING_CACHE[key] = out
     return out
 
 
@@ -1802,7 +1851,7 @@ for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
     add(doc, f"MotorRubber{_tag}", make_motor_rubber(_sd), color=(0.15, 0.15, 0.18))
 
 for _zs, _tag in ((1, "Top"), (-1, "Bottom")):
-    add(doc, f"Deck{_tag}", make_deck(_zs), color=(0.45, 0.55, 0.75),
+    add(doc, f"Deck{_tag}", cached(make_deck, _zs), color=(0.45, 0.55, 0.75),
         transparency=70)
 
 _ms_reach = mot_base_z + 15
@@ -1956,7 +2005,7 @@ if RUN_CHECKS:
     # Parts shared by every axis: they are built once, so they are not in
     # AXIS_PARTS and the all-pairs loop never sees them. The decks landed here too —
     # the same blind spot the wall was in.
-    _deck_top, _deck_bot = make_deck(1), make_deck(-1)
+    _deck_top, _deck_bot = cached(make_deck, 1), cached(make_deck, -1)
     _SHARED = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
                ("DeckTop", _deck_top), ("DeckBottom", _deck_bot)]
     _carr_mot_who = "-"
@@ -2010,6 +2059,8 @@ if RUN_CHECKS:
             for _sub, _against in ((make_link(_A_k, _st_k[_Bk]), _LINK_CONES),
                                    (make_link_knuckle(_A_k, _st_k[_Bk]), _LINK_POSTS)):
                 for _n, _s in _against:
+                    if bb_gap(_sub, _s) >= _link_gap:
+                        continue
                     _d = _sub.distToShape(_s)[0]
                     if _d < _link_gap:
                         _link_gap = _d
@@ -2029,13 +2080,15 @@ if RUN_CHECKS:
         _ring = uj_place(make_uj_ring(_L_k), _st_k)
         # The prism alone: its pins sit in the fork's holes by design.
         _cross = uj_place(make_uj_cross(pins=False), _st_k)
-        _cone = place_carriage(make_output_cone(), _st_k)
+        _cone = place_carriage(cached(make_output_cone), _st_k)
         for _a, _an, _b, _bn in ((_mid, "UJMid", _cone, "OutputCone"),
                                  (_mid, "UJMid", _fixed["Wall"], "Wall"),
                                  (_mid, "UJMid", _fixed["BearingOutIn"], "BearingOutIn"),
                                  (_mid, "UJMid", _fixed["UJFork"], "UJFork"),
                                  (_ring, "UJRing", _fixed["OutputShaft"], "OutputShaft"),
                                  (_cross, "UJCross", _fixed["UJFork"], "UJFork")):
+            if bb_gap(_a, _b) >= _uj_gap:
+                continue
             _d = _a.distToShape(_b)[0]
             if _d < _uj_gap:
                 _uj_gap = _d
@@ -2104,7 +2157,7 @@ if RUN_CHECKS:
         _st_k = pose_state(phi_preload * _k / 4.0)
         _mov = {n: s for n, s, c, t in act_moving_parts(_st_k)
                 if not n.startswith("Pin")}
-        _mov["Carriage"] = place_carriage(make_carriage(), _st_k)
+        _mov["Carriage"] = place_carriage(cached(make_carriage), _st_k)
         _pairs = [(a, b) for a in _mov for b in _fixed_act]
         _names = list(_mov)
         _pairs += [(_names[i], _names[j]) for i in range(len(_names))
@@ -2118,6 +2171,8 @@ if RUN_CHECKS:
                 continue
             _sa = _mov[_a]
             _sb = _mov[_b] if _b in _mov else _fixed_act[_b]
+            if bb_gap(_sa, _sb) >= max(_act_gap, 1.5):
+                continue
             _d = _sa.distToShape(_sb)[0]
             if _d < 1.5:
                 _act_tight[(_a, _b)] = min(_d, _act_tight.get((_a, _b), 9.0))
@@ -2127,31 +2182,31 @@ if RUN_CHECKS:
 
 
     # Every other axis, not just the next one. The four of them share one box.
-    _mech = None
-    for _n, _s, _c, _t in AXIS_PARTS:
-        if _n == "Wall":
-            _wall_shape = _s
-            continue
-        _mech = _s.copy() if _mech is None else _mech.fuse(_s)
-
-
-    def axis_shape(k):
-        """Axis k of the pinwheel, as one shape.
+    def axis_parts(k):
+        """Axis k of the pinwheel, part by part.
 
         All four axes are the SAME, rotated about Z — nothing is turned over any
         more. Each axis' servo sits in its own (+X) corner of the pinwheel, so no
         two want the same one. (Turning alternate axes over was only ever there
-        for two servos lying on the same floor.)"""
-        shape = _mech.copy().fuse(_wall_shape)
-        shape.rotate(ORIGIN, Z_AXIS, 90.0 * k)
-        return shape
+        for two servos lying on the same floor.)
+
+        Part by part rather than fused into one solid: fusing forty parts and
+        then intersecting the results cost more than every other check put
+        together, and the bounding boxes throw out all but a handful of the
+        pairs anyway."""
+        return [(n, place(sh, 90.0 * k)) for n, sh, c, t in AXIS_PARTS]
 
 
-    _asm = axis_shape(0)
+    _axis0 = axis_parts(0)
     _adj_overlap = 0.0
     _adj_worst = 0
     for _k in (1, 2, 3):
-        _v = _asm.common(axis_shape(_k)).Volume
+        _v = 0.0
+        for _na, _sa in _axis0:
+            for _nb, _sb in axis_parts(_k):
+                if not _bb_hit(_sa, _sb):
+                    continue
+                _v += _sa.common(_sb).Volume
         if _v > _adj_overlap:
             _adj_overlap, _adj_worst = _v, _k
 
@@ -2159,19 +2214,32 @@ if RUN_CHECKS:
     # its neighbour in the chain. Just under shim_gap must clear, just over
     # must hit — both ways, top and bottom. That is the play the shims fill,
     # found in the real solids rather than read back off the parameters.
+    def _near_joint(shape, pivot, r=12.0):
+        """Just the part of a shape around one pivot, full width in X.
+
+        The nudge test below is a boolean between solids, and on the whole
+        carriage against the whole link that is the most expensive check in
+        the macro. Cropping both to the joint first is the same test on
+        shapes a tenth the size."""
+        box = Part.makeBox(200.0, 2 * r, 2 * r,
+                           v(-100.0, pivot[0] - r, pivot[1] - r))
+        return shape.common(box)
+
+
     def _x_stop(mov, fixed_list, d):
         m = mov.copy()
         m.translate(v(d, 0, 0))
         return any(_bb_hit(m, f) and m.common(f).Volume > 1e-6 for f in fixed_list)
     _st0 = {n: sh for n, sh, c, t in moving_parts(pose_state(0.0)) + FIXED_PARTS}
     _x_bad = []
-    for _mn, _fn in (("Carriage", ("LinkT", "LinkB")),
-                     ("LinkT", ("FramePostT",)), ("LinkB", ("FramePostB",))):
-        _fl = [_st0[n] for n in _fn]
+    for _mn, _fn, _piv in (("Carriage", ("LinkT",), B1_0), ("Carriage", ("LinkB",), B2_0),
+                           ("LinkT", ("FramePostT",), A1), ("LinkB", ("FramePostB",), A2)):
+        _mv = _near_joint(_st0[_mn], _piv)
+        _fl = [_near_joint(_st0[n], _piv) for n in _fn]
         for _sg in (1, -1):
-            if (_x_stop(_st0[_mn], _fl, _sg * (shim_gap - 0.02))
-                    or not _x_stop(_st0[_mn], _fl, _sg * (shim_gap + 0.02))):
-                _x_bad.append(f"{_mn}{'+' if _sg > 0 else '-'}")
+            if (_x_stop(_mv, _fl, _sg * (shim_gap - 0.02))
+                    or not _x_stop(_mv, _fl, _sg * (shim_gap + 0.02))):
+                _x_bad.append(f"{_mn}@{_fn[0]}{'+' if _sg > 0 else '-'}")
     _x_slip = x_play_max / L_line
 
     # Pins have to GO IN: the four-bar's frame pins slide in along X from
@@ -2194,6 +2262,8 @@ if RUN_CHECKS:
             _c = _all["PinClip" + _j]
             for _n, _sh in _all.items():
                 if _n in _own or _n.startswith(("Pin", "Shim")):
+                    continue
+                if bb_gap(_c, _sh) >= _clip_gap_min:
                     continue
                 _d = _c.distToShape(_sh)[0]
                 if _d < _clip_gap_min:
