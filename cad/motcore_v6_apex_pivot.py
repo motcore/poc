@@ -1534,12 +1534,12 @@ def make_screw_top():
     never through the servo."""
     x0 = min(screw_x - nut_d / 2.0, screw_x + guide_dx - guide_d / 2.0 - 3.0)
     x1 = max(screw_x + nut_d / 2.0, screw_x + guide_dx + guide_d / 2.0 + 3.0)
-    post = Part.makeBox(x1 - x0, cube_half + bracket_weld - screw_y, 8.0,
-                        v(x0, screw_y, screw_top_z - 4.0))
-    post = post.fuse(cyl(screw_d / 2.0 + 3.0, 8.0,
-                         v(screw_x, screw_y, screw_top_z - 4.0), Z_AXIS))
-    post = post.fuse(cyl(guide_d / 2.0 + 3.0, 8.0,
-                         v(screw_x + guide_dx, screw_y, screw_top_z - 4.0),
+    post = Part.makeBox(x1 - x0, cube_half + bracket_weld - screw_y, 6.0,
+                        v(x0, screw_y, screw_top_z - 3.0))
+    post = post.fuse(cyl(screw_d / 2.0 + 3.0, 6.0,
+                         v(screw_x, screw_y, screw_top_z - 3.0), Z_AXIS))
+    post = post.fuse(cyl(guide_d / 2.0 + 3.0, 6.0,
+                         v(screw_x + guide_dx, screw_y, screw_top_z - 3.0),
                          Z_AXIS))
     post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 12.0,
                         v(screw_x, screw_y, screw_top_z - 6.0), Z_AXIS))
