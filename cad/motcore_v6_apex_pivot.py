@@ -285,6 +285,14 @@ nut_l         = 10.0   # mm — along the screw
 push_t        = 4.0    # mm — the pusher arm from the nut out to the ear
 push_w        = 12.0   # mm — wide enough to carry the guide bore as well
                         #      as the pin
+# The series spring lives at the END of the pusher, as a cartridge: the ear's
+# pin rides in a slot with a spring stack above it and another below, so the
+# nut can push the carriage BOTH ways through a spring. It has to be both
+# ways — free is the middle of the travel — which is why it is two stacks and
+# not one spring.
+spr_od        = 8.0    # mm — outside Ø of each stack
+spr_h         = 3.0    # mm — its height, seated
+spr_clr       = 0.2    # mm — slack in the slot beyond the working stroke
 guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
                         #      screw, through a bore in the nut's own pusher.
                         #      Without it the nut just turns with the screw;
@@ -299,7 +307,7 @@ guide_dx      = -10.0  # mm — the rod sits on the FAR side of the screw from
                         #      carriage's ring on the way up.
 guide_z0      = -8.0   # mm — where the rod starts: above the servo, below the
                         #      nut's travel, and outside the ring's rim
-screw_top_z   = 26.0   # mm — where the screw's top bearing sits, clear
+screw_top_z   = 31.0   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
                         #      chain's ratio now. It buys the ear an effective
@@ -839,6 +847,14 @@ else:
 _POSE_CACHE.clear()
 STOPS = {"free": 0.0, "contact": phi_c, "preload": phi_preload}
 phi = CARRIAGE_DIR * STOPS[CARRIAGE_STOP] if CARRIAGE_STOP != "free" else 0.0
+
+# The spring's working stroke: what is left of the servo's turn once the free
+# gap is closed, in millimetres at the nut. Everything about the spring — rate,
+# size, which family of part it can be — follows from this one number.
+spring_stroke = max(0.05, (sv_theta_max - sv_theta_c) / 360.0 * screw_lead)
+spring_rate = (2.0 * math.pi * sv_use * sv_stall * screw_eff
+               / (screw_lead / 1000.0)) / spring_stroke     # N/mm
+
 
 drift_contact = apex_drift(phi_c)
 drift_preload = apex_drift(phi_preload)
@@ -1548,7 +1564,7 @@ def make_nut(st):
     guide is for, and why the guide is a real feature and not a detail."""
     z = st["nut_z"]
     body = cyl(nut_d / 2.0, nut_l, v(screw_x, screw_y, z - nut_l / 2.0), Z_AXIS)
-    _x_face = ear_sx * side_x - side_t / 2.0 - act_gap
+    _x_face = _x_face_push()
     arm = Part.makeBox(_x_face - screw_x, push_w, push_t,
                        v(screw_x, screw_y - push_w / 2.0, z - push_t / 2.0))
     body = body.fuse(arm)
@@ -1566,8 +1582,30 @@ def make_nut(st):
     body = body.cut(cyl(guide_d / 2.0 + 0.25, push_t + 2,
                         v(screw_x + guide_dx, screw_y, z - push_t / 2.0 - 1),
                         Z_AXIS))
-    return body.cut(pin_x((ear_y, z), fdm_act_hole_d,
-                          ear_sx * side_x - 2.0, 4.0))
+    # The cartridge at the pusher's end: a block with a bore for the two
+    # spring stacks and a SLOT for the ear's pin between them. The pin's
+    # freedom in that slot is the spring's whole working stroke, twice over
+    # — once for each direction of engagement.
+    _slot = act_pin_d + 2.0 * (spring_stroke + spr_clr)
+    blk_h = _slot + 2.0 * spr_h + 4.0
+    # OUTBOARD of the carriage's ring, not against the arm: the cartridge is
+    # a block, and anywhere inside hous_ro it would dip into the ring's own
+    # cylinder. The ear's pin spans the gap instead — it is Ø3 steel over
+    # 6 mm, which that load does not notice.
+    _x_cart = -(hous_ro + 0.5) if ear_sx < 0 else (hous_ro + 0.5)
+    blk = Part.makeBox(push_t, spr_od + 4.0, blk_h,
+                       v(_x_cart - push_t, screw_y - (spr_od + 4.0) / 2.0,
+                         z - blk_h / 2.0))
+    body = body.fuse(blk)
+    body = body.cut(cyl(spr_od / 2.0 + 0.2, _slot + 2.0 * spr_h,
+                        v(_x_cart - push_t / 2.0, screw_y,
+                          z - (_slot / 2.0 + spr_h)), Z_AXIS))
+    # The pin's slot: a hole through, stretched in Z by the stroke.
+    body = body.cut(Part.makeBox(push_t + 2.0, fdm_act_hole_d, _slot,
+                                 v(_x_cart - push_t - 1.0,
+                                   ear_y - fdm_act_hole_d / 2.0,
+                                   z - _slot / 2.0)))
+    return body
 
 
 def _plate_bar(pts, x_band, w, press=(), holes=None):
@@ -1587,10 +1625,31 @@ def _plate_bar(pts, x_band, w, press=(), holes=None):
     return body
 
 
+def make_spring_stack(st, side):
+    """One of the two spring stacks in the cartridge, as its envelope.
+
+    Rate and stroke come out of the screw, not out of a catalogue: the lead
+    fixes how much travel is left after contact, and the servo's stall torque
+    fixes the force at the end of it. What the catalogue has to match is
+    spring_rate over spring_stroke — see the report."""
+    z = st["nut_z"] + side * (act_pin_d / 2.0 + spring_stroke + spr_clr)
+    z0 = z if side > 0 else z - spr_h
+    return cyl(spr_od / 2.0, spr_h, v(_x_face_push() - push_t / 2.0,
+                                      screw_y, z0), Z_AXIS)
+
+
+def _x_face_push():
+    """X of the pusher's outboard face: just short of the carriage's ring,
+    where its spring cartridge can stand clear of it."""
+    return -(hous_ro + 0.5) if ear_sx < 0 else (hous_ro + 0.5)
+
+
 def act_moving_parts(st):
     """The nut and its pusher. The screw turns but does not move, so it is a
     fixed part; the servo likewise."""
-    return [("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0)]
+    return [("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
+            ("SpringUp", make_spring_stack(st, 1), (0.85, 0.85, 0.20), 0),
+            ("SpringDown", make_spring_stack(st, -1), (0.85, 0.85, 0.20), 0)]
 
 
 def both_hands(pts):
@@ -1933,8 +1992,18 @@ def place(shape, rot_deg):
     return s
 
 
+# Parts that are PRINTED AS PART of another one. They stay in AXIS_PARTS,
+# because the checks need to see them as themselves — that they merge, that
+# they clear what they pass — but they are not DRAWN separately: their host
+# already contains them, and drawing both shows every one of them twice.
+WELDED_INTO = {"FramePostT": "Wall", "FramePostB": "Wall",
+               "ServoBracket": "Wall", "ScrewTop": "Wall",
+               "GuideFoot": "Wall"}
+
 for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
     for _pname, _pshape, _pcolor, _ptrans in AXIS_PARTS:
+        if _pname in WELDED_INTO:
+            continue
         add(doc, f"{_pname}_{_ax_name}", place(_pshape, _ax_rot),
             color=_pcolor, transparency=_ptrans)
 
@@ -2228,7 +2297,7 @@ if RUN_CHECKS:
     # Force at the nut: a screw's own equation, with its efficiency.
     _F_screw = (2.0 * math.pi * sv_use * sv_stall * screw_eff
                 / (screw_lead / 1000.0))
-    _spring_stroke = (sv_theta_max - sv_theta_c) / 360.0 * screw_lead
+    _spring_stroke = spring_stroke
 
     # The chain, swept as DISTANCES over the stroke, same lesson as the links and
     # the cardan: its stack is 0.5 mm plate to plate and it runs past the servo's
@@ -2236,6 +2305,10 @@ if RUN_CHECKS:
     # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
     # designed gap between neighbouring plates, not a running clearance.
     _ACT_PINNED = {frozenset(p) for p in (("ActNut", "Carriage"),
+                                          ("ActNut", "SpringUp"),
+                                          ("ActNut", "SpringDown"),
+                                          ("SpringUp", "Carriage"),
+                                          ("SpringDown", "Carriage"),
                                           ("ActNut", "ScrewShaft"),
                                           ("ActNut", "GuideRod"),
                                           ("GuideRod", "ScrewTop"),
