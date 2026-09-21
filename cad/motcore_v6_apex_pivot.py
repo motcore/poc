@@ -1721,89 +1721,50 @@ def make_brass_nut(st):
 
 
 def make_nut(st):
-    """The CAGE, printed: it grips the brass nut and carries the two spring
-    seats out to the guide rod.
+    """The CAGE, printed: it grips the brass nut and holds the carrier and
+    its two springs.
 
-    The spring cannot sit between the nut and the ear along the pusher —
-    there is no room beside the screw — so it sits round the GUIDE ROD,
-    which has space and is already the part that stops everything turning.
+    Built as ONE block with only what has to be empty cut out of it — not as
+    collar, plates, web, spine and roof fused one by one, which left slivers
+    and steps between them that did nothing (the user found three). What is
+    cut out:
+      * the CHAMBER between the two seat plates, where carrier and springs
+        live. Open toward the wall, so they go in from there, and toward the
+        ear, where the carrier's arm leaves. Its motor-side wall is the
+        'roof', taking the wall as the floor, as the user does.
+      * the brass nut's pocket above it, also open toward the wall;
+      * the screw's bore, and the guide rod's.
     The nut pushes a plate, the plate pushes a spring, the spring pushes the
-    carrier: that is the series compliance, and it works both ways because
-    there is a plate, a spring and a seat on each side."""
+    carrier: that is the series compliance, both ways."""
     z = st["nut_z"]
     zn = _nut_body_z(st)
-    # A collar round the brass nut, open toward the wall (there is no room
-    # that way) — the web up the motor side closes it.
-    body = cyl(nut_d / 2.0 + 2.0, nut_l, v(screw_x, screw_y, zn - nut_l / 2.0),
-               Z_AXIS)
-    body = body.cut(Part.makeBox(60.0, 30.0, 60.0,
-                                 v(screw_x - 30.0, cube_half - run_clr,
-                                   z - 30.0)))
     g = _cage_gap()
     gx = screw_x + guide_dx
-    for side in (1, -1):
-        z_plate = z + side * (g / 2.0) if side > 0 else z - g / 2.0 - cage_t
-        _p0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
-        _p1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
-        plate = Part.makeBox(_p1 - _p0, push_w, cage_t,
-                             v(_p0, screw_y - push_w / 2.0, z_plate))
-        body = body.fuse(plate)
-    # A web down the nut's INBOARD side ties the two plates to it. It cannot
-    # be a sleeve round the nut: at this Y the wall is 7 mm away and the nut
-    # is already 14 across, so the cage has to grow toward the motor, not
-    # round.
-    web_t = 9.0
-    web_y1 = screw_y - push_w / 2.0 + 3.5      # overlapping the seat plates
-    _z_bot = z - g / 2.0 - cage_t
-    _z_top = zn + nut_l / 2.0
-    # The ROOF — taking the wall as the floor, as the user does: a plate down
-    # the cage's motor-side face, the whole length of the seat plates and the
-    # whole height between them. It turns the two plates from separate
-    # cantilevers into one C-channel. The carrier leaves the cage toward the
-    # ear, in X, so a closed face on the motor side costs it nothing.
-    _roof_t = 2.5
-    _roof_y1 = screw_y - push_w / 2.0 - 0.5      # clear of the carrier
-    _px0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
-    _px1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
-    body = body.fuse(Part.makeBox(_px1 - _px0, _roof_t,
-                                  g + 2.0 * cage_t,
-                                  v(_px0, _roof_y1 - _roof_t,
-                                    z - g / 2.0 - cage_t)))
-    # A spine BEYOND the rod ties the two seat plates together. It cannot run
-    # up the motor side: that is where the carrier's own arm passes, and the
-    # cage has to let it move.
-    # The spine ties the seat plates together on the far side of the NUT,
-    # away from the carrier's own arm.
-    _sp = (screw_x - nut_d / 2.0 - 3.0 if guide_dx > 0
-           else screw_x + nut_d / 2.0 + 0.5)
-    body = body.fuse(Part.makeBox(2.5, push_w, z + g / 2.0 + cage_t - _z_bot,
-                                  v(_sp, screw_y - push_w / 2.0, _z_bot)))
-    # Narrow enough in X to keep off the springs, which stand round the
-    # guide rod a few millimetres away.
-    _web_x0 = (gx + spr_od / 2.0 + 0.5 if guide_dx < 0
-               else screw_x - nut_d / 2.0 - 3.0)
-    _web_x1 = (screw_x + nut_d / 2.0 if guide_dx < 0
-               else gx - spr_od / 2.0 - 0.5)
-    body = body.fuse(Part.makeBox(_web_x1 - _web_x0, web_t,
-                                  _z_top - _z_bot,
-                                  v(_web_x0, web_y1 - web_t, _z_bot)))
-    # Bores LAST: every fuse above would fill an earlier hole back in.
-    # The web runs past the carrier's own height, so it is slotted there —
-    # that slot is what lets the carrier float between the springs.
-    _slot_h = pin_boss_t + 2.0 * (spring_stroke + spr_clr) + 0.6
-    body = body.cut(Part.makeBox(nut_d + 4.0, 20.0, _slot_h,
-                                 v(screw_x - nut_d / 2.0 - 3.0, web_y1 - 15.0,
-                                   z - _slot_h / 2.0)))
-    _h = _z_top - _z_bot + 2.0
-    # The brass nut's own pocket, cut LAST like every other bore: the web is
-    # fused after the collar and would otherwise fill it straight back in.
+    roof_t = 2.5
+    x0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
+    x1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
+    y_in = screw_y - push_w / 2.0 - 0.5          # the carrier's motor side
+    y0 = y_in - roof_t
+    y1 = min(screw_y + push_w / 2.0, cube_half - run_clr)
+    z0 = z - g / 2.0 - cage_t
+    z1 = zn + nut_l / 2.0
+    body = Part.makeBox(x1 - x0, y1 - y0, z1 - z0, v(x0, y0, z0))
+    # the chamber: from the spine at x0 to open at x1, from the roof to open
+    # at the wall side, between the seat plates
+    spine_t = 2.5
+    body = body.cut(Part.makeBox(x1 - x0 - spine_t + 1.0, y1 - y_in + 1.0, g,
+                                 v(x0 + spine_t, y_in, z - g / 2.0)))
+    # the brass nut's pocket, open toward the wall
     body = body.cut(cyl(nut_d / 2.0 + 0.15, nut_l + 0.4,
                         v(screw_x, screw_y, zn - nut_l / 2.0 - 0.2), Z_AXIS))
-    body = body.cut(cyl(screw_d / 2.0 + 0.2, _h, v(screw_x, screw_y,
-                                                   _z_bot - 1), Z_AXIS))
-    return body.cut(cyl(guide_d / 2.0 + 0.25, _h,
-                        v(gx, screw_y, _z_bot - 1), Z_AXIS))
-
+    body = body.cut(Part.makeBox(nut_d + 0.3, y1 - screw_y + 1.0, nut_l + 0.4,
+                                 v(screw_x - nut_d / 2.0 - 0.15, screw_y,
+                                   zn - nut_l / 2.0 - 0.2)))
+    # bores
+    body = body.cut(cyl(screw_d / 2.0 + 0.2, z1 - z0 + 2.0,
+                        v(screw_x, screw_y, z0 - 1.0), Z_AXIS))
+    return body.cut(cyl(guide_d / 2.0 + 0.25, z1 - z0 + 2.0,
+                        v(gx, screw_y, z0 - 1.0), Z_AXIS))
 
 def make_carrier(st):
     """The floating carrier: it slides on the guide rod between the two
