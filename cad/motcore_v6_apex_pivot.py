@@ -324,7 +324,10 @@ carrier_bush  = 12.0   # mm — and its bush on the guide rod is this long. The
 pin_boss_t    = 8.0    # mm — it thickens to this round the ear pin's slot
 pin_boss_x    = 5.0    # mm — over this much of its length: short, so it
                         #      stops before the screw the arm passes
-cage_t        = 2.5    # mm — each of the driver's two seat plates
+cage_t        = 2.5    # mm — the driver's LOWER seat plate
+cage_top_t    = 5.0    # mm — its UPPER one, thicker: the nut's flange screws
+                        #      down into it, and over the chamber this plate is
+                        #      all the thread they get. At 2.5 it was nothing.
 spr_h         = 1.8    # mm — its height, seated. Short, because the cage
                         #      has to hold bush, springs and stroke between
                         #      the nut above and the ring below.
@@ -1720,7 +1723,7 @@ def _nut_body_z(st):
     The flange sits on the upper seat plate and the body hangs down into the
     cage beside the springs, where the chamber is empty: that keeps the whole
     assembly low enough to clear the screw's top bearing."""
-    return st["nut_z"] + _cage_gap() / 2.0 + cage_t
+    return st["nut_z"] + _cage_gap() / 2.0 + cage_top_t
 
 
 def _cage_gap():
@@ -1767,7 +1770,12 @@ def make_nut(st):
     g = _cage_gap()
     gx = screw_x + guide_dx
     roof_t = 2.5
-    x0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
+    # Out far enough to take the flange's outer screw WHOLE — the cage used
+    # to end on that screw's own axis (user, 2026-09-21) — and no closer to
+    # the neighbour's wall than a running gap.
+    x0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0,
+             max(screw_x - nut_fl_pitch / 2.0 - foot_tap_d / 2.0 - 1.5,
+                 -cube_half + run_clr / 2.0 + 0.05))
     x1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
     y_in = min(screw_y - nut_fl[1] / 2.0,
                guide_y - spr_od / 2.0, _carrier_y()[0]) - 0.5
@@ -1903,7 +1911,8 @@ def make_flange_screw(st, sx):
     """One of the two M3 screws that hold the nut's flange down on the cage:
     from above, through the flange, into the cage."""
     zf = _nut_body_z(st) + nut_fl[2]
-    return make_screw(v(screw_x + sx, screw_y, zf), v(0, 0, -1), 3.0, 6.0,
+    # M3 x 10: 4 through the flange, 6 into the cage.
+    return make_screw(v(screw_x + sx, screw_y, zf), v(0, 0, -1), 3.0, 10.0,
                       5.5, 2.0)
 
 
