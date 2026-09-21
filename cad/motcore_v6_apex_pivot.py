@@ -1368,7 +1368,8 @@ def make_carriage():
     # runs in the carrier's slot.
     body = body.cut(pin_x(E0, fdm_act_press_d, x_ear[0] - 1.0,
                           x_ear[1] - x_ear[0] + 1.0))
-    return body
+    # One face per flat: the arms' faces coplanar with the block's leave seams.
+    return body.removeSplitter()
 
 
 def make_ear():
@@ -1389,16 +1390,22 @@ def make_carriage_arms(sd):
     # The jog out to each pivot runs at 45 deg, not square: from B straight
     # down-and-out until it meets the upright.
     z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
-    part = bar_yz((arm_root[0], -z_corner), (arm_root[0], z_corner),
-                  arm_up_w, x0, side_t)
     # The jogs and the pin's boss run OUTWARD to the block's own face: the
     # pin had 4 mm of arm round it and stood a millimetre out of it, in air.
-    # Flush with the block, the pin is held along its whole reach.
+    # Flush with the block, the pin is held along its whole reach. The
+    # upright goes out to the block's edge with them (user, 2026-09-21).
     x0_out = x0 if sd > 0 else -carr_half
     t_out = carr_half - (side_x - side_t / 2.0)
+    # Square-ended, not round: a round end stood out over the block's top
+    # beside the jog.
+    part = box_yz(arm_root[0] - arm_up_w / 2.0, arm_root[0] + arm_up_w / 2.0,
+                  -z_corner, z_corner, x0_out, t_out)
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
-        corner = (arm_root[0], zs * z_corner)
+        # The jog's inner end runs 5 mm on INTO the block, so its round end
+        # is buried there instead of standing out over the block's top.
+        _k = 5.0 / math.sqrt(2.0)
+        corner = (arm_root[0] + _k, zs * (z_corner - _k))
         part = part.fuse(bar_yz(corner, b, arm_w, x0_out, t_out))
         part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0_out, t_out))
         # Thrust boss on the arm's INNER face, standing out to a shim's width
@@ -1408,7 +1415,10 @@ def make_carriage_arms(sd):
         part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5,
                                  sd * x_in if sd > 0 else -x_arm_in,
                                  x_arm_in - x_in))
-    return part
+    # Nothing past the wall-side face: it is the face on the bed.
+    return part.cut(Part.makeBox(2 * carr_half + 20.0, 20.0, 2 * carr_half + 40.0,
+                                 v(-carr_half - 10.0, hous_y1,
+                                   -carr_half - 20.0)))
 
 def make_carriage_bearing(y_face, sd):
     y_start = min(y_face, y_face + sd * brg_w)
