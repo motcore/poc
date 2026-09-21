@@ -212,7 +212,11 @@ x_play_max = 0.08     # mm — carriage X play allowed after shimming: its slip,
 sv_theta_max  = 80.0   # deg — servo sweep, free → full preload (margin to the
                         #       MG90's own ~90 deg end stops)
 sv_stall      = 0.18   # Nm  — MG90-class stall torque; the spring is sized to
-sv_use        = 0.8    #       reach this fraction of it at full preload
+sv_use        = 0.6    #       reach this fraction of it at full preload.
+                        #       Was 0.8 (user, 2026-09-21): the datasheet's
+                        #       stall is a best case at 4.8 V, cheap servos
+                        #       come in under it, and the supply sags just
+                        #       when the servo pulls hardest.
 spring_ratio  = 15.0   # —   — rubber stiffness / spring stiffness, both seen as
                         #       servo-side angle past contact. Invented (doc
                         #       §10.2): it only sets how far past contact the
