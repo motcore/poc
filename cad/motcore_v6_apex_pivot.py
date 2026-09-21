@@ -624,14 +624,12 @@ fw_screw_z    = 0.0    # mm — |Z| the wall screws sit off the pivot's own
                         #      swept part actually being there: two screws,
                         #      X-spread only, same count and pattern the deck
                         #      version used.
-deck_t        = 12.0   # mm — floor / ceiling plate thickness. Was 4: the
-                        #      motor shaft's axial load lands in the middle of
-                        #      these plates, 36 N per engaged axis (144 with all
-                        #      four on one cone), and 4 mm of PLA sank 0.1-0.7
-                        #      mm under it — the rubber's whole squeeze. Grown
-                        #      OUTWARD (the inside is full); printed with 4-5
-                        #      solid layers each face and ~15-20% gyroid it IS a
-                        #      box plate, ~10-15x stiffer (user, 2026-09-21).
+deck_t        = 4.0    # mm — floor / ceiling plate thickness. The motor
+                        #      shaft's axial load (36 N per engaged axis, 144
+                        #      with all four on one cone) does NOT bend it: four
+                        #      12 mm ribs take it from the bearing's boss
+                        #      straight to the four-bar's posts, ~0.007 mm
+                        #      (user, 2026-09-21: back to a 106 mm cube)
 deck_boss_h   = 5.0    # mm — how far their screw bosses stand proud, inward
 deck_pocket_min = 1.0  # mm — relief in the CEILING's inner face over the crank's
                         #      path: at full stroke the crank passed 0.21 mm under
@@ -660,9 +658,7 @@ foot_flange   = 9.0    # mm — how far a frame-bracket foot turns inboard to gi
 bracket_weld  = 1.0    # mm — how far a bracket printed as part of its host
                         #      runs INTO it, so the fuse is a solid joint and
                         #      not two solids sharing a face
-wall_thick     = 12.0  # mm — cube wall thickness: the same 12 as the decks,
-                        #      because it has to be a CUBE (user, 2026-09-21),
-                        #      and a box plate like them
+wall_thick     = 4.0   # mm — cube wall thickness
 wall_gap       = 2.0   # mm — RUNNING clearance, corona back plate → wall. It
                         #      was 6, which is a lot of air for a disc facing a
                         #      fixed plate. Note it no longer sets the cube on
@@ -694,28 +690,40 @@ shaft_d        = 5.0   # mm — output shaft diameter
 motor_shaft_d  = 8.0   # mm — ground Ø8 rod. Ø5 bent ~0.08 mm under one axis'
                         #      radial load between the decks, against a ~0.2
                         #      mm squeeze; Ø8 bends ~0.01
-mbrg           = (8.0, 22.0, 7.0)   # mm — 608ZZ, one in each deck
+mbrg           = (8.0, 16.0, 5.0)   # mm — 688ZZ, one in each deck: a 608
+                                    #      was 2 mm too tall under the lower
+                                    #      flange's screw heads
+rib_w, rib_d   = 4.0, 12.0          # mm — the decks' ribs (12 deep clears the
+                                    #      links by 3.5 mm over the stroke)
 mflange        = (22.0, 4.0)        # mm — rigid flange coupling for Ø8: flange
 mflange_hub    = (12.0, 13.0)       #      Ø x thick, hub Ø x long — PROVISIONAL,
 mflange_pcd    = 17.0               #      measure the one bought; 4x M3 on PCD
 mcol_wash_t    = 1.0   # mm — washer 8x12 between each collar and its bearing's
                         #      inner race (a collar Ø14 would reach the shield)
-mbrg_lip       = 1.0   # mm — the lip each 608's outer race pushes on, Ø18 bore
+mbrg_lip       = 1.0   # mm — the lip each 688's outer race pushes on
+mring          = (4.2, 5.0, 2.0)    # mm — printed ring on a 688's inner race
+                                    #      (ri, ro, thick): its shields start
+                                    #      just outside r 5
 # Cube to cube (user, 2026-09-21): FIVE identical male outputs (top and the
 # four walls) and one female input (bottom), so a cube stacks on any output.
-# The joint is a jaw (spider) coupling — halves bought with a 5 or an 8 mm
-# bore, the same outside — located by a square spigot (it centres and it
-# carries the reaction torque, in 90 deg steps) and held by magnets at the
-# corners. A hard knock pulls the cubes apart, which is wanted.
-jc_d           = 20.0  # mm ┐ jaw coupling D20 L25: half = hub + claws,
-jc_hub         = 7.5   # mm │ assembled length jc_len — PROVISIONAL, measure
-jc_claw        = 9.0   # mm │
-jc_len         = 25.0  # mm ┘
-jc_clr         = 0.6   # mm — round each half, radially and at its base
+# PRINTED DOGS keyed on a D on the shaft by a grub — a jaw coupling was 25 mm
+# long and made the faces 12 mm thick. They carry ~1 Nm on the walls' Ø5 and
+# ~1.4 Nm at the input (the column's fuse); located by a square spigot (it
+# centres, and carries the reaction torque in 90 deg steps), held by magnets
+# at the corners. A hard knock pulls the cubes apart, which is wanted.
+dog_d          = 20.0  # mm — the dogs' Ø
+dog_base_m     = 5.5   # mm — male's base (its D bore's length, plus the claws')
+dog_base_f     = 5.5   # mm — female's base
+dog_claw       = 4.0   # mm — claw height; claws r dog_claw_ri..dog_d/2
+dog_claw_ri    = 6.0   # mm
+dog_tube_r     = 5.5   # mm — the male's core through its claws (more D)
+dog_gap        = 0.5   # mm — claw tips off the other half's base
+dog_clr        = 0.6   # mm — round each dog, and at its base
 sp_side        = 34.0  # mm ┐ the square spigot on each output face
 sp_h           = 3.0   # mm ┘
 sp_clr         = 0.2   # mm — the input face's socket over the spigot
-mag_d, mag_t   = 10.0, 3.0   # mm — N52 disc magnets, four per face
+mag_d, mag_t   = 10.0, 2.0   # mm — N52 disc magnets, four per face (2 thick:
+                              #      the plates are 4)
 mag_at         = 40.0  # mm — at (±40, ±40) from the face's centre
 
 # ── Carriage bearings — MR105ZZ, the project's single standard bearing ───────
@@ -1263,53 +1271,44 @@ def make_motor_cone(sd):
     return cone
 
 
-def _ring_z(ri, ro, z0, h):
-    """A ring on the motor axis from z0 over h (h may be negative)."""
-    za = min(z0, z0 + h)
-    return cyl(ro, abs(h), v(0, 0, za)).cut(cyl(ri, abs(h) + 2, v(0, 0, za - 1)))
+def _dog_off():
+    """How far past its face a male dog's base starts: just clear of the wall
+    output shaft's outer bearing, which stands 1.5 mm proud of the wall."""
+    return out_brg_len + 0.6 - wall_thick
 
 
-def make_motor_shaft():
-    """The motor shaft: Ø8, from inside the input's female coupling half to
-    inside the top output's male half."""
-    z0 = _col_z(-1)["hub"][1]          # the female half's hub, outer end
-    z1 = _col_z(1)["hub"][1]           # the male half's hub, outer end
-    return cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
+def _face():
+    return cube_half + deck_t
 
 
-def _jc_sink():
-    """How deep each male half sits in its own face: as deep as the walls
-    allow, 0.7 mm clear of the output shaft's outer bearing."""
-    return wall_thick - (brg_seat_lip + brg_w + 0.7)
-
-
-def _col_z(sd):
-    """Z of the column's parts on one side (sd = +1 top, -1 bottom), as a
-    dict, all measured from the cube's outer face inward. Top: the male half
-    in the face, the 608 under it on a lip. Bottom: the female half and its
-    spider in a socket, the 608 over it on a lip, standing in a boss."""
-    zf = cube_half + deck_t
-    if sd > 0:
-        half0 = zf - _jc_sink()                  # male half's base
-        hub = (half0, half0 + jc_hub)
-        claws = (half0 + jc_hub, half0 + jc_hub + jc_claw)
-        socket = half0 - jc_clr                  # counterbore's floor
-    else:
-        inner = zf - (jc_len - _jc_sink())       # female half's inner end
-        hub = (inner, inner + jc_hub)
-        claws = (inner + jc_hub, inner + jc_hub + jc_claw)
-        socket = inner - jc_clr
-    lip = (socket - mbrg_lip, socket)
-    brg = (lip[0] - mbrg[2], lip[0])
-    wash = (brg[0] - mcol_wash_t, brg[0])
-    col = (wash[0] - col_h, wash[0])
-    # every entry as (inner end, outer end), then mirrored for the bottom
-    d = dict(face=zf, hub=hub, claws=claws, socket=socket, lip=lip,
-             brg=brg, wash=wash, col=col)
-    if sd < 0:
-        d = {k: (tuple(-x for x in val) if isinstance(val, tuple) else -val)
-             for k, val in d.items()}
+def _col_top():
+    """Z of the top's parts (positive up)."""
+    F = _face()
+    b0 = F + _dog_off()
+    d = dict(base=(b0, b0 + dog_base_m),
+             claws=(b0 + dog_base_m, b0 + dog_base_m + dog_claw),
+             lip=(cube_half, cube_half + mbrg_lip),
+             brg=(cube_half - mbrg[2], cube_half))
+    d["ext"] = (d["lip"][1] + 0.5, b0)            # the top dog's hub, inward
+    d["ring"] = (d["brg"][0] - mring[2], d["brg"][0])
+    d["col"] = (d["ring"][0] - col_h, d["ring"][0])
     return d
+
+
+def _col_bottom():
+    """Z of the bottom's parts, as DEPTHS into the cube from its face."""
+    fc0 = _dog_off() + dog_base_m + dog_gap
+    fc1 = fc0 + dog_claw
+    fb1 = fc1 + dog_base_f
+    rec = fb1 + dog_clr
+    return dict(claws=(fc0, fc1), base=(fc1, fb1), socket=rec,
+                lip=(rec, rec + mbrg_lip),
+                brg=(rec + mbrg_lip, rec + mbrg_lip + mbrg[2]))
+
+
+def _zb(depth):
+    """Bottom depth -> z."""
+    return -(_face() - depth)
 
 
 def _zspan(a, b, r_in, r_out):
@@ -1320,34 +1319,45 @@ def _zspan(a, b, r_in, r_out):
     return ring
 
 
+def make_motor_shaft():
+    """The motor shaft: Ø8, from the input's female dog to the top's male
+    dog, a D filed at each end for their grubs. A plain steel rod, not a
+    hardened linear rod: that one cannot be filed."""
+    z0 = _zb(_col_bottom()["base"][0] + 0.3)
+    z1 = _col_top()["claws"][1] - 0.5
+    return cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
+
+
 def make_motor_bearing(sd):
-    """608ZZ, on its lip, just inside the coupling's socket."""
-    z = _col_z(sd)["brg"]
+    """688ZZ on its lip."""
+    if sd > 0:
+        z = _col_top()["brg"]
+    else:
+        z = tuple(_zb(t) for t in _col_bottom()["brg"])
     return _zspan(z[0], z[1], mbrg[0] / 2.0, mbrg[1] / 2.0)
 
 
-def make_motor_washer(sd):
-    """8x12x1 washer on the bearing's inner race, on the cone side."""
-    z = _col_z(sd)["wash"]
-    return _zspan(z[0], z[1], motor_shaft_d / 2.0, 6.0)
+def make_motor_ring():
+    """Top: printed ring on the top 688's inner race, under the collar."""
+    z = _col_top()["ring"]
+    return _zspan(z[0], z[1], mring[0], mring[1])
 
 
-def make_motor_collar(sd):
-    """Lock collar on the shaft against that washer: the pair of them hold
-    the shaft in Z, each deck taking the thrust toward itself."""
-    z = _col_z(sd)["col"]
+def make_motor_collar(sd=1):
+    """Top: lock collar under that ring — the up stop."""
+    z = _col_top()["col"]
     return _zspan(z[0], z[1], motor_shaft_d / 2.0, col_d / 2.0)
 
 
 def make_motor_spacer():
     """Bottom only, PRINTED: a sleeve from the lower cone's flange down to the
-    washer on the bottom bearing. There is no room for a collar there — the
-    flange's screw heads take it — so the flange itself, through this, is the
-    down stop. Its length sets the cones' height: print it to length, or shim
-    it, to put the rubber apex on the carriage's."""
+    bottom 688's inner race, inside the flange's ring of screw heads. The
+    flange, through this, is the down stop, and its length sets the cones'
+    height: print it to length, or shim it, to put the rubber apex on the
+    carriage's."""
     z0 = -(mot_base_z + mflange[1])
-    z1 = _col_z(-1)["wash"][0]
-    return _zspan(z0, z1, motor_shaft_d / 2.0 + 0.2, 5.8)
+    z1 = _zb(_col_bottom()["brg"][1])
+    return _zspan(z0, z1, mring[0], mring[1])
 
 
 def make_motor_flange(sd):
@@ -1366,38 +1376,39 @@ def make_motor_flange(sd):
     return body
 
 
-def _jaw_half(hub, claws, bore_d, axis_pt, axis):
-    """A jaw-coupling half as its envelope: the hub with its bore, and the
-    claws (with the spider, on the female) as a solid drum."""
-    def span(a, b):
-        lo, hi = min(a, b), max(a, b)
-        return lo, hi - lo
-    lo, ln = span(*hub)
-    body = cyl(jc_d / 2.0, ln, axis_pt(lo), axis)
-    body = body.cut(cyl(bore_d / 2.0, ln + 2, axis_pt(lo - 1), axis))
-    lo, ln = span(*claws)
-    return body.fuse(cyl(jc_d / 2.0, ln, axis_pt(lo), axis))
+def _male_dog(bore_d, t0, pt, axis, ext=None):
+    """A male dog (PRINTED) as its envelope: base, then its claws as a drum
+    (claws and the core between them), a D bore through all of it, and
+    optionally a hub reaching back inward (the top's)."""
+    body = cyl(dog_d / 2.0, dog_base_m + dog_claw, pt(t0), axis)
+    if ext is not None:
+        body = body.fuse(cyl(7.0, ext[1] - ext[0], pt(ext[0]), axis))
+    lo = t0 if ext is None else ext[0]
+    return body.cut(cyl(bore_d / 2.0, t0 + dog_base_m + dog_claw - lo + 2,
+                        pt(lo - 1), axis))
 
 
-def make_jaw_top():
-    """The top output's male half, on the motor shaft."""
-    z = _col_z(1)
-    return _jaw_half(z["hub"], z["claws"], motor_shaft_d,
-                     lambda t: v(0, 0, t), Z_AXIS)
+def make_dog_top():
+    """The top output's male dog, on the motor shaft."""
+    d = _col_top()
+    return _male_dog(motor_shaft_d, d["base"][0], lambda t: v(0, 0, t), Z_AXIS,
+                     ext=d["ext"])
 
 
-def make_jaw_bottom():
-    """The input's female half, with its spider, on the motor shaft."""
-    z = _col_z(-1)
-    return _jaw_half(z["hub"], z["claws"], motor_shaft_d,
-                     lambda t: v(0, 0, t), Z_AXIS)
+def make_dog_wall():
+    """A wall output's male dog, on the output shaft (per axis)."""
+    return _male_dog(shaft_d, _face() + _dog_off(), lambda t: v(0, t, 0), Y_AXIS)
 
 
-def make_jaw_wall():
-    """A wall output's male half, on the output shaft (per axis)."""
-    y0 = cube_half + wall_thick - _jc_sink()
-    return _jaw_half((y0, y0 + jc_hub), (y0 + jc_hub, y0 + jc_hub + jc_claw),
-                     shaft_d, lambda t: v(0, t, 0), Y_AXIS)
+def make_dog_bottom():
+    """The input's female dog (PRINTED), with the TPU spider in its claws:
+    its claws leave the middle free for the male's core."""
+    d = _col_bottom()
+    z_c0, z_c1 = _zb(d["claws"][0]), _zb(d["claws"][1])
+    z_b1 = _zb(d["base"][1])
+    claws = _zspan(z_c0, z_c1, dog_claw_ri, dog_d / 2.0)
+    base = _zspan(z_c1, z_b1, motor_shaft_d / 2.0, dog_d / 2.0)
+    return claws.fuse(base)
 
 
 def _face_magnet_pts():
@@ -1413,35 +1424,62 @@ def make_wall_magnet(k):
 def make_deck_magnet(zs, k):
     """One of a deck's four magnets, flush with its outer face."""
     x, y = _face_magnet_pts()[k]
-    zf = zs * (cube_half + deck_t)
+    zf = zs * _face()
     return cyl(mag_d / 2.0, mag_t, v(x, y, zf - zs * mag_t if zs > 0 else zf))
 
 
+def _deck_ribs(zs):
+    """Four ribs under the deck, one in each axis' mid-plane, from the
+    bearing's boss out to the frame post's pad: the motor shaft's thrust goes
+    straight to the posts it reacts against, and the plate barely bends."""
+    z0 = cube_half - rib_d if zs > 0 else -cube_half - 1.0
+    # The post is its own part: the rib stops 0.6 short of its front face,
+    # and only the strip level with the deck's pad runs on into the pad.
+    y_post = cached(make_frame_bracket, 1).BoundBox.YMin
+    z_pad = fb_A[1] + fp_post_y
+    ribs = None
+    for _, rot in AXES:
+        r = Part.makeBox(rib_w, y_post - 0.6 - 9.0, rib_d + 1.0,
+                         v(-rib_w / 2.0, 9.0, z0))
+        zp0, zp1 = (z_pad, cube_half + 1.0) if zs > 0 else (-cube_half - 1.0, -z_pad)
+        r = r.fuse(Part.makeBox(rib_w, 1.6, zp1 - zp0,
+                                v(-rib_w / 2.0, y_post - 0.6, zp0)))
+        r = place(r, rot)
+        ribs = r if ribs is None else ribs.fuse(r)
+    return ribs
+
+
 def _deck_column_features(deck, zs):
-    """The deck's middle: the 608 on its lip, the coupling's socket, the
-    spigot (top) or its socket (bottom), and the four magnet pockets. All
-    cut LAST."""
-    z = _col_z(zs)
-    zf = z["face"]
+    """The deck's middle: ribs, the 688's boss and lip, the dog's hole or
+    socket, the spigot (top) or its socket (bottom), and the magnet pockets.
+    Holes cut LAST."""
+    F = _face()
     seat_r = mbrg[1] / 2.0 + brg_fit_press
-    b_in, b_out = z["brg"]
-    # A boss inside the cube wherever the bearing stands proud of the deck.
-    if abs(b_in) < cube_half:
-        deck = deck.fuse(_zspan(b_in, zs * (cube_half + 1.0), 0.0, seat_r + 3.0))
+    hole_r = dog_d / 2.0 + dog_clr
+    deck = deck.fuse(_deck_ribs(zs))
     if zs > 0:
+        d = _col_top()
+        deck = deck.fuse(_zspan(d["brg"][0], cube_half + 1.0, 0.0, seat_r + 3.0))
         deck = deck.fuse(Part.makeBox(sp_side, sp_side, sp_h,
-                                      v(-sp_side / 2.0, -sp_side / 2.0, zf)))
+                                      v(-sp_side / 2.0, -sp_side / 2.0, F)))
+        deck = deck.cut(_zspan(d["brg"][0] - 0.01, d["brg"][1], 0.0, seat_r))
+        deck = deck.cut(_zspan(d["lip"][0] - 0.01, d["lip"][1] + 0.01, 0.0, 6.5))
+        deck = deck.cut(_zspan(d["lip"][1], F + sp_h + 1.0, 0.0, hole_r))
     else:
+        d = _col_bottom()
+        z_top = _zb(d["brg"][1])
+        deck = deck.fuse(_zspan(-cube_half - 1.0, z_top, 0.0, hole_r + 2.4))
         w = sp_side + 2 * sp_clr
         deck = deck.cut(Part.makeBox(w, w, sp_h + 0.2,
-                                     v(-w / 2.0, -w / 2.0, zf - 0.01)))
-    deck = deck.cut(_zspan(b_in - zs * 0.01, b_out, 0.0, seat_r))
-    deck = deck.cut(_zspan(z["lip"][0], z["lip"][1], 0.0, 9.0))
-    deck = deck.cut(_zspan(z["socket"], zf + zs * (sp_h + 1.0), 0.0,
-                           jc_d / 2.0 + jc_clr))
+                                     v(-w / 2.0, -w / 2.0, -F - 0.01)))
+        deck = deck.cut(_zspan(-F - 1.0, _zb(d["socket"]), 0.0, hole_r))
+        deck = deck.cut(_zspan(_zb(d["lip"][0]) - 0.01, _zb(d["lip"][1]) + 0.01,
+                               0.0, 6.5))
+        deck = deck.cut(_zspan(_zb(d["brg"][0]), z_top + 0.01, 0.0, seat_r))
     for x, y in _face_magnet_pts():
         deck = deck.cut(cyl(mag_d / 2.0 + 0.1, mag_t + 0.2 + 1.0,
-                            v(x, y, zf - zs * (mag_t + 0.2) if zs > 0 else zf - 1.0)))
+                            v(x, y, zs * F - zs * (mag_t + 0.2) if zs > 0
+                              else -F - 1.0)))
     return deck
 
 
@@ -1621,7 +1659,7 @@ def make_output_shaft():
     """Ø5 output shaft: from the cardan's fork out through the wall's two
     bearings (one in an inner boss, one in the wall), a little past."""
     y0 = uj_cross_y + uj_fork_back
-    y1 = cube_half + wall_thick - _jc_sink() + jc_hub   # through its male half
+    y1 = _face() + _dog_off() + dog_base_m + dog_claw - 0.5   # through its dog
     shaft = cyl(shaft_d / 2.0, y1 - y0, v(0, y0, 0), Y_AXIS)
     return shaft.cut(Part.makeBox(shaft_d + 2, y1 - y0, shaft_d,
                                   v(-(shaft_d / 2.0 + 1), y0, shaft_flat_d / 2.0)))
@@ -2515,8 +2553,11 @@ def make_wall():
     yf = cube_half + wall_thick
     wall = wall.fuse(Part.makeBox(sp_side, sp_h, sp_side,
                                   v(-sp_side / 2.0, yf, -sp_side / 2.0)))
-    y_sock = yf - _jc_sink() - jc_clr
-    wall = wall.cut(cyl(jc_d / 2.0 + jc_clr, yf + sp_h + 1.0 - y_sock,
+    # the spigot filled the outer bearing's seat back in: cut it again
+    wall = wall.cut(cyl(brg_od / 2.0 + brg_fit_press, out_brg_len - brg_seat_lip + 1.0,
+                        v(0, cube_half + brg_seat_lip, 0), Y_AXIS))
+    y_sock = yf + _dog_off() - dog_clr
+    wall = wall.cut(cyl(dog_d / 2.0 + dog_clr, yf + sp_h + 1.0 - y_sock,
                         v(0, y_sock, 0), Y_AXIS))
     for x, z in _face_magnet_pts():
         wall = wall.cut(cyl(mag_d / 2.0 + 0.1, mag_t + 0.2 + 1.0,
@@ -2664,7 +2705,7 @@ CARRIAGE_REST = [
 # ── Fixed to the frame ──────────────────────────────────────────────────────
 FIXED_PARTS = [
     ("OutputShaft",   make_output_shaft(),                    (0.60, 0.60, 0.60), 0),
-    ("JawMale",       make_jaw_wall(),                        (0.70, 0.30, 0.25), 0),
+    ("DogWall",       make_dog_wall(),                        (0.70, 0.30, 0.25), 0),
     ("WallMagnet0",   make_wall_magnet(0),                    (0.55, 0.55, 0.60), 0),
     ("WallMagnet1",   make_wall_magnet(1),                    (0.55, 0.55, 0.60), 0),
     ("WallMagnet2",   make_wall_magnet(2),                    (0.55, 0.55, 0.60), 0),
@@ -2799,15 +2840,15 @@ for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
 # ── Central column ──────────────────────────────────────────────────────────
 _STEEL = (0.6, 0.6, 0.62)
 COLUMN_PARTS = [("MotorShaft", make_motor_shaft(), _STEEL),
-                ("JawTop", make_jaw_top(), (0.70, 0.30, 0.25)),
-                ("JawBottom", make_jaw_bottom(), (0.70, 0.30, 0.25))]
+                ("DogTop", make_dog_top(), (0.70, 0.30, 0.25)),
+                ("DogBottom", make_dog_bottom(), (0.70, 0.30, 0.25))]
+COLUMN_PARTS += [("MotorRingUpper", make_motor_ring(), (0.30, 0.65, 0.60))]
 COLUMN_PARTS += [(f"DeckMagnet{'T' if _zs > 0 else 'B'}{_k}",
                   make_deck_magnet(_zs, _k), (0.55, 0.55, 0.60))
                  for _zs in (1, -1) for _k in range(4)]
 for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
     COLUMN_PARTS += [
         (f"MotorBearing{_tag}", make_motor_bearing(_sd), (0.30, 0.30, 0.32)),
-        (f"MotorWasher{_tag}", make_motor_washer(_sd), _STEEL),
         ((f"MotorCollar{_tag}", make_motor_collar(_sd), (0.35, 0.35, 0.38))
          if _sd > 0 else ("MotorSpacerLower", make_motor_spacer(), (0.30, 0.65, 0.60))),
         (f"MotorFlange{_tag}", make_motor_flange(_sd), _STEEL)]
@@ -3372,7 +3413,7 @@ if RUN_CHECKS:
         ("OutputShaft", "BearingOutput"), ("OutputShaft", "BearingOutIn"),
         ("Wall", "BearingOutput"), ("Wall", "BearingOutIn"),
         ("Wall", "OutputShaft"), ("DeckTop", "Wall"), ("DeckBottom", "Wall"),
-        ("JawMale", "OutputShaft"),
+        ("DogWall", "OutputShaft"),
         ("Wall", "WallMagnet0"), ("Wall", "WallMagnet1"),
         ("Wall", "WallMagnet2"), ("Wall", "WallMagnet3"),
     )}
@@ -3671,12 +3712,12 @@ if RUN_CHECKS:
     print("  Filing the flat is the one manual step here.")
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
     print("             Ø5 rod (output shaft),")
-    print(f"             SHARED: Ø8 ground rod ~{2 * (cube_half + deck_t + 15):.0f} mm"
-          f" (motor shaft), 2x 608ZZ, 1x Ø8 shaft collar, 2x washers 8x12x1,")
+    print(f"             SHARED: Ø8 plain steel rod (NOT a hardened linear rod: it"
+          f" gets two filed flats) ~{_col_top()['claws'][1] + _face():.0f} mm,")
+    print("             2x 688ZZ, 1x Ø8 shaft collar,")
     print("             2x rigid flange couplings Ø8 (+ 8x M3x10), for the motor cones,")
-    print("             PER CUBE: jaw couplings D20 — 1 half bore 8 + spider (input),")
-    print("             1 half bore 8 (top output), 4 halves bore 5 (wall outputs);")
-    print("             24 disc magnets N52 10x3 (4 per face, 6 faces).")
+    print("             PER CUBE: printed dogs (4 male D5, 1 male D8, 1 female D8)")
+    print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2.")
     print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
     print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
           f" {screw_top_z - (-cube_half + servo_body[0]):.0f} mm of it) + its nut,")
