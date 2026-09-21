@@ -673,6 +673,26 @@ Falling out of it: the wall carries no screws at all now, and `both_hands()`
 stopped mirroring the screw pattern — nothing is turned over any more, and
 the mirrored half had landed in the actuation's own column.
 
+### 12d.3 The carriage becomes a block (2026-09-21)
+
+The user's idea, raised once before and not viable then — the block's corners
+reach 29.6 from the axis where the ring reached 21.5, and in the old layout
+those corners landed on the pusher, the servo and the screw's post. Since
+then the guide rod moved 7.8 mm toward the motor (to keep the nut's flange
+whole), which let it come 3 mm in toward the screw in X (they are at
+different Y now), which pulled the cage off the carriage and gave the
+corners their room.
+
+- Block half-width 20.9: the least that keeps 2.2 mm of wall over the
+  6805's seat on the flats.
+- The ear is bored straight into the block's own −X face: no boss, no arm.
+  The pin is pressed into it and runs in the carrier's slot; the carrier's
+  arm, bush to pin, is 7.6 mm.
+- The servo is modelled as it is: a main case 22.4 tall and a gear tower,
+  12.2 long, over the shaft end only, up to 28.2. The end of the case nearest
+  the carriage has no body above 22.4 — which is where the block's lower
+  corner comes.
+
 ## 13. Next session — raised 2026-09-17, not yet worked
 
 Notes as raised, not designs. Nothing here has been checked against the macro.

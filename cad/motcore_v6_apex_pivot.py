@@ -223,6 +223,13 @@ servo_body    = (28.2, 22.4, 12.5)   # mm — MG90D, off its own datasheet
                         #      CASE only: the datasheet's 32.2 runs to the top
                         #      of the spline, and the spline is the last 4.
 sv_spline_h   = 4.0    # mm — the splined shaft standing off the case
+sv_case_h     = 22.4   # mm — the MAIN case is only this tall (datasheet). The
+                        #      rest of servo_body[0], up to 28.2, is the gear
+                        #      TOWER round the shaft, and it is only
+sv_tower_len  = 12.2   # mm — this long, at the shaft's own end (user,
+                        #      2026-09-21). The other end of the case has no
+                        #      body above sv_case_h — which is exactly where
+                        #      the carriage block's corner comes.
 sv_shaft_end  = 6.25   # mm — the shaft sits this far from the case's SIDE,
                         #      measured on the body alone, tabs not counted
                         #      (user, 2026-09-20). On a 22.4 case that is
@@ -338,7 +345,7 @@ guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
                         #      with it, it also takes the moment the pusher
                         #      makes by reaching 15 mm out to the ear, which
                         #      otherwise all lands on the ear's pin.
-guide_dx      = 11.5   # mm — the rod sits between the screw and the ear
+guide_dx      = 8.5    # mm — the rod sits between the screw and the ear
                         #      (user, 2026-09-20), which is the right way
                         #      round: the carrier's arm then runs 11 mm from
                         #      its bush to the pin instead of 21, and never
@@ -413,6 +420,13 @@ hous_flange_ri = 16.0  # mm — the flange the bearing stops against, on the WAL
                         #      wall-side face, which is the face the carriage
                         #      prints on, so the stop grows up off the bed.
 hous_ro       = 21.5   # mm — housing outer radius (2.3 mm over the seat)
+carr_half     = 20.9   # mm — the carriage is a BLOCK now, not a ring (user,
+                        #      2026-09-21): this is its half-width in X and Z,
+                        #      the least that keeps 2.2 mm of wall over the
+                        #      6805's seat on the flats. Its corners reach 29.6,
+                        #      which the ring never did, and they fit only
+                        #      because the guide rod moved in Y and could then
+                        #      come in toward the screw in X.
 hous_y0       = nb_y0 - hous_lip          # DERIVED
 hous_y1       = nb_y0 + nb_w + 1.0        # DERIVED, 1 mm proud of the bearing
 side_x        = 15.0   # mm — X of the carriage's two arms. OUTBOARD of the
@@ -958,7 +972,10 @@ slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-sl
 # in Z, because the ear rides over the case while the spring is on the shaft.
 # No X stack any more: the screw's nut pushes the ear straight, so the only
 # band left is the carriage arm's own, which the ear is part of.
-x_ear = (ear_sx * side_x - side_t / 2.0, ear_sx * side_x + side_t / 2.0)
+# The ear is bored into the block's own face, ear_pin_in deep.
+ear_pin_in = 8.0
+x_ear = ((-carr_half, -carr_half + ear_pin_in) if ear_sx < 0
+         else (carr_half - ear_pin_in, carr_half))
 
 
 def _rot_about(p, c, a):
@@ -1332,10 +1349,12 @@ def make_carriage():
     the bearing's stop: a solid flange from the bearing down to the bed. The
     bearing goes in from the cone side, then carriage and bearing slide onto
     the neck together. The arms' uprights stay the bearing's width."""
-    y_end = max(hous_y1, E0[0] + act_boss_r + 0.5)
-    body = cyl(hous_ro, y_end - hous_y0, v(0, hous_y0, 0), Y_AXIS)
+    y_end = hous_y1
+    # A BLOCK round the neck, not a ring: flat faces for the ear and for the
+    # bed, and it only fits now that the actuation has moved off its corners.
+    body = Part.makeBox(2 * carr_half, y_end - hous_y0, 2 * carr_half,
+                        v(-carr_half, hous_y0, -carr_half))
     body = body.fuse(make_carriage_arms(1)).fuse(make_carriage_arms(-1))
-    body = body.fuse(make_ear())
     # Every hole LAST: a later fuse fills an earlier hole straight back in.
     seat_r = nb_od / 2.0 + brg_fit_press
     body = body.cut(cyl(hous_flange_ri, 60.0, v(0, 0.0, 0), Y_AXIS))
@@ -1345,8 +1364,10 @@ def make_carriage():
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
                               -(side_x + side_t / 2.0 + 2.0),
                               2 * (side_x + side_t / 2.0 + 2.0)))
-    body = body.cut(pin_x(E0, fdm_act_hole_d, x_ear[0] - 1.0,
-                          x_ear[1] - x_ear[0] + 2.0))
+    # The ear is the block's own face: the pin is PRESSED into it here, and
+    # runs in the carrier's slot.
+    body = body.cut(pin_x(E0, fdm_act_press_d, x_ear[0] - 1.0,
+                          x_ear[1] - x_ear[0] + 1.0))
     return body
 
 
@@ -1607,7 +1628,10 @@ def make_servo_body():
     """MG90-class placeholder: case plus its tab plate, upright on the floor
     under the screw, tabs out to each side in X."""
     x0, y0, z0, bx, by, bz = servo_box()
-    body = Part.makeBox(bx, by, bz, v(x0, y0, z0))
+    # The main case, and the gear tower over the shaft end only.
+    body = Part.makeBox(bx, by, sv_case_h, v(x0, y0, z0))
+    body = body.fuse(Part.makeBox(sv_tower_len, by, bz - sv_case_h,
+                                  v(x0, y0, z0 + sv_case_h)))
     tz0, tz1 = _tab_z()
     body = body.fuse(Part.makeBox(bx + 2 * servo_tab_out, by, tz1 - tz0,
                                   v(x0 - servo_tab_out, y0, tz0)))
@@ -1694,10 +1718,11 @@ def make_guide_foot():
     # From r IN FRONT of the rod's axis, not from the axis itself: a box that
     # starts on the axis leaves the bore half open, and half a bore holds
     # half a rod.
-    # Narrower on the side facing the carriage: its ring passes just there.
+    # Narrow on BOTH sides in X: the carriage passes on one, and on the other
+    # the screw, which the rod now stands only 8.5 mm from.
     r_in = 3.5
     gx = screw_x + guide_dx
-    x_lo, x_hi = (gx - r, gx + r_in) if guide_dx > 0 else (gx - r_in, gx + r)
+    x_lo, x_hi = gx - r_in, gx + r_in
     arm = Part.makeBox(x_hi - x_lo, cube_half + bracket_weld - (guide_y - r),
                        2 * r, v(x_lo, guide_y - r, guide_z0 - r))
     return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
@@ -1776,7 +1801,7 @@ def make_nut(st):
     x0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0,
              max(screw_x - nut_fl_pitch / 2.0 - foot_tap_d / 2.0 - 1.5,
                  -cube_half + run_clr / 2.0 + 0.05))
-    x1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
+    x1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 0.5)
     y_in = min(screw_y - nut_fl[1] / 2.0,
                guide_y - spr_od / 2.0, _carrier_y()[0]) - 0.5
     y0 = y_in - roof_t
@@ -1800,8 +1825,9 @@ def make_nut(st):
     # Clear of the carriage's ring, which its lower corner comes near when
     # the carriage tilts down: a cut of the ring's own cylinder, grown by its
     # swing, takes exactly what is in the way and nothing else.
-    body = body.cut(cyl(hous_ro + 1.5, hous_y1 - hous_y0 + 2.0,
-                        v(0, hous_y0 - 1.0, 0), Y_AXIS))
+    _h = carr_half + 1.5
+    body = body.cut(Part.makeBox(2 * _h, hous_y1 - hous_y0 + 2.0, 2 * _h,
+                                 v(-_h, hous_y0 - 1.0, -_h)))
     # bores
     body = body.cut(cyl(screw_d / 2.0 + 0.2, z1 - z0 + 2.0,
                         v(screw_x, screw_y, z0 - 1.0), Z_AXIS))
@@ -1828,7 +1854,7 @@ def make_carrier(st):
     # Right up to the carriage's arm: at the ear's own height the ring's
     # silhouette ends at |x| 15.4, so the last few millimetres are free and
     # the pin between them can be short.
-    _x_end = ear_sx * side_x - side_t / 2.0 - act_gap
+    _x_end = _x_face_push()
     _y0, _y1 = _carrier_y()
     arm = Part.makeBox(_x_end - gx, _y1 - _y0, carrier_t,
                        v(gx, _y0, z - carrier_t / 2.0))
@@ -1861,12 +1887,11 @@ def make_carrier(st):
 
 def make_ear_pin(st):
     """The one pin left in the whole actuation: it joins the carrier's arm to
-    the ear on the carriage, pressed into the ear and running in the arm."""
-    x0 = ear_sx * side_x + side_t / 2.0
-    x1 = ear_sx * side_x - side_t / 2.0 - act_gap - carrier_t - 0.5
-    # At the EAR's own place, which moves with the carriage: the pin is
-    # pressed into the ear and it is the carrier that slides on it.
-    return pin_x(st["E"], act_pin_d, min(x0, x1), abs(x1 - x0))
+    the ear, pressed into the carriage block's face and running in the
+    carrier's slot."""
+    x_in = x_ear[1] if ear_sx < 0 else x_ear[0]
+    x_out = _x_face_push() - ear_sx * (carrier_t + 0.5)
+    return pin_x(st["E"], act_pin_d, min(x_in, x_out), abs(x_out - x_in))
 
 
 def make_spring_stack(st, side):
@@ -1902,9 +1927,9 @@ def _plate_bar(pts, x_band, w, press=(), holes=None):
 
 
 def _x_face_push():
-    """X of the pusher's outboard face: just short of the carriage's ring,
-    where its spring cartridge can stand clear of it."""
-    return -(hous_ro + 0.5) if ear_sx < 0 else (hous_ro + 0.5)
+    """X of the carrier's outboard face: a running gap off the carriage
+    block's face, where the ear is."""
+    return -(carr_half + act_gap) if ear_sx < 0 else (carr_half + act_gap)
 
 
 def make_flange_screw(st, sx):
@@ -3090,7 +3115,7 @@ if RUN_CHECKS:
     print("-" * 72)
     _cbb = BY_NAME["Carriage"].BoundBox
     print(f"  Carriage: ONE piece, {_cbb.YLength:.0f} x {_cbb.ZLength:.0f} x"
-          f" {_cbb.XLength:.0f} mm, a ring round the cone's neck")
+          f" {_cbb.XLength:.0f} mm, a block round the cone's neck")
     _cube_tied = [k for k, val in cube_half_by.items() if val > cube_half - 0.05]
     print(f"  Cube half-size ({cube_half:.1f}) = motor axis to the wall's inner"
           f" face, set by: {' AND '.join(_cube_tied)}")
