@@ -1756,6 +1756,19 @@ def make_nut(st):
     web_y1 = screw_y - push_w / 2.0 + 3.5      # overlapping the seat plates
     _z_bot = z - g / 2.0 - cage_t
     _z_top = zn + nut_l / 2.0
+    # The ROOF — taking the wall as the floor, as the user does: a plate down
+    # the cage's motor-side face, the whole length of the seat plates and the
+    # whole height between them. It turns the two plates from separate
+    # cantilevers into one C-channel. The carrier leaves the cage toward the
+    # ear, in X, so a closed face on the motor side costs it nothing.
+    _roof_t = 2.5
+    _roof_y1 = screw_y - push_w / 2.0 - 0.5      # clear of the carrier
+    _px0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
+    _px1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
+    body = body.fuse(Part.makeBox(_px1 - _px0, _roof_t,
+                                  g + 2.0 * cage_t,
+                                  v(_px0, _roof_y1 - _roof_t,
+                                    z - g / 2.0 - cage_t)))
     # A spine BEYOND the rod ties the two seat plates together. It cannot run
     # up the motor side: that is where the carrier's own arm passes, and the
     # cage has to let it move.
