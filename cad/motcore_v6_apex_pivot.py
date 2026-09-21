@@ -266,6 +266,9 @@ sv_z0         = -47.0  # mm — case bottom, down by the floor. STANDING: its
                         #      bridge passes clear OVER it.
 sv_wall_clr   = 0.5    # mm — case back to the wall
 servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
+sv_cable_h    = 6.0    # mm — the cable's slot in the cradle: this tall from
+                        #      the floor (MG90D: the lead leaves the case's
+                        #      end away from the shaft, low — check on the part)
 servo_tab_out = 4.7    # mm — how far each tab reaches past the body
 servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
 horn_t        = 1.8    # mm ┐ X stack: spring and crank outboard of the
@@ -1669,33 +1672,36 @@ def servo_screw_xs():
 
 
 def make_servo_bracket():
-    """The servo's cradle, on the FLOOR (user, 2026-09-20): a plate it stands
-    on and a post under each mounting tab. PRINTED AS PART of the floor.
+    """The servo's cradle, on the WALL (user, 2026-09-21): a back behind the
+    case and a post under each mounting tab. PRINTED AS PART of the wall.
 
-    Back on the floor rather than the wall because its tab screws run along
-    Z: on the floor, which prints flat, those come out as true holes, and
-    the same screws into a wall bracket would have been horizontal ones."""
+    It was on the floor so the tab screws would come out as vertical holes;
+    on the wall they are horizontal, but they are Ø1.6 self-tapping pilots,
+    and in exchange the cradle holds on by its whole back. The case itself
+    still stands on the floor."""
     tz0, tz1 = _tab_z()
     x0, y0, z0, bx, by, bz = servo_box()
-    part = Part.makeBox(bx + 2.0 * (servo_tab_out + 1.0), by,
-                        sv_stand + bracket_weld,
-                        v(x0 - servo_tab_out - 1.0, y0,
-                          z0 - sv_stand - bracket_weld))
+    part = None
     for sx, out in ((x0, -1.0), (x0 + bx, 1.0)):
         post = Part.makeBox(servo_tab_out + 1.0, by, tz0 - z0,
                             v(sx if out > 0 else sx - servo_tab_out - 1.0,
                               y0, z0))
-        part = part.fuse(post)
+        part = post if part is None else part.fuse(post)
     # A BACK behind the case, filling the strip between it and the wall
     # (user, 2026-09-21), from the floor up to the tabs: the case is held
     # on its wall side as well as on its tabs.
     part = part.fuse(Part.makeBox(bx + 2.0 * (servo_tab_out + 1.0),
-                                  cube_half - (y0 + by), tz1 - z0 + bracket_weld,
-                                  v(x0 - servo_tab_out - 1.0, y0 + by,
-                                    z0 - bracket_weld)))
+                                  cube_half + bracket_weld - (y0 + by), tz1 - z0,
+                                  v(x0 - servo_tab_out - 1.0, y0 + by, z0)))
     for sx in servo_screw_xs():
         part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 4.0),
                             Z_AXIS))
+    # The cable's way out (user, 2026-09-21): through the post at the case's
+    # far end, toward the carriage and not the neighbour's wall, OPEN on the
+    # motor side so the lead drops in from there, with the servo in place.
+    part = part.cut(Part.makeBox(servo_tab_out + 3.0, screw_y + 2.0 - (y0 - 1.0),
+                                 sv_cable_h,
+                                 v(x0 + bx - 1.0, y0 - 1.0, z0)))
     # Trimmed to the cube: the cradle is wider than the case, and the case is
     # already out at the corner.
     return part.cut(Part.makeBox(40.0, 60.0, 60.0,
@@ -2039,11 +2045,6 @@ def make_deck(zs):
         # the ceiling is the part they come out true on.
         for _, rot in AXES:
             deck = deck.fuse(place(cached(make_screw_top), rot))
-    if zs < 0:
-        # The servo stands on the floor, so its cradle is part of the floor —
-        # and its tab screws run along Z too.
-        for _, rot in AXES:
-            deck = deck.fuse(place(cached(make_servo_bracket), rot))
     return deck
 
 
@@ -2086,6 +2087,7 @@ def make_wall():
     # this wall: it sits above the servo, where neither floor nor ceiling can
     # reach it without passing through the case.
     wall = wall.fuse(cached(make_guide_foot))
+    wall = wall.fuse(cached(make_servo_bracket))   # the servo's cradle
     return wall
 
 
@@ -2339,7 +2341,7 @@ def place(shape, rot_deg):
 # because the checks need to see them as themselves — that they merge, that
 # they clear what they pass — but they are not DRAWN separately: their host
 # already contains them, and drawing both shows every one of them twice.
-WELDED_INTO = {"ServoBracket": "DeckBottom", "ScrewTop": "DeckTop",
+WELDED_INTO = {"ServoBracket": "Wall", "ScrewTop": "DeckTop",
                "GuideFoot": "Wall"}
 
 for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
@@ -2474,7 +2476,7 @@ if RUN_CHECKS:
     _MESH_PAIRS = set()
 
 
-    _WELDED = [{"DeckTop", "ScrewTop"}, {"DeckBottom", "ServoBracket"},
+    _WELDED = [{"DeckTop", "ScrewTop"}, {"Wall", "ServoBracket"},
                {"Wall", "GuideFoot"}]
 
 
@@ -2859,13 +2861,13 @@ if RUN_CHECKS:
         ("FramePostT", "WallScrew2"), ("FramePostT", "WallScrew3"),
         ("FramePostB", "WallScrew0"), ("FramePostB", "WallScrew1"),
         ("FramePostB", "WallScrew2"), ("FramePostB", "WallScrew3"),
-        ("DeckBottom", "ServoBracket"), ("DeckTop", "ScrewTop"),
-        # the cradle's back is printed up against the wall's face
-        ("Wall", "ServoBracket"),
+        ("Wall", "ServoBracket"), ("DeckTop", "ScrewTop"),
+        # the cradle's posts stand on the floor, as the case does
+        ("DeckBottom", "ServoBracket"),
         # assembled: pressed, seated, screwed or bolted together
         ("ServoBody", "ServoBracket"), ("ServoBody", "ScrewShaft"),
         # a bracket IS its host, so anything it holds touches that host
-        ("ServoBody", "DeckBottom"), ("GuideRod", "Wall"),
+        ("ServoBody", "DeckBottom"), ("ServoBody", "Wall"), ("GuideRod", "Wall"),
         ("GuideRod", "DeckTop"), ("ScrewShaft", "DeckTop"),
         ("ScrewNut", "DeckTop"), ("ScrewShaft", "Wall"),
         ("ScrewShaft", "ScrewTop"), ("GuideRod", "GuideFoot"),
