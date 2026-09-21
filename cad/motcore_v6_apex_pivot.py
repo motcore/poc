@@ -357,16 +357,12 @@ guide_dx      = 8.5    # mm — the rod sits between the screw and the ear
                         #      its bush to the pin instead of 21, and never
                         #      has to cross the screw. The screw goes out into
                         #      the corner and takes the servo with it.
-guide_z0      = 0.5    # mm — where the rod starts: above the servo's
-                        #      coupler, below the nut's travel (the cage comes
-                        #      down to 6.7), and outside the ring's rim
 # The coupler between the servo and the screw (user, 2026-09-21). The servo's
-# own DOUBLE-arm horn (the symmetric one of the three it ships with) is keyed
-# into a pocket in the coupler's base, its arms cut down to horn_arm_len tip
-# to tip; the horn's own M2.5 screw goes through the coupler's floor into the
-# spline and clamps both. Above the floor a D bore takes the screw's filed
-# end: it turns the screw and lets it slide in Z, so the screw's thrust never
-# reaches the servo.
+# own DOUBLE-arm horn (the symmetric one of the three it ships with) sits in
+# a pocket in the coupler's base, its arms cut down to horn_arm_len tip to
+# tip: it drives the coupler by its shape and is FREE in Z in there, so the
+# servo never takes the screw's thrust. The coupler is gripped on the screw's
+# filed flat by a grub, and is the thrust stack's lower collar.
 horn_hub_d    = 7.0    # mm — the horn's hub (measured, roughly)
 horn_hub_h    = 4.0    # mm — its height
 horn_arm_t    = 2.0    # mm — the arms' thickness, flush with the hub's top
@@ -377,11 +373,26 @@ horn_arm_len  = 11.0   # mm — tip to tip, CUT to this: the coupler turns with
 horn_lift     = 0.5    # mm — the hub's underside above the case
 horn_screw_d  = 2.5    # mm — the horn's screw (measured)
 cpl_d         = 13.5   # mm — the coupler's diameter
-cpl_floor     = 1.5    # mm — between the horn and the D bore
+cpl_floor     = 1.5    # mm — between the horn's pocket and the D bore
 cpl_fit       = 0.2    # mm — the horn's pocket, over its outline
-cpl_head_h    = 2.0    # mm — room for the horn screw's head in the bore
-screw_float   = 1.0    # mm — the screw's end off that head: its Z play
-screw_flat    = 7.0    # mm — across the D, on the screw's end
+cpl_float     = 1.0    # mm — the pocket's roof above the horn: its Z play
+cpl_head_h    = 2.0    # mm — the horn screw's head (stock screw)
+cpl_top_z     = -6.4   # mm — the coupler's top face: the stack above it
+                        #      ends 1 mm under the cage's lowest point (6.7)
+screw_flat    = 7.0    # mm — across the D, on the screw's end (filed, -Y)
+# The screw's THRUST stop (user, 2026-09-21): nothing may stand above the
+# ceiling (a cube can be stacked there) and the wall is 7.6 mm off the screw,
+# too close for any 8 mm-bore thrust bearing (Ø16). So a plate on the guide
+# rod's foot, pinched between the coupler below and a lock collar above, a
+# PTFE washer each side. Costs ~0.03 Nm of friction (~19% of the servo).
+tw_od         = 12.0   # mm ┐ PTFE thrust washers, 8 x 12 x 1
+tw_t          = 1.0    # mm ┘
+tw_mu         = 0.12   # — PTFE on PLA, dry: friction on the loaded washer
+tp_t          = 4.0    # mm — the thrust plate
+col_d         = 14.0   # mm ┐ T8 lock collar (grub-screw type) — measure it
+col_h         = 6.0    # mm ┘
+guide_z0      = cpl_top_z + tw_t + 1.0   # DERIVED — the rod starts inside the
+                        #      foot, 1 mm above its underside
 screw_top_z   = 45.3   # mm — where the screw's top bearing sits, clear
                         #      above the nut's own travel
 horn_r        = 4.3    # mm — crank radius, the ONE number that sets the
@@ -976,8 +987,15 @@ phi = CARRIAGE_DIR * STOPS[CARRIAGE_STOP] if CARRIAGE_STOP != "free" else 0.0
 # gap is closed, in millimetres at the nut. Everything about the spring — rate,
 # size, which family of part it can be — follows from this one number.
 spring_stroke = max(0.05, (sv_theta_max - sv_theta_c) / 360.0 * screw_lead)
-spring_rate = (2.0 * math.pi * sv_use * sv_stall * screw_eff
-               / (screw_lead / 1000.0)) / spring_stroke     # N/mm
+def screw_force():
+    """Force at the nut for the servo's working torque: the screw's own
+    equation, plus the loaded thrust washer's friction at its mean radius."""
+    r_m = (screw_d / 2.0 + tw_od / 2.0) / 2.0 / 1000.0
+    per_newton = (screw_lead / 1000.0) / (2.0 * math.pi * screw_eff) + tw_mu * r_m
+    return sv_use * sv_stall / per_newton
+
+
+spring_rate = screw_force() / spring_stroke     # N/mm
 
 
 drift_contact = apex_drift(phi_c)
@@ -1740,10 +1758,15 @@ def _horn_z():
 
 
 def _cpl_z():
-    """Z of the coupler's base, its floor's top face, and its top: the top
-    stays a millimetre under the guide rod's foot."""
+    """Z of the coupler's base, its floor's top face, and its top face."""
     h0, h1 = _horn_z()
-    return h0, h1 + cpl_floor, guide_z0 - (guide_d / 2.0 + 3.0) - 1.0
+    return h0, h1 + cpl_float + cpl_floor, cpl_top_z
+
+
+def _thrust_z():
+    """Z of the thrust plate's underside and top, and of the collar's base."""
+    tp0 = cpl_top_z + tw_t
+    return tp0, tp0 + tp_t, tp0 + tp_t + tw_t
 
 
 def _horn_outline(grow, z0, h):
@@ -1768,48 +1791,95 @@ def make_servo_horn():
                         v(screw_x, screw_y, h0 - 1.0), Z_AXIS))
 
 
+def _screw_bore_r():
+    """A running bore on the screw's crests, with the printer's allowance."""
+    return (fdm_shaft_hole_d - 5.0 + screw_d) / 2.0
+
+
 def make_coupler():
-    """The coupler: PRINTED. The horn keyed into its base, a floor the horn
-    screw clamps down, and a D bore the screw's filed end slides in.
+    """The coupler: PRINTED. The horn in a pocket in its base, free in Z;
+    above it a floor, and a D bore gripped on the screw's flat by a grub.
+    Its top face is the thrust stack's lower collar.
 
     Printed with its top on the bed: the D bore opens on the bed, the floor
     bridges over it, and the horn's pocket opens upward — nothing needs
     support, and the D comes out a true vertical hole."""
     c0, cf, c1 = _cpl_z()
+    h0, h1 = _horn_z()
+    g = cpl_fit
+    top = h1 + cpl_float
     body = cyl(cpl_d / 2.0, c1 - c0, v(screw_x, screw_y, c0), Z_AXIS)
-    body = body.cut(_horn_outline(cpl_fit, c0 - 1.0, _horn_z()[1] - c0 + 1.0))
-    body = body.cut(cyl(horn_screw_d / 2.0 + 0.2, cpl_floor + 2.0,
-                        v(screw_x, screw_y, cf - cpl_floor - 1.0), Z_AXIS))
-    # The D: round bore, less a flat. Sized for the screw's CRESTS with the
-    # printer's running allowance; the flat is where the torque goes.
-    r = (fdm_shaft_hole_d - 5.0 + screw_d) / 2.0
+    pocket = cyl(horn_hub_d / 2.0 + g, top - c0 + 1.0,
+                 v(screw_x, screw_y, c0 - 1.0), Z_AXIS)
+    half = horn_arm_len / 2.0 + g
+    w = horn_arm_w + 2.0 * g
+    z_arm = h1 - horn_arm_t - g
+    pocket = pocket.fuse(Part.makeBox(2.0 * half, w, top - z_arm,
+                                      v(screw_x - half, screw_y - w / 2.0,
+                                        z_arm)))
+    body = body.cut(pocket)
+    # the horn screw's head goes through the floor: the floor clamps nothing
+    body = body.cut(cyl(2.6, cpl_floor + 2.0,
+                        v(screw_x, screw_y, top - 1.0), Z_AXIS))
+    r = _screw_bore_r()
     bore = cyl(r, c1 - cf + 1.0, v(screw_x, screw_y, cf), Z_AXIS)
-    x_flat = screw_x - (screw_flat - screw_d / 2.0) - 0.2
-    bore = bore.cut(Part.makeBox(x_flat - (screw_x - r - 1.0), 2 * r + 2,
+    y_flat = screw_y - (screw_flat - screw_d / 2.0) - 0.2
+    bore = bore.cut(Part.makeBox(2 * r + 2, y_flat - (screw_y - r - 1.0),
                                  c1 - cf + 2.0,
-                                 v(screw_x - r - 1.0, screw_y - r - 1, cf - 0.5)))
-    return body.cut(bore)
+                                 v(screw_x - r - 1, screw_y - r - 1.0, cf - 0.5)))
+    body = body.cut(bore)
+    # the grub's tapped hole, square onto the flat
+    return body.cut(cyl(foot_tap_d / 2.0, cpl_d / 2.0 + 1.0,
+                        v(screw_x, screw_y - cpl_d / 2.0 - 0.5, (cf + c1) / 2.0),
+                        Y_AXIS))
+
+
+def make_coupler_grub():
+    """M3 grub: through the coupler's side onto the screw's flat."""
+    _, cf, c1 = _cpl_z()
+    y0 = screw_y - cpl_d / 2.0 + 0.5
+    y1 = screw_y - (screw_flat - screw_d / 2.0)
+    return cyl(1.5, y1 - y0, v(screw_x, y0, (cf + c1) / 2.0), Y_AXIS)
 
 
 def make_horn_screw():
-    """The horn's M2.5, longer than the stock one by the coupler's floor."""
-    _, cf, _ = _cpl_z()
-    return make_screw(v(screw_x, screw_y, cf), v(0, 0, -1), horn_screw_d,
-                      cpl_floor + horn_hub_h, 4.5, cpl_head_h)
+    """The horn's own M2.5 (stock): holds the horn on the spline, and only
+    that — its head sits in the coupler's floor without touching it."""
+    _, h1 = _horn_z()
+    return make_screw(v(screw_x, screw_y, h1), v(0, 0, -1), horn_screw_d,
+                      horn_hub_h, 4.5, cpl_head_h)
+
+
+def make_thrust_washer(lo):
+    """PTFE 8 x 12 x 1: under the thrust plate (lo) or on it."""
+    tp0, tp1, _ = _thrust_z()
+    z0 = tp0 - tw_t if lo else tp1
+    ring = cyl(tw_od / 2.0, tw_t, v(screw_x, screw_y, z0), Z_AXIS)
+    return ring.cut(cyl(screw_d / 2.0, tw_t + 2, v(screw_x, screw_y, z0 - 1),
+                        Z_AXIS))
+
+
+def make_lock_collar():
+    """T8 lock collar on the screw, above the thrust plate: the down stop."""
+    _, _, zc = _thrust_z()
+    ring = cyl(col_d / 2.0, col_h, v(screw_x, screw_y, zc), Z_AXIS)
+    return ring.cut(cyl(screw_d / 2.0, col_h + 2, v(screw_x, screw_y, zc - 1),
+                        Z_AXIS))
 
 
 def make_screw_shaft():
-    """The lead screw itself: from the coupler's D bore up past the nut's
-    whole travel to its top bearing. Its bottom end has a flat filed on it."""
+    """The lead screw itself: from the coupler's D bore, through the thrust
+    plate, past the nut's whole travel and up into its top bearing. Its
+    bottom end has a flat filed on it, on the -Y side."""
     _, cf, c1 = _cpl_z()
-    z0 = cf + cpl_head_h + screw_float
-    sh = cyl(screw_d / 2.0, screw_top_z - z0, v(screw_x, screw_y, z0), Z_AXIS)
-    # the flat, over the bore's length and a couple of millimetres more
-    x_flat = screw_x - (screw_flat - screw_d / 2.0)
-    return sh.cut(Part.makeBox(x_flat - (screw_x - screw_d / 2.0 - 1.0),
-                               screw_d + 2, c1 - z0 + 2.0,
-                               v(screw_x - screw_d / 2.0 - 1.0,
-                                 screw_y - screw_d / 2.0 - 1, z0 - 1.0)))
+    z0 = cf + 0.5
+    z1 = cube_half - 0.5
+    sh = cyl(screw_d / 2.0, z1 - z0, v(screw_x, screw_y, z0), Z_AXIS)
+    y_flat = screw_y - (screw_flat - screw_d / 2.0)
+    return sh.cut(Part.makeBox(screw_d + 2, y_flat - (screw_y - screw_d / 2.0 - 1.0),
+                               c1 - z0 + 1.5,
+                               v(screw_x - screw_d / 2.0 - 1,
+                                 screw_y - screw_d / 2.0 - 1.0, z0 - 1.0)))
 
 
 def make_screw_top():
@@ -1855,11 +1925,22 @@ def make_guide_foot():
     r_in = 3.5
     gx = screw_x + guide_dx
     x_lo, x_hi = gx - r_in, gx + r_in
-    arm = Part.makeBox(x_hi - x_lo, cube_half + bracket_weld - (guide_y - r),
-                       2 * r, v(x_lo, guide_y - r, guide_z0 - r))
-    return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
-                       v(screw_x + guide_dx, guide_y, guide_z0 - r - 1),
-                       Z_AXIS))
+    tp0, tp1, _ = _thrust_z()
+    h = 10.0
+    y_w = cube_half + bracket_weld
+    body = Part.makeBox(x_hi - x_lo, y_w - (guide_y - r), h,
+                        v(x_lo, guide_y - r, tp0))
+    # ...and on round the screw as its THRUST plate (user, 2026-09-21)
+    rb = _screw_bore_r()
+    xs0 = screw_x - rb - 3.0
+    ys0 = screw_y - rb - 3.0
+    body = body.fuse(Part.makeBox(x_hi - xs0, y_w - ys0, tp_t,
+                                  v(xs0, ys0, tp0)))
+    # room over the plate for the washer and the collar, turning
+    body = body.cut(cyl(col_d / 2.0 + 0.8, h, v(screw_x, screw_y, tp1), Z_AXIS))
+    body = body.cut(cyl(rb, tp_t + 2.0, v(screw_x, screw_y, tp0 - 1.0), Z_AXIS))
+    return body.cut(cyl(fdm_pin_press_d / 2.0, h + 2.0,
+                        v(gx, guide_y, tp0 - 1.0), Z_AXIS))
 
 
 def make_guide_rod():
@@ -2339,6 +2420,10 @@ FIXED_PARTS = [
     ("ServoHorn",     cached(make_servo_horn),                (0.12, 0.12, 0.12), 0),
     ("Coupler",       cached(make_coupler),                   (0.30, 0.65, 0.60), 0),
     ("HornScrew",     cached(make_horn_screw),                (0.35, 0.35, 0.38), 0),
+    ("CouplerGrub",   cached(make_coupler_grub),              (0.35, 0.35, 0.38), 0),
+    ("ThrustWasherLo", cached(make_thrust_washer, True),      (0.92, 0.92, 0.90), 0),
+    ("ThrustWasherHi", cached(make_thrust_washer, False),     (0.92, 0.92, 0.90), 0),
+    ("LockCollar",    cached(make_lock_collar),               (0.35, 0.35, 0.38), 0),
     ("FrameScrewT0",  make_frame_screw(1, fp_deck_ys[0]),     (0.35, 0.35, 0.38), 0),
     ("FrameScrewT1",  make_frame_screw(1, fp_deck_ys[1]),     (0.35, 0.35, 0.38), 0),
     ("FrameScrewB0",  make_frame_screw(-1, fp_deck_ys[0]),    (0.35, 0.35, 0.38), 0),
@@ -2610,7 +2695,8 @@ if RUN_CHECKS:
             return True
         # the horn's screw threads into the spline, and the spline is inside
         # the horn's socket: both modelled solid
-        if {na, nb} in ({"HornScrew", "ServoBody"}, {"ServoHorn", "ServoBody"}):
+        if {na, nb} in ({"HornScrew", "ServoBody"}, {"ServoHorn", "ServoBody"},
+                        {"CouplerGrub", "Coupler"}):
             return True
         return False
 
@@ -2752,8 +2838,7 @@ if RUN_CHECKS:
     _ear_sideways = max(abs(pose_state(phi_preload * k / 8.0)["E"][0] - E0[0])
                         for k in range(-8, 9))
     # Force at the nut: a screw's own equation, with its efficiency.
-    _F_screw = (2.0 * math.pi * sv_use * sv_stall * screw_eff
-                / (screw_lead / 1000.0))
+    _F_screw = screw_force()
     _spring_stroke = spring_stroke
 
     # The chain, swept as DISTANCES over the stroke, same lesson as the links and
@@ -2791,7 +2876,7 @@ if RUN_CHECKS:
                                           ("ScrewShaft", "Wall"),
                                           ("ScrewShaft", "DeckBottom"))}
     _ACT_AGAINST = ("ServoBody", "ServoBracket", "ScrewShaft", "ScrewTop",
-                    "Coupler", "ServoHorn",
+                    "Coupler", "ServoHorn", "LockCollar", "ThrustWasherHi",
                     "GuideRod", "GuideFoot",
                     "FramePostT", "FramePostB", "Wall", "DeckTop", "DeckBottom")
     _act_gap, _act_who = 1e9, "-"
@@ -2976,6 +3061,13 @@ if RUN_CHECKS:
         ("HornScrew", "ServoHorn"), ("HornScrew", "Coupler"),
         ("HornScrew", "ServoBody"), ("Coupler", "ServoBody"),
         ("Coupler", "ScrewShaft"),
+        ("CouplerGrub", "Coupler"), ("CouplerGrub", "ScrewShaft"),
+        # the thrust stack: coupler | washer | plate | washer | collar
+        ("ThrustWasherLo", "Coupler"), ("ThrustWasherLo", "GuideFoot"),
+        ("ThrustWasherLo", "Wall"), ("ThrustWasherLo", "ScrewShaft"),
+        ("ThrustWasherHi", "LockCollar"), ("ThrustWasherHi", "GuideFoot"),
+        ("ThrustWasherHi", "Wall"), ("ThrustWasherHi", "ScrewShaft"),
+        ("LockCollar", "ScrewShaft"), ("GuideFoot", "ScrewShaft"),
         # a bracket IS its host, so anything it holds touches that host
         ("ServoBody", "DeckBottom"), ("ServoBody", "Wall"), ("GuideRod", "Wall"),
         ("GuideRod", "DeckTop"), ("ScrewShaft", "DeckTop"),
@@ -3227,7 +3319,7 @@ if RUN_CHECKS:
     print(f"    nut travel {abs(_ear_travel):.2f} mm over the stroke;"
           f" the servo's own {2*sv_theta_max:.0f} deg would give"
           f" {2*sv_theta_max/360.0*screw_lead:.2f}")
-    print(f"    force at the ear: 2*pi*tau*eff/lead = {_F_screw:.0f} N"
+    print(f"    force at the ear: screw + thrust washer friction = {_F_screw:.0f} N"
           f"  (the crank chain gave 34)")
     print(f"    servo turn: {_horn_contact:.1f} deg to contact, {_horn_preload:.1f} deg"
           f" at full preload, of {sv_theta_max:.0f} available — the rest"
@@ -3284,7 +3376,7 @@ if RUN_CHECKS:
     print(f"             Ø{guide_d:.0f} rod for the guide, Ø3 pin stock (1 ear pin),")
     print(f"             8 shim washers 4x8 (0.1-0.5) for the four-bar's thrust faces,")
     print(f"             1 compression spring ~{_k_lin:.0f} N/mm,"
-          f" 1 horn screw M2.5 (stock + 1.5 mm),")
+          f" 1 T8 lock collar, 2 PTFE washers 8x12x1, 1 M3 grub,")
     print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
     print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
           f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
