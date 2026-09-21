@@ -497,11 +497,17 @@ fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
                         #      block's own free edge
 fp_post_y     = 6.0    # mm — half-height (Z) the block adds above and below
                         #      the screw spread and the pivot lug
-fp_deck_y     = 34.3   # mm — Y of those screws: forward of the pin (y 38.9) by
-                        #      enough that a tapped hole clears its bore, so
-                        #      the screw can go deep beside the pin instead of
-                        #      stopping short above it with 2 mm of thread
-fp_deck_dx    = 3.6    # mm — |X| of the two screws that hold each frame post
+fp_deck_ys    = (34.3, 44.9)   # mm — Y of the two screws that hold each
+                        #      frame post: one IN FRONT of the pin (y 38.9), one
+                        #      BEHIND it, both on the post's centreline. That is
+                        #      as far apart as they can go (user, 2026-09-21):
+                        #      spread in X they would leave the post, which is
+                        #      only the lug's width because the link arms swing
+                        #      either side of it. Each clears the pin's bore, so
+                        #      it can go deep beside the pin.
+fp_post_back  = 1.0    # mm — the post runs back to this short of the wall's
+                        #      inner face, to give the rear screw its meat
+fp_deck_dx    = 0.0    # mm — |X| of those screws: centred
                         #      to the deck's own block. They run along Z, in
                         #      from OUTSIDE the cube, and stop short of the
                         #      pin (user, 2026-09-20).
@@ -1445,10 +1451,12 @@ def frame_pad(zs):
     z_face = zs * (fb_A[1] + fp_post_y)
     z_deck = zs * cube_half
     y_far = fb_A[0] - fp_lug_x
-    pad = Part.makeBox(2 * fp_lug_x, wall_face_y - y_far,
+    # As wide as the PIN, not just the post (user, 2026-09-21): it spans the
+    # link arms too, which it can because it stands above their sweep.
+    hx = link_x + link_t / 2.0 + 1.0
+    pad = Part.makeBox(2 * hx, cube_half - fp_post_back - y_far,
                        abs(z_deck - z_face) + bracket_weld,
-                       v(-fp_lug_x, y_far,
-                         min(z_face, z_deck + zs * bracket_weld)))
+                       v(-hx, y_far, min(z_face, z_deck + zs * bracket_weld)))
     return pad
 
 
@@ -1460,21 +1468,21 @@ def frame_pad_holes(zs):
     tool = None
     z_out = zs * (cube_half + deck_t)
     z_face = zs * (fb_A[1] + fp_post_y)
-    for sx in (-fp_deck_dx, fp_deck_dx):
+    for sy in fp_deck_ys:
         hole = cyl(foot_hole_d / 2.0, abs(z_out - z_face) + 2.0,
-                   v(sx, fp_deck_y, z_out + zs * 1.0), v(0, 0, -zs))
+                   v(fp_deck_dx, sy, z_out + zs * 1.0), v(0, 0, -zs))
         head = cyl(foot_screw_d, 2.0 + 1.0,
-                   v(sx, fp_deck_y, z_out + zs * 1.0), v(0, 0, -zs))
+                   v(fp_deck_dx, sy, z_out + zs * 1.0), v(0, 0, -zs))
         t = hole.fuse(head)
         tool = t if tool is None else tool.fuse(t)
     return tool
 
 
-def make_frame_screw(zs, sx):
+def make_frame_screw(zs, sy):
     """One of those screws, drawn: its head sunk in the deck, its shank
     running down through deck and pad into the post, beside the pin."""
     z_out = zs * (cube_half + deck_t) - zs * 2.0
-    return make_screw(v(sx, fp_deck_y, z_out), v(0, 0, -zs), foot_screw_d,
+    return make_screw(v(fp_deck_dx, sy, z_out), v(0, 0, -zs), foot_screw_d,
                       fp_deck_len, foot_screw_d * 1.8, 2.0)
 
 
@@ -1504,7 +1512,8 @@ def make_frame_bracket(zs):
     screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
     y_far = fb_A[0] - fp_lug_x
-    part = Part.makeBox(2 * fp_lug_x, wall_face_y - y_far, 2 * fp_post_y,
+    y_back = cube_half - fp_post_back
+    part = Part.makeBox(2 * fp_lug_x, y_back - y_far, 2 * fp_post_y,
                         v(-fp_lug_x, y_far, z_pin - fp_post_y))
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
@@ -1529,9 +1538,9 @@ def make_frame_bracket(zs):
     # outside face, then fp_deck_len of shank), plus a millimetre.
     _tip = cube_half + deck_t - 2.0 - fp_deck_len
     _depth = abs(_z_face) - _tip + 1.0
-    for sx in (-fp_deck_dx, fp_deck_dx):
+    for sy in fp_deck_ys:
         part = part.cut(cyl(foot_tap_d / 2.0, _depth,
-                            v(sx, fp_deck_y, _z_face), v(0, 0, -zs)))
+                            v(fp_deck_dx, sy, _z_face), v(0, 0, -zs)))
     return part
 
 def servo_box():
@@ -2117,10 +2126,10 @@ FIXED_PARTS = [
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
     ("ServoBracket",  cached(make_servo_bracket),             (0.75, 0.75, 0.78), 0),
     ("ScrewShaft",    cached(make_screw_shaft),               (0.60, 0.60, 0.60), 0),
-    ("FrameScrewT0",  make_frame_screw(1, -fp_deck_dx),       (0.35, 0.35, 0.38), 0),
-    ("FrameScrewT1",  make_frame_screw(1, fp_deck_dx),        (0.35, 0.35, 0.38), 0),
-    ("FrameScrewB0",  make_frame_screw(-1, -fp_deck_dx),      (0.35, 0.35, 0.38), 0),
-    ("FrameScrewB1",  make_frame_screw(-1, fp_deck_dx),       (0.35, 0.35, 0.38), 0),
+    ("FrameScrewT0",  make_frame_screw(1, fp_deck_ys[0]),     (0.35, 0.35, 0.38), 0),
+    ("FrameScrewT1",  make_frame_screw(1, fp_deck_ys[1]),     (0.35, 0.35, 0.38), 0),
+    ("FrameScrewB0",  make_frame_screw(-1, fp_deck_ys[0]),    (0.35, 0.35, 0.38), 0),
+    ("FrameScrewB1",  make_frame_screw(-1, fp_deck_ys[1]),    (0.35, 0.35, 0.38), 0),
     ("GuideRod",      cached(make_guide_rod),                 (0.45, 0.45, 0.50), 0),
     ("GuideFoot",     cached(make_guide_foot),                (0.75, 0.75, 0.78), 0),
     ("ScrewTop",      cached(make_screw_top),                 (0.75, 0.75, 0.78), 0),
