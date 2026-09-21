@@ -624,7 +624,14 @@ fw_screw_z    = 0.0    # mm — |Z| the wall screws sit off the pivot's own
                         #      swept part actually being there: two screws,
                         #      X-spread only, same count and pattern the deck
                         #      version used.
-deck_t        = 4.0    # mm — floor / ceiling plate thickness
+deck_t        = 12.0   # mm — floor / ceiling plate thickness. Was 4: the
+                        #      motor shaft's axial load lands in the middle of
+                        #      these plates, 36 N per engaged axis (144 with all
+                        #      four on one cone), and 4 mm of PLA sank 0.1-0.7
+                        #      mm under it — the rubber's whole squeeze. Grown
+                        #      OUTWARD (the inside is full); printed with 4-5
+                        #      solid layers each face and ~15-20% gyroid it IS a
+                        #      box plate, ~10-15x stiffer (user, 2026-09-21).
 deck_boss_h   = 5.0    # mm — how far their screw bosses stand proud, inward
 deck_pocket_min = 1.0  # mm — relief in the CEILING's inner face over the crank's
                         #      path: at full stroke the crank passed 0.21 mm under
@@ -680,7 +687,17 @@ cone_wall     = 2.5    # mm — wall of the output cone, which is a SHELL. This 
                         #      in front of it. A conical shell gives up almost
                         #      nothing in torsion against a solid cone, and it
                         #      takes a lot of mass off the part that tilts.
-shaft_d        = 5.0   # mm — motor and output shaft diameter
+shaft_d        = 5.0   # mm — output shaft diameter
+# The central column (user, 2026-09-21): "the motor cones must not move".
+motor_shaft_d  = 8.0   # mm — ground Ø8 rod. Ø5 bent ~0.08 mm under one axis'
+                        #      radial load between the decks, against a ~0.2
+                        #      mm squeeze; Ø8 bends ~0.01
+mbrg           = (8.0, 22.0, 7.0)   # mm — 608ZZ, one in each deck
+mflange        = (22.0, 4.0)        # mm — rigid flange coupling for Ø8: flange
+mflange_hub    = (12.0, 13.0)       #      Ø x thick, hub Ø x long — PROVISIONAL,
+mflange_pcd    = 17.0               #      measure the one bought; 4x M3 on PCD
+mcol_wash_t    = 1.0   # mm — washer 8x12 between each collar and its bearing's
+                        #      inner race (a collar Ø14 would reach the shield)
 
 # ── Carriage bearings — MR105ZZ, the project's single standard bearing ───────
 brg_id        = 5.0    # mm ┐
@@ -704,6 +721,8 @@ out_brg_len   = brg_w + brg_seat_lip   # DERIVED — the output shaft's OUTER
 # This printer runs small holes ~0.5 mm UNDERSIZE, so every hole that receives
 # real hardware is modelled oversize by a measured amount, not at nominal.
 fdm_shaft_hole_d = 5.8  # mm — modelled Ø for a Ø5 rod (measured, coupon v2)
+fdm_mshaft_hole_d = 8.8 # mm — same allowance on the Ø8 motor shaft: a slip fit,
+                        #      so the cones slide on it until their flanges clamp
 fdm_pin_hole_d   = 4.6  # mm — modelled Ø for a Ø4 pin (extrapolated — verify)
 fdm_bolt_hole_d  = 3.8  # mm — modelled Ø for an M3 clamp bolt to pass through
 fdm_dowel_hole_d = 5.5  # mm — modelled Ø for the Ø5 trunnion dowel, INTERFERENCE
@@ -1209,10 +1228,71 @@ def make_motor_cone(sd):
     apex = v(0, 0, sd * mot_apex_z)
     cone = cone_frustum(apex, axis, alpha, s_motor_lo, s_mot_hi)
     bore_h = (s_mot_hi - s_motor_lo) * math.cos(alpha) + 4
-    cone = cone.cut(cyl(fdm_shaft_hole_d / 2.0, bore_h,
+    cone = cone.cut(cyl(fdm_mshaft_hole_d / 2.0, bore_h,
                         v(0, 0, apex.z + sd * (s_motor_lo * math.cos(alpha) - 2)),
                         axis))
+    # the flange coupling's four M3, self-tapping up into the base
+    for k in range(4):
+        a = math.radians(45.0 + 90.0 * k)
+        cone = cone.cut(cyl(foot_tap_d / 2.0, 9.0,
+                            v(mflange_pcd / 2.0 * math.cos(a),
+                              mflange_pcd / 2.0 * math.sin(a),
+                              sd * (mot_base_z + 1.0)), v(0, 0, -sd)))
     return cone
+
+
+def _ring_z(ri, ro, z0, h):
+    """A ring on the motor axis from z0 over h (h may be negative)."""
+    za = min(z0, z0 + h)
+    return cyl(ro, abs(h), v(0, 0, za)).cut(cyl(ri, abs(h) + 2, v(0, 0, za - 1)))
+
+
+def make_motor_shaft():
+    """The motor shaft: Ø8, through both decks, with a stub out of each —
+    below for the motor's coupling, above for a cube stacked on this axis."""
+    reach = cube_half + deck_t + 15.0
+    return cyl(motor_shaft_d / 2.0, 2 * reach, v(0, 0, -reach))
+
+
+def make_motor_bearing(sd):
+    """608ZZ in the deck, flush with its inner face."""
+    return _ring_z(mbrg[0] / 2.0, mbrg[1] / 2.0, sd * cube_half, sd * mbrg[2])
+
+
+def make_motor_washer(sd):
+    """8x12x1 washer on the bearing's inner race, inside the cube."""
+    return _ring_z(motor_shaft_d / 2.0, 6.0, sd * cube_half, -sd * mcol_wash_t)
+
+
+def make_motor_collar(sd):
+    """Lock collar on the shaft against that washer: the pair of them hold
+    the shaft in Z, each deck taking the thrust toward itself."""
+    return _ring_z(motor_shaft_d / 2.0, col_d / 2.0,
+                   sd * (cube_half - mcol_wash_t), -sd * col_h)
+
+
+def make_motor_flange(sd):
+    """Rigid flange coupling on the cone's base: flange against the base,
+    hub pointing away from the apex, grubs on the shaft."""
+    z0 = sd * mot_base_z
+    body = _ring_z(motor_shaft_d / 2.0, mflange[0] / 2.0, z0, sd * mflange[1])
+    body = body.fuse(_ring_z(motor_shaft_d / 2.0, mflange_hub[0] / 2.0,
+                             z0 + sd * mflange[1], sd * mflange_hub[1]))
+    for k in range(4):
+        a = math.radians(45.0 + 90.0 * k)
+        body = body.cut(cyl(1.7, mflange[1] + 2.0,
+                            v(mflange_pcd / 2.0 * math.cos(a),
+                              mflange_pcd / 2.0 * math.sin(a),
+                              z0 - sd * 1.0), v(0, 0, sd)))
+    return body
+
+
+def make_motor_flange_screw(sd, k):
+    """One of the flange's M3 x 10, head on the flange, into the cone."""
+    a = math.radians(45.0 + 90.0 * k)
+    base = v(mflange_pcd / 2.0 * math.cos(a), mflange_pcd / 2.0 * math.sin(a),
+             sd * (mot_base_z + mflange[1]))
+    return make_screw(base, v(0, 0, -sd), 3.0, 10.0, 5.0, 2.0)
 
 
 def make_motor_rubber(sd):
@@ -1586,7 +1666,7 @@ def frame_pad_holes(zs):
     for sy in fp_deck_ys:
         hole = cyl(foot_hole_d / 2.0, abs(z_out - z_face) + 2.0,
                    v(fp_deck_dx, sy, z_out + zs * 1.0), v(0, 0, -zs))
-        head = cyl(foot_screw_d, 2.0 + 1.0,
+        head = cyl(foot_screw_d, deck_t - 2.0 + 1.0,
                    v(fp_deck_dx, sy, z_out + zs * 1.0), v(0, 0, -zs))
         t = hole.fuse(head)
         tool = t if tool is None else tool.fuse(t)
@@ -1596,7 +1676,7 @@ def frame_pad_holes(zs):
 def make_frame_screw(zs, sy):
     """One of those screws, drawn: its head sunk in the deck, its shank
     running down through deck and pad into the post, beside the pin."""
-    z_out = zs * (cube_half + deck_t) - zs * 2.0
+    z_out = zs * (cube_half + 2.0)      # head sunk to 2 mm off the inner face
     return make_screw(v(fp_deck_dx, sy, z_out), v(0, 0, -zs), foot_screw_d,
                       fp_deck_len, foot_screw_d * 1.8, 2.0)
 
@@ -1664,7 +1744,7 @@ def make_frame_bracket(zs):
     _z_face = z_pin + zs * fp_post_y
     # Deep enough for the screw's own tip (head sunk 2 mm into the deck's
     # outside face, then fp_deck_len of shank), plus a millimetre.
-    _tip = cube_half + deck_t - 2.0 - fp_deck_len
+    _tip = cube_half + 2.0 - fp_deck_len
     _depth = abs(_z_face) - _tip + 1.0
     for sy in fp_deck_ys:
         part = part.cut(cyl(foot_tap_d / 2.0, _depth,
@@ -2207,7 +2287,7 @@ def make_deck(zs):
     z_out = zs * (cube_half + deck_t)
     deck = Part.makeBox(2 * cube_out, 2 * cube_out, deck_t,
                         v(-cube_out, -cube_out, min(z_in, z_out)))
-    deck = deck.cut(cyl(shaft_d / 2.0 + wall_shaft_clr, deck_t + 2,
+    deck = deck.cut(cyl(motor_shaft_d / 2.0 + 1.0, deck_t + 2,
                         v(0, 0, min(z_in, z_out) - 1)))
     for _, rot in AXES:
         for sx, sy in both_hands(deck_screws()):
@@ -2229,7 +2309,13 @@ def make_deck(zs):
         # the ceiling is the part they come out true on.
         for _, rot in AXES:
             deck = deck.fuse(place(cached(make_screw_top), rot))
-    return deck
+    # The 608's seat, from the inner face; what is left outboard of it is the
+    # lip the outer race pushes on. Cut LAST.
+    seat_r = mbrg[1] / 2.0 + brg_fit_press
+    deck = deck.cut(cyl(seat_r, mbrg[2] + 1.0,
+                        v(0, 0, z_in - zs * 1.0 if zs > 0 else z_in - mbrg[2])))
+    return deck.cut(cyl(motor_shaft_d / 2.0 + 1.0, deck_t + 2,
+                        v(0, 0, min(z_in, z_out) - 1)))
 
 
 def make_wall():
@@ -2543,6 +2629,17 @@ for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
             color=_pcolor, transparency=_ptrans)
 
 # ── Central column ──────────────────────────────────────────────────────────
+_STEEL = (0.6, 0.6, 0.62)
+COLUMN_PARTS = [("MotorShaft", make_motor_shaft(), _STEEL)]
+for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
+    COLUMN_PARTS += [
+        (f"MotorBearing{_tag}", make_motor_bearing(_sd), (0.30, 0.30, 0.32)),
+        (f"MotorWasher{_tag}", make_motor_washer(_sd), _STEEL),
+        (f"MotorCollar{_tag}", make_motor_collar(_sd), (0.35, 0.35, 0.38)),
+        (f"MotorFlange{_tag}", make_motor_flange(_sd), _STEEL)]
+    COLUMN_PARTS += [(f"MotorFlangeScrew{_tag}{_k}",
+                      make_motor_flange_screw(_sd, _k), (0.35, 0.35, 0.38))
+                     for _k in range(4)]
 for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
     add(doc, f"MotorCone{_tag}", make_motor_cone(_sd), color=(1.0, 0.60, 0.15))
     add(doc, f"MotorRubber{_tag}", make_motor_rubber(_sd), color=(0.15, 0.15, 0.18))
@@ -2551,9 +2648,8 @@ for _zs, _tag in ((1, "Top"), (-1, "Bottom")):
     add(doc, f"Deck{_tag}", cached(make_deck, _zs), color=(0.45, 0.55, 0.75),
         transparency=70)
 
-_ms_reach = mot_base_z + 15
-add(doc, "MotorShaft", cyl(shaft_d / 2.0, 2 * _ms_reach, v(0, 0, -_ms_reach)),
-    color=(0.6, 0.6, 0.6))
+for _n, _sh, _c in COLUMN_PARTS:
+    add(doc, _n, _sh, color=_c)
 
 doc.recompute()
 
@@ -2720,7 +2816,25 @@ if RUN_CHECKS:
     # the same blind spot the wall was in.
     _deck_top, _deck_bot = cached(make_deck, 1), cached(make_deck, -1)
     _SHARED = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
-               ("DeckTop", _deck_top), ("DeckBottom", _deck_bot)]
+               ("DeckTop", _deck_top), ("DeckBottom", _deck_bot)] + \
+              [(n, sh) for n, sh, c in COLUMN_PARTS]
+    # The column among itself (nothing else looked at these pairs): overlaps
+    # only where a screw goes into its part.
+    _col = [("MotorConeLower", _mc_lo), ("MotorConeUpper", _mc_up),
+            ("DeckTop", _deck_top), ("DeckBottom", _deck_bot)] + \
+           [(n, sh) for n, sh, c in COLUMN_PARTS]
+    _col_ov, _col_who = 0.0, "-"
+    for _i in range(len(_col)):
+        for _j in range(_i + 1, len(_col)):
+            _na, _nb = _col[_i][0], _col[_j][0]
+            if "FlangeScrew" in _na or "FlangeScrew" in _nb:
+                _other = _nb if "FlangeScrew" in _na else _na
+                if _other.startswith(("MotorCone", "MotorFlange")):
+                    continue
+            if _bb_hit(_col[_i][1], _col[_j][1]):
+                _ov = _col[_i][1].common(_col[_j][1]).Volume
+                if _ov > max(_col_ov, 1e-6):
+                    _col_ov, _col_who = _ov, f"{_na} x {_nb}"
     _carr_mot_who = "-"
     _pair_ov, _pair_who = 0.0, "-"
     _carr_mot_ov = 0.0
@@ -3012,7 +3126,7 @@ if RUN_CHECKS:
                     _clip_who = f"clip {_j} x {_n} at {math.degrees(_st_k['phi']):+.1f} deg"
 
     # Output cone tip vs the motor shaft it points at.
-    _tip_clr = out_tip_y - shaft_d / 2.0
+    _tip_clr = out_tip_y - motor_shaft_d / 2.0
 
     # Every shape in the tree is a valid solid. A boolean that half-failed leaves a
     # shape that still draws and still has a volume, so this is not free.
@@ -3133,6 +3247,8 @@ if RUN_CHECKS:
          nb_y0 - out_base_y, "> 1.0", nb_y0 - out_base_y > 1.0),
         ("output cone tip clears the motor shaft  (mm)",
          _tip_clr, "> 1.0", _tip_clr > 1.0),
+        (f"central column parts clear each other [{_col_who}]  (mm3)",
+         _col_ov, "== 0", _col_ov < 1e-6),
         ("actuation chain assembles at every tilt of the stroke  (poses failed)",
          _act_fail, "== 0", _act_fail == 0),
         # The screw's own two questions: does the servo have the turn for
@@ -3363,7 +3479,8 @@ if RUN_CHECKS:
     for _k, _val in sorted(cube_half_by.items(), key=lambda kv: -kv[1]):
         print(f"      {_val:5.1f}  {_k}")
     print(f"  CUBE side {2 * cube_out:.1f} mm"
-          f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall)")
+          f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall),"
+          f" HEIGHT {2 * (cube_half + deck_t):.1f} mm (decks {deck_t:.0f})")
     print("  PRINTED: MotorCone x2 (same part, flipped), OutputCone (a SHELL),")
     print("           Carriage (one piece),")
     print("           UJMid, UJRing, UJCross, UJFork,")
@@ -3377,6 +3494,9 @@ if RUN_CHECKS:
     print("  Filing the flat is the one manual step here.")
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
     print("             Ø5 rod (output shaft),")
+    print(f"             SHARED: Ø8 ground rod ~{2 * (cube_half + deck_t + 15):.0f} mm"
+          f" (motor shaft), 2x 608ZZ, 2x Ø8 shaft collars, 2x washers 8x12x1,")
+    print("             2x rigid flange couplings Ø8 (+ 8x M3x10), for the motor cones,")
     print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
     print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
           f" {screw_top_z - (-cube_half + servo_body[0]):.0f} mm of it) + its nut,")
