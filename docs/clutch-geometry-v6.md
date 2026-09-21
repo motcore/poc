@@ -663,8 +663,8 @@ The user's rule, and it is a better one than "everything on the wall":
   6 mm in front of it and one 6 mm behind, on the post's centreline — so they
   can go deep without meeting its bore. Right above the pin they would have
   had 2 mm of thread. The post runs back to the wall and forward by the same
-  amount, symmetric about its pivot, with its front corner bevelled along the
-  link's knuckle, which passes right under it. The deck's block is the post's
+  amount, symmetric about its pivot, with a straight 45° chamfer (3.5 mm legs) on
+  its front edge, over the link's knuckle, which passes right under it. The deck's block is the post's
   own footprint and no wider.
 - Only the guide rod's foot stays on the wall: it sits above the servo, where
   neither deck reaches it without passing through the case.

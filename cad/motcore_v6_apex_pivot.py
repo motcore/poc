@@ -509,6 +509,8 @@ fp_deck_ys    = (fb_A[0] - fp_screw_off, fb_A[0] + fp_screw_off)   # mm — Y of
                         #      only the lug's width because the link arms swing
                         #      either side of it. Each clears the pin's bore, so
                         #      it can go deep beside the pin.
+fp_chamfer    = 3.5    # mm — legs of the 45 deg chamfer on the post's front
+                        #      edge, over the link's knuckle
 fp_post_back  = 0.0    # mm — the post runs right back to the wall's inner
                         #      face (user, 2026-09-21), and forward by the same
                         #      amount on the other side of the pin, so it is
@@ -1493,20 +1495,6 @@ def make_frame_screw(zs, sy):
                       fp_deck_len, foot_screw_d * 1.8, 2.0)
 
 
-def _knuckle_swept_envelope(A, Bkey):
-    """The link's knuckle over the whole tilt stroke, grown by the swept
-    link clearance the checks demand."""
-    env = None
-    web_x = link_x + link_t / 2.0
-    for k in range(-4, 5):
-        B = pose_state(phi_preload * k / 4.0)[Bkey]
-        f = link_knuckle_d / math.dist(A, B)
-        K = (A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f)
-        d = disc_yz(K, link_knuckle + 1.0 + 0.2, -web_x - 1.0, 2 * web_x + 2.0)
-        env = d if env is None else env.fuse(d)
-    return env
-
-
 def make_frame_bracket(zs):
     """The four-bar's frame pivot: a foot against the wall's boss face and a
     post reaching in to the pivot. PRINTED SEPARATELY and screwed on (user,
@@ -1552,12 +1540,19 @@ def make_frame_bracket(zs):
     swept = cached(_link_swept_envelope,
                    A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
-    # And the KNUCKLE's own sweep, grown by the link clearance: the post now
-    # runs as far in front of its pin as behind it, and in front it passes
-    # right over the knuckle. Cutting the knuckle's path out of it bevels
-    # that corner along the link, instead of shortening the whole post.
-    part = part.cut(cached(_knuckle_swept_envelope,
-                           A1 if zs > 0 else A2, "B1" if zs > 0 else "B2"))
+    # A 45 deg CHAMFER on the front edge that faces the link's knuckle: the
+    # post now runs as far in front of its pin as behind it, and in front it
+    # sits right over the knuckle. Straight, not the knuckle's own round
+    # path — it prints clean, and a round cut only follows the knuckle
+    # because that is the easy thing to program (user, 2026-09-21). Legs of
+    # 3.1 clear the knuckle's swept envelope; fp_chamfer leaves margin.
+    z_edge = z_pin - zs * fp_post_y
+    tri = [v(-fp_lug_x - 1.0, y_far - 0.01, z_edge + zs * fp_chamfer),
+           v(-fp_lug_x - 1.0, y_far - 0.01, z_edge - zs * 0.01),
+           v(-fp_lug_x - 1.0, y_far + fp_chamfer, z_edge - zs * 0.01)]
+    cham = Part.Face(Part.makePolygon(tri + [tri[0]])).extrude(
+        v(2 * fp_lug_x + 2.0, 0, 0))
+    part = part.cut(cham)
     # Tapped from the deck side, along Z: the deck's own block comes down
     # (or up) to this face and the screw goes in from OUTSIDE the cube.
     _z_face = z_pin + zs * fp_post_y
