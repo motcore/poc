@@ -280,8 +280,20 @@ screw_lead    = 8.0    # mm per turn — T8 is 4-start, so a turn is 8 mm. This
 screw_eff     = 0.5    # — thread efficiency at that lead (steel on brass).
                         #      It is high BECAUSE the lead is coarse; the same
                         #      coarseness is why it does not self-lock.
-nut_d         = 14.0   # mm — the brass nut's body
-nut_l         = 10.0   # mm — along the screw
+# The nut is the rectangular-flange one from a T8 anti-backlash kit for the
+# Ender 3 (CESFONJER, user, 2026-09-21) — its spring and its second nut are
+# not used. Its flange is 22 x 10.5, so it fits the 16.6 mm the cage has in
+# Y without filing, and its two holes both hold it and stop it turning.
+nut_d         = 10.0   # mm — the brass nut's body
+nut_l         = 15.0   # mm — overall, flange included
+nut_fl        = (22.0, 10.5, 4.0)   # mm — flange: along X, along Y, thick
+nut_fl_hole   = 2.6    # mm — its two holes (likely tapped M3 — check it)
+nut_fl_pitch  = 16.0   # mm — between them, along X
+nut_fl_cut    = 5.5    # mm — the flange is CUT here on the guide rod's side,
+                        #      its ear sawn off: whole, it reaches 11 mm from
+                        #      the screw and the rod stands 11.5 away, so the
+                        #      two meet. One screw in the remaining ear both
+                        #      holds the nut and stops it turning.
 push_t        = 4.0    # mm — the pusher arm from the nut out to the ear
 push_w        = 14.0   # mm — the carrier's arm. It has to STRADDLE the
                         #      screw: the rod is on one side of it and the ear
@@ -319,7 +331,7 @@ guide_d       = 4.0    # mm — the anti-rotation guide: a Ø4 rod beside the
                         #      with it, it also takes the moment the pusher
                         #      makes by reaching 15 mm out to the ear, which
                         #      otherwise all lands on the ear's pin.
-guide_dx      = 10.5   # mm — the rod sits between the screw and the ear
+guide_dx      = 11.5   # mm — the rod sits between the screw and the ear
                         #      (user, 2026-09-20), which is the right way
                         #      round: the carrier's arm then runs 11 mm from
                         #      its bush to the pin instead of 21, and never
@@ -1675,8 +1687,12 @@ def make_guide_foot():
     # From r IN FRONT of the rod's axis, not from the axis itself: a box that
     # starts on the axis leaves the bore half open, and half a bore holds
     # half a rod.
-    arm = Part.makeBox(2 * r, cube_half + bracket_weld - (screw_y - r), 2 * r,
-                       v(screw_x + guide_dx - r, screw_y - r, guide_z0 - r))
+    # Narrower on the side facing the carriage: its ring passes just there.
+    r_in = 3.5
+    gx = screw_x + guide_dx
+    x_lo, x_hi = (gx - r, gx + r_in) if guide_dx > 0 else (gx - r_in, gx + r)
+    arm = Part.makeBox(x_hi - x_lo, cube_half + bracket_weld - (screw_y - r),
+                       2 * r, v(x_lo, screw_y - r, guide_z0 - r))
     return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
                        v(screw_x + guide_dx, screw_y, guide_z0 - r - 1),
                        Z_AXIS))
@@ -1695,13 +1711,12 @@ def _guide_z0():
 
 
 def _nut_body_z(st):
-    """The brass nut sits ABOVE the cage, not level with the carrier: at the
-    carrier's own height the nut's 14 mm body is exactly where the carrier
-    has to be, and below the carrier are the guide rod's foot and the servo."""
-    # Sitting straight on the upper seat plate: the 1 mm that used to be
-    # left between them was a gap bridged by nothing but the web, and the
-    # user spotted it as a hole that made no sense.
-    return st["nut_z"] + (_cage_gap() / 2.0 + cage_t + nut_l / 2.0)
+    """Z of the nut's FLANGE underside, which is the cage's top face.
+
+    The flange sits on the upper seat plate and the body hangs down into the
+    cage beside the springs, where the chamber is empty: that keeps the whole
+    assembly low enough to clear the screw's top bearing."""
+    return st["nut_z"] + _cage_gap() / 2.0 + cage_t
 
 
 def _cage_gap():
@@ -1711,13 +1726,23 @@ def _cage_gap():
 
 
 def make_brass_nut(st):
-    """The nut itself: BOUGHT, brass, threaded on the screw. Drawn on its own
-    so it is not mistaken for something printed."""
-    z = _nut_body_z(st)
-    return cyl(nut_d / 2.0, nut_l, v(screw_x, screw_y, z - nut_l / 2.0),
-               Z_AXIS).cut(cyl(screw_d / 2.0 - 0.6, nut_l + 2,
-                               v(screw_x, screw_y, z - nut_l / 2.0 - 1),
-                               Z_AXIS))
+    """The nut itself: BOUGHT, brass. Flange on top of the cage, body hanging
+    down into it, the screw's thread through both."""
+    zf = _nut_body_z(st)
+    fx, fy, ft = nut_fl
+    body = cyl(nut_d / 2.0, nut_l - ft, v(screw_x, screw_y, zf - (nut_l - ft)),
+               Z_AXIS)
+    _side = 1.0 if guide_dx > 0 else -1.0   # which ear faces the rod
+    _x_lo = screw_x - fx / 2.0 if _side > 0 else screw_x - nut_fl_cut
+    _x_hi = screw_x + nut_fl_cut if _side > 0 else screw_x + fx / 2.0
+    body = body.fuse(Part.makeBox(_x_hi - _x_lo, fy, ft,
+                                  v(_x_lo, screw_y - fy / 2.0, zf)))
+    body = body.cut(cyl(screw_d / 2.0 - 0.6, nut_l + 2,
+                        v(screw_x, screw_y, zf - nut_l), Z_AXIS))
+    body = body.cut(cyl(nut_fl_hole / 2.0, ft + 2,
+                        v(screw_x - _side * nut_fl_pitch / 2.0, screw_y,
+                          zf - 1), Z_AXIS))
+    return body
 
 
 def make_nut(st):
@@ -1747,19 +1772,27 @@ def make_nut(st):
     y0 = y_in - roof_t
     y1 = min(screw_y + push_w / 2.0, cube_half - run_clr)
     z0 = z - g / 2.0 - cage_t
-    z1 = zn + nut_l / 2.0
+    z1 = zn                          # the cage's top IS the flange's seat
     body = Part.makeBox(x1 - x0, y1 - y0, z1 - z0, v(x0, y0, z0))
     # the chamber: from the spine at x0 to open at x1, from the roof to open
     # at the wall side, between the seat plates
     spine_t = 2.5
     body = body.cut(Part.makeBox(x1 - x0 - spine_t + 1.0, y1 - y_in + 1.0, g,
                                  v(x0 + spine_t, y_in, z - g / 2.0)))
-    # the brass nut's pocket, open toward the wall
-    body = body.cut(cyl(nut_d / 2.0 + 0.15, nut_l + 0.4,
-                        v(screw_x, screw_y, zn - nut_l / 2.0 - 0.2), Z_AXIS))
-    body = body.cut(Part.makeBox(nut_d + 0.3, y1 - screw_y + 1.0, nut_l + 0.4,
-                                 v(screw_x - nut_d / 2.0 - 0.15, screw_y,
-                                   zn - nut_l / 2.0 - 0.2)))
+    # the brass nut's body goes down through the top into the chamber, and
+    # its flange screws down onto the top face: two pilots for M3
+    body = body.cut(cyl(nut_d / 2.0 + 0.2, nut_l - nut_fl[2] + 0.5,
+                        v(screw_x, screw_y, zn - (nut_l - nut_fl[2]) - 0.5),
+                        Z_AXIS))
+    _side = 1.0 if guide_dx > 0 else -1.0
+    body = body.cut(cyl(foot_tap_d / 2.0, 7.0,
+                        v(screw_x - _side * nut_fl_pitch / 2.0, screw_y,
+                          zn - 7.0), Z_AXIS))
+    # Clear of the carriage's ring, which its lower corner comes near when
+    # the carriage tilts down: a cut of the ring's own cylinder, grown by its
+    # swing, takes exactly what is in the way and nothing else.
+    body = body.cut(cyl(hous_ro + 1.5, hous_y1 - hous_y0 + 2.0,
+                        v(0, hous_y0 - 1.0, 0), Y_AXIS))
     # bores
     body = body.cut(cyl(screw_d / 2.0 + 0.2, z1 - z0 + 2.0,
                         v(screw_x, screw_y, z0 - 1.0), Z_AXIS))
@@ -1857,10 +1890,21 @@ def _x_face_push():
     return -(hous_ro + 0.5) if ear_sx < 0 else (hous_ro + 0.5)
 
 
+def make_flange_screw(st, sx):
+    """One of the two M3 screws that hold the nut's flange down on the cage:
+    from above, through the flange, into the cage."""
+    zf = _nut_body_z(st) + nut_fl[2]
+    return make_screw(v(screw_x + sx, screw_y, zf), v(0, 0, -1), 3.0, 6.0,
+                      5.5, 2.0)
+
+
 def act_moving_parts(st):
     """The nut and its pusher. The screw turns but does not move, so it is a
     fixed part; the servo likewise."""
     return [("ScrewNut", make_brass_nut(st), (0.72, 0.55, 0.30), 0),
+            ("NutScrew0", make_flange_screw(
+                st, -(1.0 if guide_dx > 0 else -1.0) * nut_fl_pitch / 2.0),
+             (0.35, 0.35, 0.38), 0),
             ("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
             ("SpringCarrier", make_carrier(st), (0.30, 0.55, 0.85), 0),
             ("EarPin", make_ear_pin(st), (0.45, 0.45, 0.50), 0),
@@ -2386,6 +2430,11 @@ if RUN_CHECKS:
         # with the screw by definition.
         if {na, nb} == {"ScrewNut", "ScrewShaft"}:
             return True
+        # the flange's screws: threaded through the flange, self-tapping into
+        # the cage below it
+        if {na, nb} & {"NutScrew0", "NutScrew1"} and \
+                {na, nb} & {"ScrewNut", "ActNut"}:
+            return True
         return False
 
 
@@ -2535,7 +2584,11 @@ if RUN_CHECKS:
     # case, the four-bar's post and the carriage, so "== 0 mm3" at three stops is
     # not enough. Pairs joined by a pin are left out — their 0.5 mm is the
     # designed gap between neighbouring plates, not a running clearance.
-    _ACT_PINNED = {frozenset(p) for p in (("EarPin", "Carriage"),
+    _ACT_PINNED = {frozenset(p) for p in (("NutScrew0", "ScrewNut"),
+                                          ("NutScrew1", "ScrewNut"),
+                                          ("NutScrew0", "ActNut"),
+                                          ("NutScrew1", "ActNut"),
+                                          ("EarPin", "Carriage"),
                                           ("EarPin", "SpringCarrier"),
                                           ("ScrewNut", "ActNut"),
                                           ("ScrewNut", "ScrewShaft"),
