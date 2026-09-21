@@ -656,16 +656,18 @@ The user's rule, and it is a better one than "everything on the wall":
   FLOOR, which the servo stands on anyway.
 - The four-bar's frame posts have **X bores** for their pins. Printed with the
   wall those would be horizontal holes, which is where FDM goes oval, so they
-  are printed SEPARATELY, laid bore-up, and screwed on.
+  are printed SEPARATELY, laid bore-up. They are held by the DECKS, not the
+  wall (user, 2026-09-21): each deck grows a solid block down (or up) to its
+  post, and two short screws go in along Z from OUTSIDE the cube, heads sunk
+  flush in the deck's outer face, and bite the post BESIDE the pin — at
+  y 34.3, forward of the pin's y 38.9 — so they can go deep without meeting
+  its bore. Right above the pin they would have had 2 mm of thread.
 - Only the guide rod's foot stays on the wall: it sits above the servo, where
   neither deck reaches it without passing through the case.
 
-Falling out of it: the frame posts' feet are on the +X side only, with their
-two screws spread in Z rather than X — the −X half of that wall is the
-actuation's column now, and a symmetric foot ran into the servo's cradle and
-the spring cage. And `both_hands()` stopped mirroring the screw pattern:
-nothing is turned over any more, and the mirrored half landed in that same
-column.
+Falling out of it: the wall carries no screws at all now, and `both_hands()`
+stopped mirroring the screw pattern — nothing is turned over any more, and
+the mirrored half had landed in the actuation's own column.
 
 ## 13. Next session — raised 2026-09-17, not yet worked
 

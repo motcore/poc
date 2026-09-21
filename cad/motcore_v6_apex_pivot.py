@@ -497,6 +497,17 @@ fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
                         #      block's own free edge
 fp_post_y     = 6.0    # mm — half-height (Z) the block adds above and below
                         #      the screw spread and the pivot lug
+fp_deck_y     = 34.3   # mm — Y of those screws: forward of the pin (y 38.9) by
+                        #      enough that a tapped hole clears its bore, so
+                        #      the screw can go deep beside the pin instead of
+                        #      stopping short above it with 2 mm of thread
+fp_deck_dx    = 3.6    # mm — |X| of the two screws that hold each frame post
+                        #      to the deck's own block. They run along Z, in
+                        #      from OUTSIDE the cube, and stop short of the
+                        #      pin (user, 2026-09-20).
+fp_deck_len   = 12.0   # mm — and they are this long: enough to reach through
+                        #      deck and block and bite the post, short enough
+                        #      never to arrive at the pin's bore.
 fp_screw_dz   = 4.0    # mm — its screws spread in Z now, not in X: the −X
                         #      half of this wall is the actuation's column,
                         #      and a symmetric foot ran straight into the
@@ -1040,8 +1051,7 @@ def wall_screws():
 
     The list stays the single source for both the wall's bosses and the
     brackets' own holes, so the two cannot disagree."""
-    return [(fp_screw_x, zs * fb_A[1] + dz)
-            for zs in (1, -1) for dz in (-fp_screw_dz, fp_screw_dz)]
+    return []
 
 
 _SHAPE_CACHE = {}
@@ -1423,6 +1433,51 @@ def _link_swept_envelope(A, Bkey):
     return env
 
 
+def frame_pad(zs):
+    """The block the deck grows to meet a frame post, with the clearance
+    holes and the sunk heads for the two screws that hold it.
+
+    The user's idea, and a better one than a foot on the wall: the deck is
+    right there — 4 mm above the upper post and below the lower one — the
+    screws run along Z so they print true, they go in from OUTSIDE the cube
+    where a screwdriver can reach them, and their heads sink flush into the
+    deck's own face."""
+    z_face = zs * (fb_A[1] + fp_post_y)
+    z_deck = zs * cube_half
+    y_far = fb_A[0] - fp_lug_x
+    pad = Part.makeBox(2 * fp_lug_x, wall_face_y - y_far,
+                       abs(z_deck - z_face) + bracket_weld,
+                       v(-fp_lug_x, y_far,
+                         min(z_face, z_deck + zs * bracket_weld)))
+    return pad
+
+
+def frame_pad_holes(zs):
+    """What gets cut through the deck and its pad for those two screws: a
+    clearance hole all the way, and a counterbore in the deck's OUTSIDE face
+    so the head sits flush. Cut after the pads are fused — cut before, the
+    deck plate fills them straight back in."""
+    tool = None
+    z_out = zs * (cube_half + deck_t)
+    z_face = zs * (fb_A[1] + fp_post_y)
+    for sx in (-fp_deck_dx, fp_deck_dx):
+        hole = cyl(foot_hole_d / 2.0, abs(z_out - z_face) + 2.0,
+                   v(sx, fp_deck_y, z_out + zs * 1.0), v(0, 0, -zs))
+        head = cyl(foot_screw_d, 2.0 + 1.0,
+                   v(sx, fp_deck_y, z_out + zs * 1.0), v(0, 0, -zs))
+        t = hole.fuse(head)
+        tool = t if tool is None else tool.fuse(t)
+    return tool
+
+
+def make_frame_screw(zs, sx):
+    """One of those screws, drawn: its head sunk in the deck, its shank
+    running down through deck and pad into the post, beside the pin."""
+    z_out = zs * (cube_half + deck_t) - zs * 2.0
+    return make_screw(v(sx, fp_deck_y, z_out), v(0, 0, -zs), foot_screw_d,
+                      fp_deck_len, foot_screw_d * 1.8, 2.0)
+
+
 def make_frame_bracket(zs):
     """The four-bar's frame pivot: a foot against the wall's boss face and a
     post reaching in to the pivot. PRINTED SEPARATELY and screwed on (user,
@@ -1449,15 +1504,8 @@ def make_frame_bracket(zs):
     screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
     y_far = fb_A[0] - fp_lug_x
-    y_foot_in = wall_face_y - foot_t
-    _fz = fp_screw_dz + foot_edge / 2.0
-    foot = Part.makeBox(fp_post_x - fp_lug_x, foot_t, 2 * _fz,
-                        v(fp_lug_x, y_foot_in, z_pin - _fz))
-    # The post runs THROUGH the foot's own Y band: stopping at its face left
-    # the two touching along a line, which fuses into two solids.
-    part = foot.fuse(Part.makeBox(2 * fp_lug_x, wall_face_y - y_far,
-                                  2 * fp_post_y,
-                                  v(-fp_lug_x, y_far, z_pin - fp_post_y)))
+    part = Part.makeBox(2 * fp_lug_x, wall_face_y - y_far, 2 * fp_post_y,
+                        v(-fp_lug_x, y_far, z_pin - fp_post_y))
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
                              -fp_lug_x, 2 * fp_lug_x))
     part = part.cut(pin_x((fb_A[0], z_pin), fdm_pin_press_d,
@@ -1474,9 +1522,16 @@ def make_frame_bracket(zs):
     swept = cached(_link_swept_envelope,
                    A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
-    for dz in (-fp_screw_dz, fp_screw_dz):
-        part = part.cut(cyl(foot_hole_d / 2.0, foot_t + 2,
-                            v(fp_screw_x, y_foot_in - 1, z_pin + dz), Y_AXIS))
+    # Tapped from the deck side, along Z: the deck's own block comes down
+    # (or up) to this face and the screw goes in from OUTSIDE the cube.
+    _z_face = z_pin + zs * fp_post_y
+    # Deep enough for the screw's own tip (head sunk 2 mm into the deck's
+    # outside face, then fp_deck_len of shank), plus a millimetre.
+    _tip = cube_half + deck_t - 2.0 - fp_deck_len
+    _depth = abs(_z_face) - _tip + 1.0
+    for sx in (-fp_deck_dx, fp_deck_dx):
+        part = part.cut(cyl(foot_tap_d / 2.0, _depth,
+                            v(sx, fp_deck_y, _z_face), v(0, 0, -zs)))
     return part
 
 def servo_box():
@@ -1852,6 +1907,12 @@ def make_deck(zs):
                                  v(0, 0, zs)))
             deck = deck.cut(cyl(foot_tap_d / 2.0, deck_boss_h + 2.0, base,
                                 v(0, 0, zs)))
+    for _, rot in AXES:
+        # The blocks that reach the four-bar's posts, one per axis — and then
+        # the holes through them, cut LAST.
+        deck = deck.fuse(place(frame_pad(zs), rot))
+    for _, rot in AXES:
+        deck = deck.cut(place(frame_pad_holes(zs), rot))
     if zs > 0:
         # The screw's and the rod's top anchors: their bores run along Z, so
         # the ceiling is the part they come out true on.
@@ -2056,6 +2117,10 @@ FIXED_PARTS = [
     ("ServoBody",     make_servo_body(),                      (0.20, 0.25, 0.30), 0),
     ("ServoBracket",  cached(make_servo_bracket),             (0.75, 0.75, 0.78), 0),
     ("ScrewShaft",    cached(make_screw_shaft),               (0.60, 0.60, 0.60), 0),
+    ("FrameScrewT0",  make_frame_screw(1, -fp_deck_dx),       (0.35, 0.35, 0.38), 0),
+    ("FrameScrewT1",  make_frame_screw(1, fp_deck_dx),        (0.35, 0.35, 0.38), 0),
+    ("FrameScrewB0",  make_frame_screw(-1, -fp_deck_dx),      (0.35, 0.35, 0.38), 0),
+    ("FrameScrewB1",  make_frame_screw(-1, fp_deck_dx),       (0.35, 0.35, 0.38), 0),
     ("GuideRod",      cached(make_guide_rod),                 (0.45, 0.45, 0.50), 0),
     ("GuideFoot",     cached(make_guide_foot),                (0.75, 0.75, 0.78), 0),
     ("ScrewTop",      cached(make_screw_top),                 (0.75, 0.75, 0.78), 0),
@@ -2302,7 +2367,9 @@ if RUN_CHECKS:
         if (na, nb) in _MESH_PAIRS or (nb, na) in _MESH_PAIRS:
             return True
         for host, screw in (("Wall", "WallScrew"), ("DeckTop", "DeckScrewT"),
-                            ("DeckBottom", "DeckScrewB")):
+                            ("DeckBottom", "DeckScrewB"),
+                            ("FramePostT", "FrameScrewT"),
+                            ("FramePostB", "FrameScrewB")):
             if {na, nb} == {host} | {n for n in (na, nb) if n.startswith(screw)}:
                 return True
         # A bracket printed as part of its host IS its host: they are meant to
@@ -2646,6 +2713,12 @@ if RUN_CHECKS:
     _TOUCH_OK = {frozenset(q) for q in (
         # welded: printed as one part with their host
         ("Wall", "GuideFoot"),
+        # the frame posts' screws: through the deck, into the post
+        ("DeckTop", "FrameScrewT0"), ("DeckTop", "FrameScrewT1"),
+        ("DeckBottom", "FrameScrewB0"), ("DeckBottom", "FrameScrewB1"),
+        ("FramePostT", "FrameScrewT0"), ("FramePostT", "FrameScrewT1"),
+        ("FramePostB", "FrameScrewB0"), ("FramePostB", "FrameScrewB1"),
+        ("DeckTop", "FramePostT"), ("DeckBottom", "FramePostB"),
         # a screw in its own boss
         ("Wall", "WallScrew0"), ("Wall", "WallScrew1"),
         ("Wall", "WallScrew2"), ("Wall", "WallScrew3"),
