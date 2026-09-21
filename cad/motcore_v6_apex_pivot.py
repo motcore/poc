@@ -974,6 +974,7 @@ slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-sl
 # band left is the carriage arm's own, which the ear is part of.
 # The ear is bored into the block's own face, ear_pin_in deep.
 ear_pin_in = 8.0
+ear_pin_out = 5.0   # mm — and this far into the carrier's slot
 x_ear = ((-carr_half, -carr_half + ear_pin_in) if ear_sx < 0
          else (carr_half - ear_pin_in, carr_half))
 
@@ -1362,8 +1363,7 @@ def make_carriage():
                         v(0, hous_y0 - 1.0, 0), Y_AXIS))
     for zs in (1, -1):
         body = body.cut(pin_x((fb_B[0], zs * fb_B[1]), fdm_pin_hole_d,
-                              -(side_x + side_t / 2.0 + 2.0),
-                              2 * (side_x + side_t / 2.0 + 2.0)))
+                              -(carr_half + 1.0), 2 * (carr_half + 1.0)))
     # The ear is the block's own face: the pin is PRESSED into it here, and
     # runs in the carrier's slot.
     body = body.cut(pin_x(E0, fdm_act_press_d, x_ear[0] - 1.0,
@@ -1391,11 +1391,16 @@ def make_carriage_arms(sd):
     z_corner = fb_B[1] - (arm_root[0] - fb_B[0])
     part = bar_yz((arm_root[0], -z_corner), (arm_root[0], z_corner),
                   arm_up_w, x0, side_t)
+    # The jogs and the pin's boss run OUTWARD to the block's own face: the
+    # pin had 4 mm of arm round it and stood a millimetre out of it, in air.
+    # Flush with the block, the pin is held along its whole reach.
+    x0_out = x0 if sd > 0 else -carr_half
+    t_out = carr_half - (side_x - side_t / 2.0)
     for zs in (1, -1):
         b = (fb_B[0], zs * fb_B[1])
         corner = (arm_root[0], zs * z_corner)
-        part = part.fuse(bar_yz(corner, b, arm_w, x0, side_t))
-        part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0, side_t))
+        part = part.fuse(bar_yz(corner, b, arm_w, x0_out, t_out))
+        part = part.fuse(disc_yz(b, arm_w / 2.0 + 0.5, x0_out, t_out))
         # Thrust boss on the arm's INNER face, standing out to a shim's width
         # off the link's outer face (1.5 mm of X play before).
         x_in = link_x + link_t / 2.0 + shim_gap
@@ -1873,8 +1878,12 @@ def make_carrier(st):
     # spend its travel taking up its own slack.
     _sl_y = fdm_act_hole_d + 1.6
     _sl_z = act_pin_d + 0.2
-    return body.cut(Part.makeBox(carrier_t + 5.0, _sl_y, _sl_z,
-                                 v(_x_end - carrier_t - 3.0,
+    # BLIND: open on the face toward the carriage, 0.7 mm past the pin's
+    # end, so it keeps its wall off the rod's bore behind it.
+    _xa = _x_end - ear_sx * 1.0
+    _xb = _x_end + ear_sx * (ear_pin_out + 0.7)
+    return body.cut(Part.makeBox(abs(_xb - _xa), _sl_y, _sl_z,
+                                 v(min(_xa, _xb),
                                    ear_y - _sl_y / 2.0,
                                    st["E"][1] - _sl_z / 2.0)))
 
@@ -1884,7 +1893,7 @@ def make_ear_pin(st):
     the ear, pressed into the carriage block's face and running in the
     carrier's slot."""
     x_in = x_ear[1] if ear_sx < 0 else x_ear[0]
-    x_out = _x_face_push() - ear_sx * (carrier_t + 0.5)
+    x_out = _x_face_push() + ear_sx * ear_pin_out
     return pin_x(st["E"], act_pin_d, min(x_in, x_out), abs(x_out - x_in))
 
 
@@ -2247,7 +2256,7 @@ def moving_parts(st):
         return _MOVING_CACHE[key]
     out = [(n, place_carriage(sh, st), c, t) for n, sh, c, t in CARRIAGE_REST]
     pin_reach = link_x + link_t / 2.0 + 1.0
-    pin_reach_b = side_x + side_t / 2.0 + 1.0
+    pin_reach_b = carr_half - 0.5
     for zs, A, B in ((1, A1, st["B1"]), (-1, A2, st["B2"])):
         tag = "T" if zs > 0 else "B"
         out.append((f"Link{tag}", make_link(A, B), _LINK_COL, 0))
