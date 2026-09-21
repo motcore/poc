@@ -275,8 +275,11 @@ spring_len    = 2.0    # mm — torsion spring envelope along X. Short: the
                         #      whole chain lives in the 7.8 mm between the
                         #      shaft face and the neighbour's wall.
 spring_r      = 5.5    # mm — its outer radius
-sv_stand      = 2.0    # mm — how far the cradle lifts the servo off the
-                        #      floor: the plate it stands on
+sv_stand      = 0.0    # mm — how far the cradle lifts the servo off the
+                        #      floor. None now (user, 2026-09-21): standing
+                        #      on the floor itself puts its tab 2 mm further
+                        #      from the carriage's lug, which the arms' new
+                        #      bosses had brought to 0.65 mm.
 screw_x       = -37.7  # mm ┐ the lead screw's axis: up the empty column
 screw_y       = 41.5   # mm ┘ beside the carriage's arm, clear of its ring
 screw_d       = 8.0    # mm — T8 lead screw (the 3D-printer standard part)
@@ -1683,6 +1686,13 @@ def make_servo_bracket():
                             v(sx if out > 0 else sx - servo_tab_out - 1.0,
                               y0, z0))
         part = part.fuse(post)
+    # A BACK behind the case, filling the strip between it and the wall
+    # (user, 2026-09-21), from the floor up to the tabs: the case is held
+    # on its wall side as well as on its tabs.
+    part = part.fuse(Part.makeBox(bx + 2.0 * (servo_tab_out + 1.0),
+                                  cube_half - (y0 + by), tz1 - z0 + bracket_weld,
+                                  v(x0 - servo_tab_out - 1.0, y0 + by,
+                                    z0 - bracket_weld)))
     for sx in servo_screw_xs():
         part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 4.0),
                             Z_AXIS))
@@ -1711,10 +1721,15 @@ def make_screw_top():
     A screw pushes as hard as it pulls, and a servo's output bearing is not
     meant to take either, so the thrust is caught here and at the floor,
     never through the servo."""
-    x0 = min(screw_x - nut_d / 2.0, screw_x + guide_dx - guide_d / 2.0 - 3.0)
-    x1 = max(screw_x + nut_d / 2.0, screw_x + guide_dx + guide_d / 2.0 + 3.0)
-    y0 = min(screw_y - nut_d / 2.0, guide_y - guide_d / 2.0 - 3.0)
-    y1 = max(screw_y + nut_d / 2.0, guide_y + guide_d / 2.0 + 3.0)
+    # 3 mm of wall round both bores. It was sized off the nut's body, and
+    # left the screw's bore 0.6 mm from two of its faces.
+    rs = fdm_shaft_hole_d / 2.0 + 1.5 + 3.0
+    rg = guide_d / 2.0 + 3.0
+    gx = screw_x + guide_dx
+    x0 = min(screw_x - rs, gx - rg)
+    x1 = max(screw_x + rs, gx + rg)
+    y0 = min(screw_y - rs, guide_y - rg)
+    y1 = min(max(screw_y + rs, guide_y + rg), cube_half - 0.6)   # off the wall
     post = Part.makeBox(x1 - x0, y1 - y0, cube_half + bracket_weld - screw_top_z,
                         v(x0, y0, screw_top_z))
     post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 30.0,
@@ -2845,6 +2860,8 @@ if RUN_CHECKS:
         ("FramePostB", "WallScrew0"), ("FramePostB", "WallScrew1"),
         ("FramePostB", "WallScrew2"), ("FramePostB", "WallScrew3"),
         ("DeckBottom", "ServoBracket"), ("DeckTop", "ScrewTop"),
+        # the cradle's back is printed up against the wall's face
+        ("Wall", "ServoBracket"),
         # assembled: pressed, seated, screwed or bolted together
         ("ServoBody", "ServoBracket"), ("ServoBody", "ScrewShaft"),
         # a bracket IS its host, so anything it holds touches that host
