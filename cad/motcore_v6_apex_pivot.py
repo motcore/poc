@@ -268,7 +268,7 @@ sv_wall_clr   = 0.5    # mm — case back to the wall
 servo_tab_t   = 2.5    # mm — thickness of the servo's own mounting tabs
 sv_cable_h    = 6.0    # mm — the cable's slot in the cradle: this tall from
                         #      the floor (MG90D: the lead leaves the case's
-                        #      end away from the shaft, low — check on the part)
+                        #      SHAFT end, low — user, 2026-09-21)
 servo_tab_out = 4.7    # mm — how far each tab reaches past the body
 servo_screw_d = 2.0    # mm — M2 through the tabs into the bracket
 horn_t        = 1.8    # mm ┐ X stack: spring and crank outboard of the
@@ -1696,12 +1696,13 @@ def make_servo_bracket():
     for sx in servo_screw_xs():
         part = part.cut(cyl(foot_tap_d / 2.0, 6.0, v(sx, screw_y, tz0 - 4.0),
                             Z_AXIS))
-    # The cable's way out (user, 2026-09-21): through the post at the case's
-    # far end, toward the carriage and not the neighbour's wall, OPEN on the
-    # motor side so the lead drops in from there, with the servo in place.
-    part = part.cut(Part.makeBox(servo_tab_out + 3.0, screw_y + 2.0 - (y0 - 1.0),
-                                 sv_cable_h,
-                                 v(x0 + bx - 1.0, y0 - 1.0, z0)))
+    # The cable's way out (user, 2026-09-21). It leaves the case at the
+    # shaft end, which is the corner, so a POCKET in that post: blind toward
+    # the neighbour's wall (1.5 mm left), open on the motor side, so the lead
+    # turns up into the cube and drops in with the servo in place.
+    _xw = -cube_half + run_clr + 1.5
+    part = part.cut(Part.makeBox(x0 + 1.0 - _xw, screw_y + 2.0 - (y0 - 1.0),
+                                 sv_cable_h, v(_xw, y0 - 1.0, z0)))
     # Trimmed to the cube: the cradle is wider than the case, and the case is
     # already out at the corner.
     return part.cut(Part.makeBox(40.0, 60.0, 60.0,
