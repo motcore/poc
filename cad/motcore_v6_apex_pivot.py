@@ -497,7 +497,11 @@ fp_post_x     = 22.0   # mm — half-width in X of the block: fp_screw_x plus a
                         #      block's own free edge
 fp_post_y     = 6.0    # mm — half-height (Z) the block adds above and below
                         #      the screw spread and the pivot lug
-fp_deck_ys    = (34.3, 44.9)   # mm — Y of the two screws that hold each
+fp_screw_off  = 6.0    # mm — each screw this far from the pin's axis, one in
+                        #      front and one behind: symmetric, so the post is
+                        #      clamped evenly about its own pivot.
+fp_deck_ys    = (fb_A[0] - fp_screw_off, fb_A[0] + fp_screw_off)   # mm — Y of
+                        #      the two screws that hold each
                         #      frame post: one IN FRONT of the pin (y 38.9), one
                         #      BEHIND it, both on the post's centreline. That is
                         #      as far apart as they can go (user, 2026-09-21):
@@ -505,8 +509,10 @@ fp_deck_ys    = (34.3, 44.9)   # mm — Y of the two screws that hold each
                         #      only the lug's width because the link arms swing
                         #      either side of it. Each clears the pin's bore, so
                         #      it can go deep beside the pin.
-fp_post_back  = 1.0    # mm — the post runs back to this short of the wall's
-                        #      inner face, to give the rear screw its meat
+fp_post_back  = 0.0    # mm — the post runs right back to the wall's inner
+                        #      face (user, 2026-09-21), and forward by the same
+                        #      amount on the other side of the pin, so it is
+                        #      symmetric about its own pivot
 fp_deck_dx    = 0.0    # mm — |X| of those screws: centred
                         #      to the deck's own block. They run along Z, in
                         #      from OUTSIDE the cube, and stop short of the
@@ -1450,13 +1456,14 @@ def frame_pad(zs):
     deck's own face."""
     z_face = zs * (fb_A[1] + fp_post_y)
     z_deck = zs * cube_half
-    y_far = fb_A[0] - fp_lug_x
-    # As wide as the PIN, not just the post (user, 2026-09-21): it spans the
-    # link arms too, which it can because it stands above their sweep.
-    hx = link_x + link_t / 2.0 + 1.0
-    pad = Part.makeBox(2 * hx, cube_half - fp_post_back - y_far,
+    y_back = cube_half - fp_post_back
+    y_far = 2.0 * fb_A[0] - y_back
+    # The post's own footprint, no wider: the extra width was only ever there
+    # for screws spread in X, and they are spread in Y instead.
+    pad = Part.makeBox(2 * fp_lug_x, y_back - y_far,
                        abs(z_deck - z_face) + bracket_weld,
-                       v(-hx, y_far, min(z_face, z_deck + zs * bracket_weld)))
+                       v(-fp_lug_x, y_far,
+                         min(z_face, z_deck + zs * bracket_weld)))
     return pad
 
 
@@ -1486,6 +1493,20 @@ def make_frame_screw(zs, sy):
                       fp_deck_len, foot_screw_d * 1.8, 2.0)
 
 
+def _knuckle_swept_envelope(A, Bkey):
+    """The link's knuckle over the whole tilt stroke, grown by the swept
+    link clearance the checks demand."""
+    env = None
+    web_x = link_x + link_t / 2.0
+    for k in range(-4, 5):
+        B = pose_state(phi_preload * k / 4.0)[Bkey]
+        f = link_knuckle_d / math.dist(A, B)
+        K = (A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f)
+        d = disc_yz(K, link_knuckle + 1.0 + 0.2, -web_x - 1.0, 2 * web_x + 2.0)
+        env = d if env is None else env.fuse(d)
+    return env
+
+
 def make_frame_bracket(zs):
     """The four-bar's frame pivot: a foot against the wall's boss face and a
     post reaching in to the pivot. PRINTED SEPARATELY and screwed on (user,
@@ -1511,8 +1532,8 @@ def make_frame_bracket(zs):
     swept path (see fw_screw_z), which is the real reason this stayed at two
     screws, X-spread only, same as the deck version."""
     z_pin = zs * fb_A[1]
-    y_far = fb_A[0] - fp_lug_x
     y_back = cube_half - fp_post_back
+    y_far = 2.0 * fb_A[0] - y_back          # as far in front as behind
     part = Part.makeBox(2 * fp_lug_x, y_back - y_far, 2 * fp_post_y,
                         v(-fp_lug_x, y_far, z_pin - fp_post_y))
     part = part.fuse(disc_yz((fb_A[0], z_pin), link_w / 2.0 + 1.0,
@@ -1531,6 +1552,12 @@ def make_frame_bracket(zs):
     swept = cached(_link_swept_envelope,
                    A1 if zs > 0 else A2, "B1" if zs > 0 else "B2")
     part = part.cut(swept)
+    # And the KNUCKLE's own sweep, grown by the link clearance: the post now
+    # runs as far in front of its pin as behind it, and in front it passes
+    # right over the knuckle. Cutting the knuckle's path out of it bevels
+    # that corner along the link, instead of shortening the whole post.
+    part = part.cut(cached(_knuckle_swept_envelope,
+                           A1 if zs > 0 else A2, "B1" if zs > 0 else "B2"))
     # Tapped from the deck side, along Z: the deck's own block comes down
     # (or up) to this face and the screw goes in from OUTSIDE the cube.
     _z_face = z_pin + zs * fp_post_y
