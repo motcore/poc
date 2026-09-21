@@ -1849,27 +1849,21 @@ def make_carrier(st):
     gx = screw_x + guide_dx
     # A BUSH on the rod, not a plate with a hole: the rod takes the moment
     # the arm makes, and it takes it on this length.
-    body = cyl(guide_d / 2.0 + 3.0, carrier_bush,
+    _r = guide_d / 2.0 + 3.0
+    body = cyl(_r, carrier_bush,
                v(gx, guide_y, z - carrier_bush / 2.0), Z_AXIS)
-    # Right up to the carriage's arm: at the ear's own height the ring's
-    # silhouette ends at |x| 15.4, so the last few millimetres are free and
-    # the pin between them can be short.
+    # ONE block, the bush's own height, from the rod to the carriage's face:
+    # rounded round the rod, flat where it faces the ear. The arm is short
+    # now (7.6 mm), so a thin plate with a boss on its end bought nothing —
+    # the springs seat on its whole faces and the pin has 3.5 mm of wall
+    # above and below it.
     _x_end = _x_face_push()
     _y0, _y1 = _carrier_y()
-    arm = Part.makeBox(_x_end - gx, _y1 - _y0, carrier_t,
-                       v(gx, _y0, z - carrier_t / 2.0))
-    body = body.fuse(arm)
-    # A boss round the pin's own slot. The arm is carrier_t thick and the
-    # slot is fdm_act_hole_d deep, which left 0.2 mm of wall above and below
-    # it — nothing at all for the load the pin carries.
-    body = body.fuse(Part.makeBox(pin_boss_x, _y1 - _y0, pin_boss_t,
-                                  v(_x_end - pin_boss_x, _y0,
-                                    z - pin_boss_t / 2.0)))
+    _y0 = max(_y0, guide_y - _r)
+    body = body.fuse(Part.makeBox(_x_end - gx, _y1 - _y0, carrier_bush,
+                                  v(gx, _y0, z - carrier_bush / 2.0)))
     body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_bush + 2,
                         v(gx, guide_y, z - carrier_bush / 2.0 - 1), Z_AXIS))
-    # It clears the screw: the arm passes beside it, not through it.
-    body = body.cut(cyl(screw_d / 2.0 + run_clr, pin_boss_t + 2,
-                        v(screw_x, screw_y, z - pin_boss_t / 2.0 - 1), Z_AXIS))
     # A SLOT, not a hole: the ear swings on its arc while the carrier goes
     # straight up, and the difference — 0.64 mm over the stroke — has to go
     # somewhere. It goes here.
