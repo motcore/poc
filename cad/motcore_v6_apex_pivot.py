@@ -289,11 +289,15 @@ nut_l         = 15.0   # mm — overall, flange included
 nut_fl        = (22.0, 10.5, 4.0)   # mm — flange: along X, along Y, thick
 nut_fl_hole   = 2.6    # mm — its two holes (likely tapped M3 — check it)
 nut_fl_pitch  = 16.0   # mm — between them, along X
-nut_fl_cut    = 5.5    # mm — the flange is CUT here on the guide rod's side,
-                        #      its ear sawn off: whole, it reaches 11 mm from
-                        #      the screw and the rod stands 11.5 away, so the
-                        #      two meet. One screw in the remaining ear both
-                        #      holds the nut and stops it turning.
+guide_dy      = -7.8   # mm — the rod stands this far from the screw in Y,
+                        #      toward the motor: JUST enough for the nut's
+                        #      whole flange to clear it (0.6 mm at its corner),
+                        #      so the flange keeps both ears and both screws
+                        #      (user, 2026-09-21: no cutting the nut). Moving
+                        #      it out in X instead was not on — the servo's
+                        #      tab is already 0.4 off the neighbour's wall, and
+                        #      the rod's foot meets the carriage's ring.
+guide_y       = screw_y + guide_dy   # DERIVED — the rod's own Y
 push_t        = 4.0    # mm — the pusher arm from the nut out to the ear
 push_w        = 14.0   # mm — the carrier's arm. It has to STRADDLE the
                         #      screw: the rod is on one side of it and the ear
@@ -1667,14 +1671,14 @@ def make_screw_top():
     never through the servo."""
     x0 = min(screw_x - nut_d / 2.0, screw_x + guide_dx - guide_d / 2.0 - 3.0)
     x1 = max(screw_x + nut_d / 2.0, screw_x + guide_dx + guide_d / 2.0 + 3.0)
-    y0 = screw_y - nut_d / 2.0
-    y1 = max(screw_y + nut_d / 2.0, screw_y + guide_d / 2.0 + 3.0)
+    y0 = min(screw_y - nut_d / 2.0, guide_y - guide_d / 2.0 - 3.0)
+    y1 = max(screw_y + nut_d / 2.0, guide_y + guide_d / 2.0 + 3.0)
     post = Part.makeBox(x1 - x0, y1 - y0, cube_half + bracket_weld - screw_top_z,
                         v(x0, y0, screw_top_z))
     post = post.cut(cyl(fdm_shaft_hole_d / 2.0 + 1.5, 30.0,
                         v(screw_x, screw_y, screw_top_z - 1.0), Z_AXIS))
     return post.cut(cyl(fdm_pin_press_d / 2.0, 30.0,
-                        v(screw_x + guide_dx, screw_y, screw_top_z - 1.0),
+                        v(screw_x + guide_dx, guide_y, screw_top_z - 1.0),
                         Z_AXIS))
 
 
@@ -1691,10 +1695,10 @@ def make_guide_foot():
     r_in = 3.5
     gx = screw_x + guide_dx
     x_lo, x_hi = (gx - r, gx + r_in) if guide_dx > 0 else (gx - r_in, gx + r)
-    arm = Part.makeBox(x_hi - x_lo, cube_half + bracket_weld - (screw_y - r),
-                       2 * r, v(x_lo, screw_y - r, guide_z0 - r))
+    arm = Part.makeBox(x_hi - x_lo, cube_half + bracket_weld - (guide_y - r),
+                       2 * r, v(x_lo, guide_y - r, guide_z0 - r))
     return arm.cut(cyl(fdm_pin_press_d / 2.0, 3 * r,
-                       v(screw_x + guide_dx, screw_y, guide_z0 - r - 1),
+                       v(screw_x + guide_dx, guide_y, guide_z0 - r - 1),
                        Z_AXIS))
 
 
@@ -1703,7 +1707,7 @@ def make_guide_rod():
     and the screw's top post above, with the nut's pusher sliding on it."""
     z0 = _guide_z0()
     return cyl(guide_d / 2.0, screw_top_z - z0,
-               v(screw_x + guide_dx, screw_y, z0), Z_AXIS)
+               v(screw_x + guide_dx, guide_y, z0), Z_AXIS)
 
 
 def _guide_z0():
@@ -1732,16 +1736,13 @@ def make_brass_nut(st):
     fx, fy, ft = nut_fl
     body = cyl(nut_d / 2.0, nut_l - ft, v(screw_x, screw_y, zf - (nut_l - ft)),
                Z_AXIS)
-    _side = 1.0 if guide_dx > 0 else -1.0   # which ear faces the rod
-    _x_lo = screw_x - fx / 2.0 if _side > 0 else screw_x - nut_fl_cut
-    _x_hi = screw_x + nut_fl_cut if _side > 0 else screw_x + fx / 2.0
-    body = body.fuse(Part.makeBox(_x_hi - _x_lo, fy, ft,
-                                  v(_x_lo, screw_y - fy / 2.0, zf)))
+    body = body.fuse(Part.makeBox(fx, fy, ft,
+                                  v(screw_x - fx / 2.0, screw_y - fy / 2.0, zf)))
     body = body.cut(cyl(screw_d / 2.0 - 0.6, nut_l + 2,
                         v(screw_x, screw_y, zf - nut_l), Z_AXIS))
-    body = body.cut(cyl(nut_fl_hole / 2.0, ft + 2,
-                        v(screw_x - _side * nut_fl_pitch / 2.0, screw_y,
-                          zf - 1), Z_AXIS))
+    for sx in (-nut_fl_pitch / 2.0, nut_fl_pitch / 2.0):
+        body = body.cut(cyl(nut_fl_hole / 2.0, ft + 2,
+                            v(screw_x + sx, screw_y, zf - 1), Z_AXIS))
     return body
 
 
@@ -1768,9 +1769,10 @@ def make_nut(st):
     roof_t = 2.5
     x0 = min(screw_x - nut_d / 2.0 - 3.0, gx - spr_od / 2.0 - 2.0)
     x1 = max(screw_x + nut_d / 2.0 + 3.0, gx + spr_od / 2.0 + 1.0)
-    y_in = screw_y - push_w / 2.0 - 0.5          # the carrier's motor side
+    y_in = min(screw_y - nut_fl[1] / 2.0,
+               guide_y - spr_od / 2.0, _carrier_y()[0]) - 0.5
     y0 = y_in - roof_t
-    y1 = min(screw_y + push_w / 2.0, cube_half - run_clr)
+    y1 = min(screw_y + nut_d / 2.0 + 2.0, cube_half - run_clr)
     z0 = z - g / 2.0 - cage_t
     z1 = zn                          # the cage's top IS the flange's seat
     body = Part.makeBox(x1 - x0, y1 - y0, z1 - z0, v(x0, y0, z0))
@@ -1784,10 +1786,9 @@ def make_nut(st):
     body = body.cut(cyl(nut_d / 2.0 + 0.2, nut_l - nut_fl[2] + 0.5,
                         v(screw_x, screw_y, zn - (nut_l - nut_fl[2]) - 0.5),
                         Z_AXIS))
-    _side = 1.0 if guide_dx > 0 else -1.0
-    body = body.cut(cyl(foot_tap_d / 2.0, 7.0,
-                        v(screw_x - _side * nut_fl_pitch / 2.0, screw_y,
-                          zn - 7.0), Z_AXIS))
+    for sx in (-nut_fl_pitch / 2.0, nut_fl_pitch / 2.0):
+        body = body.cut(cyl(foot_tap_d / 2.0, 7.0,
+                            v(screw_x + sx, screw_y, zn - 7.0), Z_AXIS))
     # Clear of the carriage's ring, which its lower corner comes near when
     # the carriage tilts down: a cut of the ring's own cylinder, grown by its
     # swing, takes exactly what is in the way and nothing else.
@@ -1797,7 +1798,15 @@ def make_nut(st):
     body = body.cut(cyl(screw_d / 2.0 + 0.2, z1 - z0 + 2.0,
                         v(screw_x, screw_y, z0 - 1.0), Z_AXIS))
     return body.cut(cyl(guide_d / 2.0 + 0.25, z1 - z0 + 2.0,
-                        v(gx, screw_y, z0 - 1.0), Z_AXIS))
+                        v(gx, guide_y, z0 - 1.0), Z_AXIS))
+
+def _carrier_y():
+    """Y band of the carrier's arm: wide enough to take its bush on the rod
+    at one end and the ear's pin slot at the other."""
+    lo = min(guide_y, ear_y) - 4.5
+    hi = max(guide_y, ear_y) + 4.5
+    return lo, hi
+
 
 def make_carrier(st):
     """The floating carrier: it slides on the guide rod between the two
@@ -1807,23 +1816,23 @@ def make_carrier(st):
     # A BUSH on the rod, not a plate with a hole: the rod takes the moment
     # the arm makes, and it takes it on this length.
     body = cyl(guide_d / 2.0 + 3.0, carrier_bush,
-               v(gx, screw_y, z - carrier_bush / 2.0), Z_AXIS)
+               v(gx, guide_y, z - carrier_bush / 2.0), Z_AXIS)
     # Right up to the carriage's arm: at the ear's own height the ring's
     # silhouette ends at |x| 15.4, so the last few millimetres are free and
     # the pin between them can be short.
     _x_end = ear_sx * side_x - side_t / 2.0 - act_gap
-    arm = Part.makeBox(_x_end - gx, push_w, carrier_t,
-                       v(gx, screw_y - push_w / 2.0, z - carrier_t / 2.0))
+    _y0, _y1 = _carrier_y()
+    arm = Part.makeBox(_x_end - gx, _y1 - _y0, carrier_t,
+                       v(gx, _y0, z - carrier_t / 2.0))
     body = body.fuse(arm)
     # A boss round the pin's own slot. The arm is carrier_t thick and the
     # slot is fdm_act_hole_d deep, which left 0.2 mm of wall above and below
     # it — nothing at all for the load the pin carries.
-    body = body.fuse(Part.makeBox(pin_boss_x, push_w, pin_boss_t,
-                                  v(_x_end - pin_boss_x,
-                                    screw_y - push_w / 2.0,
+    body = body.fuse(Part.makeBox(pin_boss_x, _y1 - _y0, pin_boss_t,
+                                  v(_x_end - pin_boss_x, _y0,
                                     z - pin_boss_t / 2.0)))
     body = body.cut(cyl(guide_d / 2.0 + 0.25, carrier_bush + 2,
-                        v(gx, screw_y, z - carrier_bush / 2.0 - 1), Z_AXIS))
+                        v(gx, guide_y, z - carrier_bush / 2.0 - 1), Z_AXIS))
     # It clears the screw: the arm passes beside it, not through it.
     body = body.cut(cyl(screw_d / 2.0 + run_clr, pin_boss_t + 2,
                         v(screw_x, screw_y, z - pin_boss_t / 2.0 - 1), Z_AXIS))
@@ -1862,9 +1871,9 @@ def make_spring_stack(st, side):
     z = st["nut_z"] + side * (carrier_bush / 2.0)
     z0 = z if side > 0 else z - spr_h
     return cyl(spr_od / 2.0, spr_h,
-               v(screw_x + guide_dx, screw_y, z0), Z_AXIS).cut(
+               v(screw_x + guide_dx, guide_y, z0), Z_AXIS).cut(
         cyl(spr_id / 2.0, spr_h + 2,
-            v(screw_x + guide_dx, screw_y, z0 - 1), Z_AXIS))
+            v(screw_x + guide_dx, guide_y, z0 - 1), Z_AXIS))
 
 
 def _plate_bar(pts, x_band, w, press=(), holes=None):
@@ -1902,8 +1911,9 @@ def act_moving_parts(st):
     """The nut and its pusher. The screw turns but does not move, so it is a
     fixed part; the servo likewise."""
     return [("ScrewNut", make_brass_nut(st), (0.72, 0.55, 0.30), 0),
-            ("NutScrew0", make_flange_screw(
-                st, -(1.0 if guide_dx > 0 else -1.0) * nut_fl_pitch / 2.0),
+            ("NutScrew0", make_flange_screw(st, -nut_fl_pitch / 2.0),
+             (0.35, 0.35, 0.38), 0),
+            ("NutScrew1", make_flange_screw(st, nut_fl_pitch / 2.0),
              (0.35, 0.35, 0.38), 0),
             ("ActNut", make_nut(st), (0.30, 0.55, 0.85), 0),
             ("SpringCarrier", make_carrier(st), (0.30, 0.55, 0.85), 0),
