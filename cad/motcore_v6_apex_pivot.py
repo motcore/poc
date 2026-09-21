@@ -1817,10 +1817,12 @@ def make_coupler():
                  v(screw_x, screw_y, c0 - 1.0), Z_AXIS)
     half = horn_arm_len / 2.0 + g
     w = horn_arm_w + 2.0 * g
-    z_arm = h1 - horn_arm_t - g
-    pocket = pocket.fuse(Part.makeBox(2.0 * half, w, top - z_arm,
+    # The arms' slot runs right down to the base: the arms are at the TOP
+    # of the hub, so a slot only at their height leaves the base closed under
+    # them and the horn cannot go in.
+    pocket = pocket.fuse(Part.makeBox(2.0 * half, w, top - c0 + 1.0,
                                       v(screw_x - half, screw_y - w / 2.0,
-                                        z_arm)))
+                                        c0 - 1.0)))
     body = body.cut(pocket)
     # the horn screw's head goes through the floor: the floor clamps nothing
     body = body.cut(cyl(2.6, cpl_floor + 2.0,
@@ -1951,7 +1953,8 @@ def make_guide_rod():
     """The anti-rotation rod: Ø4, pressed into the wall bracket at the bottom
     and the screw's top post above, with the nut's pusher sliding on it."""
     z0 = _guide_z0()
-    return cyl(guide_d / 2.0, screw_top_z - z0,
+    z1 = cube_half - 0.5          # right up into the top post's bore
+    return cyl(guide_d / 2.0, z1 - z0,
                v(screw_x + guide_dx, guide_y, z0), Z_AXIS)
 
 
