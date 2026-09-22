@@ -723,6 +723,17 @@ dog_claw       = 4.0   # mm — claw height; claws r dog_claw_ri..dog_d/2
 dog_claw_ri    = 6.0   # mm
 dog_tube_r     = 5.5   # mm — the male's core through its claws (more D)
 dog_gap        = 0.5   # mm — claw tips off the other half's base
+dog_n          = 3     # claws per dog, like a jaw coupling's: they centre
+dog_claw_ang   = 44.0  # deg — each claw (45 less 1 of running room)
+dog_arm_ang    = 15.0  # deg — each of the spider's six arms, between claws
+dog_tip        = 1.0   # mm ┐ the claws' tips narrow over their last mm, so two
+dog_tip_ang    = 10.0  # deg┘ cubes find their way in with a twist of a shaft
+spider_ring    = (10.1, 10.9)   # mm — the TPU spider's ring, OUTSIDE the claws
+                        #      (the male's core fills the middle)
+sock_r_in      = 11.3  # mm — the input socket's radius, round the spider ring
+motor_flat_ang = 45.0  # deg — where the D8's flat faces (any angle works: the
+                        #      input dog's grub is tightened on the bench, and
+                        #      the shaft goes in from below with the dog on it)
 dog_clr        = 0.6   # mm — round each dog, and at its base
 sp_side        = 34.0  # mm ┐ the square spigot on each output face
 sp_h           = 3.0   # mm ┘
@@ -1266,24 +1277,25 @@ def make_motor_cone(sd):
     return cone.cut(_motor_d(min(z_a, z_b), abs(z_b - z_a)))
 
 
-def _d_cutter(r, flat, lo, length, axis):
+def _d_cutter(r, flat, lo, length, axis, ang=0.0):
     """A D-shaped bore: Ø2r less everything beyond the flat, `flat` off the
-    axis. Motor axis (Z): flat toward +X. Output axis (Y): flat toward +Z,
-    as the output shaft's."""
+    axis. Axis Z: flat toward `ang` deg from +X. Axis Y: flat toward +Z, as
+    the output shaft's."""
     if axis == "Z":
         c = cyl(r, length, v(0, 0, lo), Z_AXIS)
-        return c.cut(Part.makeBox(2 * r + 2, 2 * r + 2, length + 2,
-                                  v(flat, -r - 1, lo - 1)))
+        b = Part.makeBox(2 * r + 2, 2 * r + 2, length + 2, v(flat, -r - 1, lo - 1))
+        b.rotate(v(0, 0, 0), Z_AXIS, ang)
+        return c.cut(b)
     c = cyl(r, length, v(0, lo, 0), Y_AXIS)
     return c.cut(Part.makeBox(2 * r + 2, length + 2, 2 * r + 2,
                               v(-r - 1, lo - 1, flat)))
 
 
-def _motor_d(lo, length):
+def _motor_d(lo, length, ang=None):
     """The printed D bore on the motor shaft, with the printer's allowance."""
     return _d_cutter(fdm_mshaft_hole_d / 2.0,
                      motor_flat_d - motor_shaft_d / 2.0 + shaft_flat_clr,
-                     lo, length, "Z")
+                     lo, length, "Z", motor_flat_ang if ang is None else ang)
 
 
 def _output_d(lo, length):
@@ -1348,8 +1360,10 @@ def make_motor_shaft():
     z1 = _col_top()["claws"][1] - 0.5
     sh = cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
     f = motor_flat_d - motor_shaft_d / 2.0
-    return sh.cut(Part.makeBox(motor_shaft_d, motor_shaft_d + 2, z1 - z0 + 2,
-                               v(f, -motor_shaft_d / 2.0 - 1, z0 - 1)))
+    b = Part.makeBox(motor_shaft_d, motor_shaft_d + 2, z1 - z0 + 2,
+                     v(f, -motor_shaft_d / 2.0 - 1, z0 - 1))
+    b.rotate(v(0, 0, 0), Z_AXIS, motor_flat_ang)
+    return sh.cut(b)
 
 
 def make_motor_bearing(sd):
@@ -1378,40 +1392,102 @@ def make_motor_spacer(sd):
     return body.fuse(_zspan(z_step, z_brg, mring[0], mring[1]))
 
 
-def _male_dog(d_bore, t0, pt, axis, ext=None):
-    """A male dog (PRINTED) as its envelope: base, then its claws as a drum
-    (claws and the core between them), a D bore through all of it, and
-    optionally a hub reaching back inward (the top's)."""
-    body = cyl(dog_d / 2.0, dog_base_m + dog_claw, pt(t0), axis)
-    if ext is not None:
-        body = body.fuse(cyl(7.0, ext[1] - ext[0], pt(ext[0]), axis))
-    lo = t0 if ext is None else ext[0]
-    return body.cut(d_bore(lo - 1, t0 + dog_base_m + dog_claw - lo + 2))
+def _sector(r0, r1, a_mid, a_width, z0, h):
+    """An annular sector on +Z, centred on a_mid deg."""
+    c = Part.makeCylinder(r1, h, v(0, 0, z0), Z_AXIS, a_width)
+    c = c.cut(Part.makeCylinder(r0, h + 2, v(0, 0, z0 - 1), Z_AXIS, 360))
+    c.rotate(v(0, 0, 0), Z_AXIS, a_mid - a_width / 2.0)
+    return c
+
+
+def _claws(z0, a0):
+    """dog_n claws from z0 up dog_claw, centred on a0 + k*360/n, their tips
+    narrowed over the last dog_tip."""
+    body = None
+    for k in range(dog_n):
+        a = a0 + k * 360.0 / dog_n
+        c = _sector(dog_claw_ri, dog_d / 2.0, a, dog_claw_ang, z0, dog_claw - dog_tip)
+        c = c.fuse(_sector(dog_claw_ri, dog_d / 2.0, a, dog_claw_ang - dog_tip_ang,
+                           z0 + dog_claw - dog_tip, dog_tip))
+        body = c if body is None else body.fuse(c)
+    return body
+
+
+def _grub_hole(z, ang, r_from):
+    """A tapped M3 hole, radial along ang, onto the D's flat."""
+    h = cyl(foot_tap_d / 2.0, dog_d / 2.0 - r_from + 1.0, v(r_from, 0, z), X_AXIS)
+    h.rotate(v(0, 0, 0), Z_AXIS, ang)
+    return h
+
+
+def _male_local(bore, flat_ang, ext_len=0.0):
+    """A male dog in its own frame (axis +Z, base from z = 0): base, core, the
+    claws round the core, an optional hub reaching back below z = 0, the D
+    bore right through, the grub in the base. PRINTED base down."""
+    body = cyl(dog_d / 2.0, dog_base_m, v(0, 0, 0))
+    body = body.fuse(cyl(dog_tube_r, dog_claw, v(0, 0, dog_base_m)))
+    body = body.fuse(_claws(dog_base_m, flat_ang + 60.0))
+    if ext_len > 0:
+        body = body.fuse(cyl(7.0, ext_len, v(0, 0, -ext_len)))
+    body = body.cut(bore(-ext_len - 1.0, ext_len + dog_base_m + dog_claw + 2.0))
+    return body.cut(_grub_hole(dog_base_m / 2.0, flat_ang, 2.0))
 
 
 def make_dog_top():
-    """The top output's male dog, on the motor shaft."""
+    """The top output's male dog, on the motor shaft (PRINTED)."""
     d = _col_top()
-    return _male_dog(_motor_d, d["base"][0], lambda t: v(0, 0, t), Z_AXIS,
-                     ext=d["ext"])
+    t0 = d["base"][0]
+    body = _male_local(lambda lo, ln: _motor_d(lo, ln), motor_flat_ang,
+                       ext_len=t0 - d["ext"][0])
+    body.translate(v(0, 0, t0))
+    return body
 
 
 def make_dog_wall():
-    """A wall output's male dog, on the output shaft (per axis)."""
-    return _male_dog(_output_d, _face() + _dog_off(), lambda t: v(0, t, 0),
-                     Y_AXIS)
+    """A wall output's male dog, on the output shaft (per axis, PRINTED):
+    the same part as the top's but for its Ø5 D. Built on +Z with its flat
+    toward +X, then turned so +Z goes to +Y and +X to +Z, the output
+    shaft's flat."""
+    bore = lambda lo, ln: _d_cutter(fdm_shaft_hole_d / 2.0,
+                                    shaft_flat_d / 2.0 + shaft_flat_clr, lo, ln,
+                                    "Z", 0.0)
+    body = _male_local(bore, 0.0)
+    body.rotate(v(0, 0, 0), v(1, 1, 1), -120.0)
+    body.translate(v(0, _face() + _dog_off(), 0))
+    return body
+
+
+def _female_place(shape):
+    """Female frame -> world: flipped about the flat's own direction (so the
+    flat stays where the shaft's is), base up at the socket's inner end."""
+    a = math.radians(motor_flat_ang)
+    shape.rotate(v(0, 0, 0), v(math.cos(a), math.sin(a), 0), 180.0)
+    shape.translate(v(0, 0, _zb(_col_bottom()["base"][1])))
+    return shape
 
 
 def make_dog_bottom():
-    """The input's female dog (PRINTED), with the TPU spider in its claws:
-    its claws leave the middle free for the male's core."""
-    d = _col_bottom()
-    z_c0, z_c1 = _zb(d["claws"][0]), _zb(d["claws"][1])
-    z_b1 = _zb(d["base"][1])
-    claws = _zspan(z_c0, z_c1, dog_claw_ri, dog_d / 2.0)
-    base = _zspan(z_c1, z_b1, 0.0, dog_d / 2.0)
-    base = base.cut(_motor_d(min(z_c1, z_b1) - 1.0, abs(z_b1 - z_c1) + 2.0))
-    return claws.fuse(base)
+    """The input's female dog (PRINTED): base, three claws facing the input
+    face, the middle left free for the male's core. Built with its claws up
+    and flipped into place."""
+    body = cyl(dog_d / 2.0, dog_base_f, v(0, 0, 0))
+    body = body.fuse(_claws(dog_base_f, motor_flat_ang))
+    body = body.cut(_motor_d(-1.0, dog_base_f + 2.0))
+    body = body.cut(_grub_hole(dog_base_f / 2.0, motor_flat_ang, 2.0))
+    return _female_place(body)
+
+
+def make_dog_spider():
+    """The TPU spider (PRINTED, TPU): six arms between the claws, joined by a
+    ring round their outside — the male's core takes the middle."""
+    z0 = dog_base_f
+    body = cyl(spider_ring[1], dog_claw, v(0, 0, z0)).cut(
+        cyl(spider_ring[0], dog_claw + 2, v(0, 0, z0 - 1)))
+    for k in range(2 * dog_n):
+        a = motor_flat_ang + 60.0 + 30.0 + k * 60.0
+        body = body.fuse(_sector(dog_claw_ri, spider_ring[0] + 0.01, a,
+                                 dog_arm_ang, z0, dog_claw))
+    return _female_place(body)
 
 
 def _face_magnet_pts():
@@ -1471,11 +1547,11 @@ def _deck_column_features(deck, zs):
     else:
         d = _col_bottom()
         z_top = _zb(d["brg"][1])
-        deck = deck.fuse(_zspan(-cube_half - 1.0, z_top, 0.0, hole_r + 2.4))
+        deck = deck.fuse(_zspan(-cube_half - 1.0, z_top, 0.0, sock_r_in + 2.0))
         w = sp_side + 2 * sp_clr
         deck = deck.cut(Part.makeBox(w, w, sp_h + 0.2,
                                      v(-w / 2.0, -w / 2.0, -F - 0.01)))
-        deck = deck.cut(_zspan(-F - 1.0, _zb(d["socket"]), 0.0, hole_r))
+        deck = deck.cut(_zspan(-F - 1.0, _zb(d["socket"]), 0.0, sock_r_in))
         deck = deck.cut(_zspan(_zb(d["lip"][0]) - 0.01, _zb(d["lip"][1]) + 0.01,
                                0.0, 6.5))
         deck = deck.cut(_zspan(_zb(d["brg"][0]), z_top + 0.01, 0.0, seat_r))
@@ -2828,7 +2904,8 @@ for _ax_name, _ax_rot in AXES[:AXES_SHOWN]:
 _STEEL = (0.6, 0.6, 0.62)
 COLUMN_PARTS = [("MotorShaft", make_motor_shaft(), _STEEL),
                 ("DogTop", make_dog_top(), (0.70, 0.30, 0.25)),
-                ("DogBottom", make_dog_bottom(), (0.70, 0.30, 0.25))]
+                ("DogBottom", make_dog_bottom(), (0.70, 0.30, 0.25)),
+                ("DogSpider", make_dog_spider(), (0.20, 0.20, 0.22))]
 COLUMN_PARTS += [(f"DeckMagnet{'T' if _zs > 0 else 'B'}{_k}",
                   make_deck_magnet(_zs, _k), (0.55, 0.55, 0.60))
                  for _zs in (1, -1) for _k in range(4)]
