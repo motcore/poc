@@ -787,8 +787,12 @@ The moment of f about the apex is P × (−f, 0, 0) = (0, −z_c·f, +y_c·f):
 Give the carriage a second rotation, **yaw ψ about Z through the apex**, and
 guide it so that yawing also tilts it further into whichever cone it is
 touching: dθ/dψ = +k on the upper branch and −k on the lower. The path is a
-"<" whose two branches meet at contact, and the free travel runs up to that
-point along ψ = 0.
+"<" with its vertex stretched into a straight segment. The segment is the free
+travel, ±φc along ψ = 0, which the servo drives. At **each** contact point a
+spiral branch leaves toward the same side (+ψ): one climbs toward the upper
+cone, the other descends toward the lower. Friction carries the carriage along
+whichever branch it is on (the user's picture, 2-DOF about the apex: tilt, and
+a spiral rotation about the motor axis).
 
 - **The apex does not move.** Every rotation about an axis through the apex
   keeps it fixed, so the three cones keep one apex and still roll without
