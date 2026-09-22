@@ -559,11 +559,13 @@ out_brg_wall  = 3.0    # mm — material wall around the output shaft's bearing
                         #      length) is derived below, by the carriage
                         #      bearing block — it needs brg_w and brg_seat_lip,
                         #      not known yet here.
-shaft_flat_d  = 4.5    # mm — the Ø5 shafts are BOUGHT as D-shafts (user,
-                        #      2026-09-22: factory parts over modified ones),
-                        #      4.5 across the flat as they usually come — check
-                        #      the one bought; printed parts carry the matching
-                        #      D and the grub screws bear on it
+shaft_flat_d  = 4.0    # mm — TWICE the flat's distance from the axis (the
+                        #      flat sits 2.0 off it), i.e. 4.5 ACROSS the D —
+                        #      the Ø5 shafts are BOUGHT as D-shafts, and 4.5 is
+                        #      how they usually come (user, 2026-09-22: factory
+                        #      parts over modified ones; check the one bought).
+                        #      Printed parts carry the matching D and the grub
+                        #      screws bear on it
 shaft_flat_clr = 0.25  # mm — how much the printed D is relieved off the flat
 
 # ── Frame ────────────────────────────────────────────────────────────────────
@@ -696,9 +698,11 @@ mbrg           = (8.0, 16.0, 5.0)   # mm — 688ZZ, one in each deck: a 608
                                     #      flange's screw heads
 rib_w, rib_d   = 4.0, 12.0          # mm — the decks' ribs (12 deep clears the
                                     #      links by 3.5 mm over the stroke)
-mflange        = (22.0, 4.0)        # mm — rigid flange coupling for Ø8: flange
-mflange_hub    = (12.0, 13.0)       #      Ø x thick, hub Ø x long — PROVISIONAL,
-mflange_pcd    = 17.0               #      measure the one bought; 4x M3 on PCD
+motor_flat_d   = 7.5   # mm — across the bought D8's flat (check the one
+                        #      bought). The cones and the dogs are keyed on it
+                        #      directly: no flanges (user, 2026-09-22) — the
+                        #      input dog caps a cube's torque below what a
+                        #      cone's own 17 mm D carries anyway
 mcol_wash_t    = 1.0   # mm — washer 8x12 between each collar and its bearing's
                         #      inner race (a collar Ø14 would reach the shield)
 mbrg_lip       = 1.0   # mm — the lip each 688's outer race pushes on
@@ -1255,21 +1259,37 @@ def make_motor_cone(sd):
     axis = v(0, 0, sd)
     apex = v(0, 0, sd * mot_apex_z)
     cone = cone_frustum(apex, axis, alpha, s_motor_lo, s_mot_hi)
-    bore_h = (s_mot_hi - s_motor_lo) * math.cos(alpha) + 4
-    cone = cone.cut(cyl(fdm_mshaft_hole_d / 2.0, bore_h,
-                        v(0, 0, apex.z + sd * (s_motor_lo * math.cos(alpha) - 2)),
-                        axis))
-    # the flange coupling's hub goes INTO the cone's base, so the space under
-    # the base is left to the bearing; its four M3 self-tap into the base
-    cone = cone.cut(cyl(mflange_hub[0] / 2.0 + 0.3, mflange_hub[1] + 1.5,
-                        v(0, 0, sd * (mot_base_z + 1.0)), v(0, 0, -sd)))
-    for k in range(4):
-        a = math.radians(45.0 + 90.0 * k)
-        cone = cone.cut(cyl(foot_tap_d / 2.0, 9.0,
-                            v(mflange_pcd / 2.0 * math.cos(a),
-                              mflange_pcd / 2.0 * math.sin(a),
-                              sd * (mot_base_z + 1.0)), v(0, 0, -sd)))
-    return cone
+    # Keyed on the shaft's flat by its own D bore, tip to base: the torque
+    # goes in by shape, and the axial load by the spacer under its base.
+    z_a = apex.z + sd * (s_motor_lo * math.cos(alpha) - 2)
+    z_b = sd * (mot_base_z + 1.0)
+    return cone.cut(_motor_d(min(z_a, z_b), abs(z_b - z_a)))
+
+
+def _d_cutter(r, flat, lo, length, axis):
+    """A D-shaped bore: Ø2r less everything beyond the flat, `flat` off the
+    axis. Motor axis (Z): flat toward +X. Output axis (Y): flat toward +Z,
+    as the output shaft's."""
+    if axis == "Z":
+        c = cyl(r, length, v(0, 0, lo), Z_AXIS)
+        return c.cut(Part.makeBox(2 * r + 2, 2 * r + 2, length + 2,
+                                  v(flat, -r - 1, lo - 1)))
+    c = cyl(r, length, v(0, lo, 0), Y_AXIS)
+    return c.cut(Part.makeBox(2 * r + 2, length + 2, 2 * r + 2,
+                              v(-r - 1, lo - 1, flat)))
+
+
+def _motor_d(lo, length):
+    """The printed D bore on the motor shaft, with the printer's allowance."""
+    return _d_cutter(fdm_mshaft_hole_d / 2.0,
+                     motor_flat_d - motor_shaft_d / 2.0 + shaft_flat_clr,
+                     lo, length, "Z")
+
+
+def _output_d(lo, length):
+    """The printed D bore on an output shaft, as the cardan's fork has it."""
+    return _d_cutter(fdm_shaft_hole_d / 2.0, shaft_flat_d / 2.0 + shaft_flat_clr,
+                     lo, length, "Y")
 
 
 def _dog_off():
@@ -1326,7 +1346,10 @@ def make_motor_shaft():
     flanges, collar)."""
     z0 = _zb(_col_bottom()["base"][0] + 0.3)
     z1 = _col_top()["claws"][1] - 0.5
-    return cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
+    sh = cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
+    f = motor_flat_d - motor_shaft_d / 2.0
+    return sh.cut(Part.makeBox(motor_shaft_d, motor_shaft_d + 2, z1 - z0 + 2,
+                               v(f, -motor_shaft_d / 2.0 - 1, z0 - 1)))
 
 
 def make_motor_bearing(sd):
@@ -1338,46 +1361,24 @@ def make_motor_bearing(sd):
     return _zspan(z[0], z[1], mbrg[0] / 2.0, mbrg[1] / 2.0)
 
 
-def make_motor_ring():
-    """Top: printed ring on the top 688's inner race, under the collar."""
-    z = _col_top()["ring"]
-    return _zspan(z[0], z[1], mring[0], mring[1])
-
-
-def make_motor_collar(sd=1):
-    """Top: lock collar under that ring — the up stop."""
-    z = _col_top()["col"]
-    return _zspan(z[0], z[1], motor_shaft_d / 2.0, col_d / 2.0)
-
-
-def make_motor_spacer():
-    """Bottom only, PRINTED: a sleeve from the lower cone's flange down to the
-    bottom 688's inner race, inside the flange's ring of screw heads. The
-    flange, through this, is the down stop, and its length sets the cones'
+def make_motor_spacer(sd):
+    """PRINTED: a sleeve from a cone's base to its 688's inner race — the
+    contact only ever pushes a cone AWAY from the apex, so this is the stop
+    that takes it, by bearing, not by a grub's friction. Wide along its run,
+    narrow only where it lands on the inner race. Its length sets that cone's
     height: print it to length, or shim it, to put the rubber apex on the
     carriage's."""
-    z0 = -(mot_base_z + mflange[1])
-    z1 = _zb(_col_bottom()["brg"][1])
-    return _zspan(z0, z1, mring[0], mring[1])
-
-
-def make_motor_flange(sd):
-    """Rigid flange coupling on the cone's base: flange against the base,
-    hub INSIDE the cone, grubs on the shaft."""
+    if sd > 0:
+        z_brg = _col_top()["brg"][0]
+    else:
+        z_brg = _zb(_col_bottom()["brg"][1])
     z0 = sd * mot_base_z
-    body = _zspan(z0, z0 + sd * mflange[1], motor_shaft_d / 2.0, mflange[0] / 2.0)
-    body = body.fuse(_zspan(z0, z0 - sd * mflange_hub[1],
-                            motor_shaft_d / 2.0, mflange_hub[0] / 2.0))
-    for k in range(4):
-        a = math.radians(45.0 + 90.0 * k)
-        body = body.cut(cyl(1.7, mflange[1] + 2.0,
-                            v(mflange_pcd / 2.0 * math.cos(a),
-                              mflange_pcd / 2.0 * math.sin(a),
-                              z0 - sd * 1.0), v(0, 0, sd)))
-    return body
+    z_step = z_brg - sd * 1.0 if sd < 0 else z_brg - 2.0
+    body = _zspan(z0, z_step, mring[0], 8.0)
+    return body.fuse(_zspan(z_step, z_brg, mring[0], mring[1]))
 
 
-def _male_dog(bore_d, t0, pt, axis, ext=None):
+def _male_dog(d_bore, t0, pt, axis, ext=None):
     """A male dog (PRINTED) as its envelope: base, then its claws as a drum
     (claws and the core between them), a D bore through all of it, and
     optionally a hub reaching back inward (the top's)."""
@@ -1385,20 +1386,20 @@ def _male_dog(bore_d, t0, pt, axis, ext=None):
     if ext is not None:
         body = body.fuse(cyl(7.0, ext[1] - ext[0], pt(ext[0]), axis))
     lo = t0 if ext is None else ext[0]
-    return body.cut(cyl(bore_d / 2.0, t0 + dog_base_m + dog_claw - lo + 2,
-                        pt(lo - 1), axis))
+    return body.cut(d_bore(lo - 1, t0 + dog_base_m + dog_claw - lo + 2))
 
 
 def make_dog_top():
     """The top output's male dog, on the motor shaft."""
     d = _col_top()
-    return _male_dog(motor_shaft_d, d["base"][0], lambda t: v(0, 0, t), Z_AXIS,
+    return _male_dog(_motor_d, d["base"][0], lambda t: v(0, 0, t), Z_AXIS,
                      ext=d["ext"])
 
 
 def make_dog_wall():
     """A wall output's male dog, on the output shaft (per axis)."""
-    return _male_dog(shaft_d, _face() + _dog_off(), lambda t: v(0, t, 0), Y_AXIS)
+    return _male_dog(_output_d, _face() + _dog_off(), lambda t: v(0, t, 0),
+                     Y_AXIS)
 
 
 def make_dog_bottom():
@@ -1408,7 +1409,8 @@ def make_dog_bottom():
     z_c0, z_c1 = _zb(d["claws"][0]), _zb(d["claws"][1])
     z_b1 = _zb(d["base"][1])
     claws = _zspan(z_c0, z_c1, dog_claw_ri, dog_d / 2.0)
-    base = _zspan(z_c1, z_b1, motor_shaft_d / 2.0, dog_d / 2.0)
+    base = _zspan(z_c1, z_b1, 0.0, dog_d / 2.0)
+    base = base.cut(_motor_d(min(z_c1, z_b1) - 1.0, abs(z_b1 - z_c1) + 2.0))
     return claws.fuse(base)
 
 
@@ -1482,14 +1484,6 @@ def _deck_column_features(deck, zs):
                             v(x, y, zs * F - zs * (mag_t + 0.2) if zs > 0
                               else -F - 1.0)))
     return deck
-
-
-def make_motor_flange_screw(sd, k):
-    """One of the flange's M3 x 10, head on the flange, into the cone."""
-    a = math.radians(45.0 + 90.0 * k)
-    base = v(mflange_pcd / 2.0 * math.cos(a), mflange_pcd / 2.0 * math.sin(a),
-             sd * (mot_base_z + mflange[1]))
-    return make_screw(base, v(0, 0, -sd), 3.0, 10.0, 5.0, 2.0)
 
 
 def make_motor_rubber(sd):
@@ -2835,19 +2829,13 @@ _STEEL = (0.6, 0.6, 0.62)
 COLUMN_PARTS = [("MotorShaft", make_motor_shaft(), _STEEL),
                 ("DogTop", make_dog_top(), (0.70, 0.30, 0.25)),
                 ("DogBottom", make_dog_bottom(), (0.70, 0.30, 0.25))]
-COLUMN_PARTS += [("MotorRingUpper", make_motor_ring(), (0.30, 0.65, 0.60))]
 COLUMN_PARTS += [(f"DeckMagnet{'T' if _zs > 0 else 'B'}{_k}",
                   make_deck_magnet(_zs, _k), (0.55, 0.55, 0.60))
                  for _zs in (1, -1) for _k in range(4)]
 for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
     COLUMN_PARTS += [
         (f"MotorBearing{_tag}", make_motor_bearing(_sd), (0.30, 0.30, 0.32)),
-        ((f"MotorCollar{_tag}", make_motor_collar(_sd), (0.35, 0.35, 0.38))
-         if _sd > 0 else ("MotorSpacerLower", make_motor_spacer(), (0.30, 0.65, 0.60))),
-        (f"MotorFlange{_tag}", make_motor_flange(_sd), _STEEL)]
-    COLUMN_PARTS += [(f"MotorFlangeScrew{_tag}{_k}",
-                      make_motor_flange_screw(_sd, _k), (0.35, 0.35, 0.38))
-                     for _k in range(4)]
+        (f"MotorSpacer{_tag}", make_motor_spacer(_sd), (0.30, 0.65, 0.60))]
 for _sd, _tag in ((-1, "Lower"), (1, "Upper")):
     add(doc, f"MotorCone{_tag}", make_motor_cone(_sd), color=(1.0, 0.60, 0.15))
     add(doc, f"MotorRubber{_tag}", make_motor_rubber(_sd), color=(0.15, 0.15, 0.18))
@@ -3035,10 +3023,6 @@ if RUN_CHECKS:
     for _i in range(len(_col)):
         for _j in range(_i + 1, len(_col)):
             _na, _nb = _col[_i][0], _col[_j][0]
-            if "FlangeScrew" in _na or "FlangeScrew" in _nb:
-                _other = _nb if "FlangeScrew" in _na else _na
-                if _other.startswith(("MotorCone", "MotorFlange")):
-                    continue
             if _bb_hit(_col[_i][1], _col[_j][1]):
                 _ov = _col[_i][1].common(_col[_j][1]).Volume
                 if _ov > max(_col_ov, 1e-6):
@@ -3692,7 +3676,7 @@ if RUN_CHECKS:
     print(f"  CUBE side {2 * cube_out:.1f} mm"
           f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall),"
           f" HEIGHT {2 * (cube_half + deck_t):.1f} mm (decks {deck_t:.0f})")
-    print("  PRINTED: MotorCone x2 (same part, flipped), the shaft's spacer, OutputCone (a SHELL),")
+    print("  PRINTED: MotorCone x2 (same part, flipped), the shaft's 2 spacers, OutputCone (a SHELL),")
     print("           Carriage (one piece),")
     print("           UJMid, UJRing, UJCross, UJFork,")
     print("           Link x2 (each carries both its arms), the nut's pusher")
@@ -3701,7 +3685,7 @@ if RUN_CHECKS:
     print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
     print("            its own corner under the ceiling.")
     print(f"  The cardan's fork is keyed on the output shaft's factory D"
-          f" ({shaft_flat_d:.1f} mm across).")
+          f" ({shaft_d / 2.0 + shaft_flat_d / 2.0:.1f} mm across).")
     _len = lambda sh, ax: getattr(sh.BoundBox, ax + "Length")
     print(f"  LENGTHS to buy cut (or the next stock length up, if it fits):"
           f" motor D8 {_len(make_motor_shaft(), 'Z'):.0f},"
@@ -3711,9 +3695,8 @@ if RUN_CHECKS:
           f" cut to {horn_arm_len:.0f} mm tip to tip.")
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
     print("             Ø5 D-shaft (output shaft),")
-    print("             SHARED: Ø8 D-shaft (motor shaft),")
-    print("             2x 688ZZ, 1x Ø8 shaft collar,")
-    print("             2x rigid flange couplings Ø8 (+ 8x M3x10), for the motor cones,")
+    print(f"             SHARED: Ø8 D-shaft ({motor_flat_d:.1f} across the flat,"
+          f" motor shaft), 2x 688ZZ,")
     print("             PER CUBE: printed dogs (4 male D5, 1 male D8, 1 female D8)")
     print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2.")
     print("             dowels ISO 8734: 2x 4x24 (A), 2x 4x40 (B), 1x 3x14 (ear),")
