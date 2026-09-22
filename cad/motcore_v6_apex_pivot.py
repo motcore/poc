@@ -2521,6 +2521,49 @@ def both_hands(pts):
     the spring cage."""
     return list(pts)
 
+case_screw_len = 10.0   # mm — M3 x 10 countersunk (DIN 7991), from outside
+case_boss      = (9.0, 8.0, 8.0)   # mm — the wall's boss: along X, Y, Z
+
+
+def case_screws():
+    """(x, y, zs) of the screws holding ONE axis' wall to the decks, in the
+    axis' frame (user, 2026-09-22): two into the ceiling, two into the floor,
+    countersunk from outside so the stacking faces stay flat. Each wall held
+    top and bottom makes the box rigid without wall-to-wall screws. Placed
+    where the inside is free (probed): on the -X side of the floor the
+    servo's cradle post is the boss."""
+    y_b = cube_half - case_boss[1] / 2.0
+    return [(-18.0, y_b, 1), (22.0, y_b, 1),
+            (20.0, y_b, -1), (servo_screw_xs()[0], cube_half - 2.1, -1)]
+
+
+def _case_boss_needed(x, zs):
+    return not (zs < 0 and x < -30.0)      # the cradle post is the boss there
+
+
+def make_case_screw(i):
+    """One case screw, countersunk head flush with the deck's outer face."""
+    x, y, zs = case_screws()[i]
+    zf = zs * (cube_half + deck_t)
+    head = Part.makeCone(3.0, 1.5, 1.7, v(x, y, zf), v(0, 0, -zs))
+    return head.fuse(cyl(foot_screw_d / 2.0, case_screw_len - 1.7,
+                         v(x, y, zf - zs * 1.7), v(0, 0, -zs)))
+
+
+def _case_screw_holes():
+    """What each deck loses for them, all four axes: a through hole and a
+    countersink in the outer face."""
+    tool = None
+    for _, rot in AXES:
+        for x, y, zs in case_screws():
+            zf = zs * (cube_half + deck_t)
+            t = Part.makeCone(3.2, 1.7, 1.7, v(x, y, zf + zs * 0.01), v(0, 0, -zs))
+            t = t.fuse(cyl(1.7, deck_t + 2.0, v(x, y, zf + zs * 1.0), v(0, 0, -zs)))
+            t = place(t, rot)
+            tool = t if tool is None else tool.fuse(t)
+    return tool
+
+
 def deck_screws():
     """(x, y) of the screws into one deck, for ONE axis. EMPTY: the frame
     pivots and the servo both moved to the wall (see wall_screws), so the
@@ -2565,6 +2608,7 @@ def make_deck(zs):
         # the ceiling is the part they come out true on.
         for _, rot in AXES:
             deck = deck.fuse(place(cached(make_screw_top), rot))
+    deck = deck.cut(_case_screw_holes())
     return _deck_column_features(deck, zs)
 
 
@@ -2608,6 +2652,14 @@ def make_wall():
     # reach it without passing through the case.
     wall = wall.fuse(cached(make_guide_foot))
     wall = wall.fuse(cached(make_servo_bracket))   # the servo's cradle
+    # Bosses for the case screws, in the corner between the wall's inner face
+    # and each deck, then their tapped holes (LAST, after every fuse below).
+    for x, y, zs in case_screws():
+        if _case_boss_needed(x, zs):
+            bx, by, bz = case_boss
+            wall = wall.fuse(Part.makeBox(bx, by, bz,
+                                          v(x - bx / 2.0, cube_half - by,
+                                            cube_half - bz if zs > 0 else -cube_half)))
     # The output face (user, 2026-09-21): the square spigot, the male half's
     # socket through it, and four magnet pockets.
     yf = cube_half + wall_thick
@@ -2622,6 +2674,10 @@ def make_wall():
     for x, z in _face_magnet_pts():
         wall = wall.cut(cyl(mag_d / 2.0 + 0.1, mag_t + 0.2 + 1.0,
                             v(x, yf - mag_t - 0.2, z), Y_AXIS))
+    for x, y, zs in case_screws():
+        depth = case_screw_len - deck_t + 1.0
+        wall = wall.cut(cyl(foot_tap_d / 2.0, depth,
+                            v(x, y, zs * cube_half + zs * 0.5), v(0, 0, -zs)))
     return wall
 
 
@@ -2794,6 +2850,9 @@ FIXED_PARTS = [
     ("GuideFoot",     cached(make_guide_foot),                (0.75, 0.75, 0.78), 0),
     ("ScrewTop",      cached(make_screw_top),                 (0.75, 0.75, 0.78), 0),
     ("Wall",          make_wall(),                            (0.45, 0.55, 0.75), 70),
+] + [
+    (f"CaseScrew{i}", make_case_screw(i), (0.35, 0.35, 0.38), 0)
+    for i in range(len(case_screws()))
 ] + [
     (f"WallScrew{i}",
      make_screw(v(sx, _screw_seat_y(sx), sz), v(0, 1, 0), foot_screw_d,
@@ -3073,6 +3132,9 @@ if RUN_CHECKS:
         # the horn's socket: both modelled solid
         if {na, nb} in ({"HornScrew", "ServoBody"}, {"ServoHorn", "ServoBody"},
                         {"CouplerGrub", "Coupler"}):
+            return True
+        # a case screw self-taps into the wall's boss (or the cradle's post)
+        if ({na, nb} & {"Wall", "ServoBracket"}) and (na + nb).count("CaseScrew"):
             return True
         return False
 
@@ -3468,6 +3530,12 @@ if RUN_CHECKS:
         ("Wall", "BearingOutput"), ("Wall", "BearingOutIn"),
         ("Wall", "OutputShaft"), ("DeckTop", "Wall"), ("DeckBottom", "Wall"),
         ("DogWall", "OutputShaft"),
+        ("Wall", "CaseScrew0"), ("Wall", "CaseScrew1"),
+        ("Wall", "CaseScrew2"), ("Wall", "CaseScrew3"),
+        ("ServoBracket", "CaseScrew3"),
+        # and sits in its countersink in the deck
+        ("DeckTop", "CaseScrew0"), ("DeckTop", "CaseScrew1"),
+        ("DeckBottom", "CaseScrew2"), ("DeckBottom", "CaseScrew3"),
         ("Wall", "WallMagnet0"), ("Wall", "WallMagnet1"),
         ("Wall", "WallMagnet2"), ("Wall", "WallMagnet3"),
     )}
@@ -3775,7 +3843,8 @@ if RUN_CHECKS:
     print(f"             SHARED: Ø8 D-shaft ({motor_flat_d:.1f} across the flat,"
           f" motor shaft), 2x 688ZZ,")
     print("             PER CUBE: printed dogs (4 male D5, 1 male D8, 1 female D8)")
-    print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2.")
+    print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2;")
+    print("             16x M3x10 countersunk DIN 7991 (walls to the decks).")
     print("             dowels ISO 8734: 2x 4x24 (A), 2x 4x40 (B), 1x 3x14 (ear),")
     print("             Ø2 dowels for the cardan's 8 cross pins (lengths: match stock),")
     print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
