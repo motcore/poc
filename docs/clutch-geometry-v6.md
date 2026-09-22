@@ -748,3 +748,139 @@ Notes as raised, not designs. Nothing here has been checked against the macro.
    it is anchored to spline and horn).
 6. **Inventory of materials and tools** needed to build one axis: purchased
    parts, pin stock, springs, screws, rubber, filament, drills, jigs.
+
+## 14. A self-energizing clutch — analysis (started 2026-09-22)
+
+**Why.** The user's original idea, from over twenty years ago: the torque itself
+should tighten the clutch, so that *a stronger motor means more torque*. Today it
+does not. The torque that passes is set by the servo's squeeze
+(T = μ·sin β·M, §8), about ten times the clutch servo's own torque. A slow motor
+with a lot of torque, which is how the user sees the central motor, cannot get
+that torque through. Everything below is a first analysis on paper; nothing has
+been modelled yet.
+
+### 14.1 Why v6 does not self-energize
+
+The contact force on the output cone has two parts, at a point
+P = (0, y_c, z_c) on the shared generatrix, a distance s̄ from the apex
+(y_c = s̄·cos β, z_c = ±s̄·sin β):
+
+- the **normal** force N, in the tilt plane (Y-Z). Its moment about the tilt
+  axis X is N·s̄, and that moment is what the actuation has to supply;
+- the **friction** force f = μN, along X. The motor cone's surface at P moves at
+  ω ẑ × P = (−ω·y_c, 0, 0), so the output cone is dragged toward −X, and **at
+  the same point for both motor cones**, because they turn the same way.
+
+The moment of f about the apex is P × (−f, 0, 0) = (0, −z_c·f, +y_c·f):
+
+- about **X**, the tilt axis: **zero**. Friction does nothing to the tilt, and
+  that is why there is no self-energizing today.
+- about **Y**, roughly the output axis: −z_c·f. This is the torque the load
+  takes. It changes sign between the upper and lower cone, as it should,
+  because the output reverses.
+- about **Z**, the motor axis: **+y_c·f = μ·N·s̄·cos β, the same sign for both
+  cones.** This is a yaw moment on the carriage. Today the four-bar and its X
+  shims take it and it goes nowhere.
+
+### 14.2 Mechanism A — let the carriage yaw about the motor axis, on a chevron
+
+Give the carriage a second rotation, **yaw ψ about Z through the apex**, and
+guide it so that yawing also tilts it further into whichever cone it is
+touching: dθ/dψ = +k on the upper branch and −k on the lower. The path is a
+"<" whose two branches meet at contact, and the free travel runs up to that
+point along ψ = 0.
+
+- **The apex does not move.** Every rotation about an axis through the apex
+  keeps it fixed, so the three cones keep one apex and still roll without
+  slip. Yaw only carries the contact line round the motor cone. The folded
+  cardan (§6) takes the small change of angle.
+- **Balance (virtual work along a branch, dθ = k·dψ):**
+  M_s·dθ + μN·s̄·cos β·dψ = N·s̄·dθ, which gives
+
+      N·s̄·(1 − G) = M_s      with   G = μ·cos β / k
+
+      T = μ·sin β·M_s / (1 − G)
+
+  The servo supplies only the fraction (1 − G) of the squeeze. The clutch
+  passes 1/(1 − G) times what it does today, **and the squeeze grows with the
+  torque asked for**, so a stronger motor pushes more torque through.
+- **Stability.** It needs G < 1. At G ≥ 1 the squeeze runs away on its own
+  once the cones touch, and releasing it would take a pull back proportional
+  to the torque being passed, which a small servo cannot give (§14.4). G moves
+  with μ, so k has to be set against the **largest** μ expected.
+
+With β = 33° (cos β = 0.839), G and the gain 1/(1 − G) come out as:
+
+| k | μ = 1.0 | μ = 1.3 | μ = 1.6 |
+|---|---|---|---|
+| 1.6 | 0.52 → ×2.1 | 0.68 → ×3.1 | 0.84 → ×6.2 |
+| **1.7** | **0.49 → ×2.0** | **0.64 → ×2.8** | **0.79 → ×4.8** |
+| 1.8 | 0.47 → ×1.9 | 0.61 → ×2.5 | 0.75 → ×3.9 |
+| 2.0 | 0.42 → ×1.7 | 0.55 → ×2.2 | 0.67 → ×3.0 |
+
+A first pick is **k ≈ 1.7**: G stays under 0.8 even at μ = 1.6, and the gain
+is ~×2.8 at the nominal μ = 1.3. The spread of the gain with μ (×2 to ×4.8)
+means the torque for a given servo angle depends on the state of the rubber.
+Torque control needs the AS5600 and a model of μ, or a closed loop on output
+speed.
+
+- **Overrun and braking.** If the load drives the output (lowering a limb,
+  braking a swing), the friction reverses, so does the yaw moment, and the
+  carriage is pushed back toward the vertex. The clutch is then *weaker*:
+  T = μ·sin β·M_s/(1 + G), ×0.61 at G = 0.64. It frees itself rather than
+  locking, like a freewheel, which is safe. But it means **the clutch cannot be
+  a strong brake**, so the fourth state (the brake/lock) still has to be its
+  own mechanism.
+- **Scale of the motion — the hard part.** The whole squeeze is
+  δφ ≈ 0.046° of tilt (contact 2.0°, preload 2.046°), so the yaw along a
+  branch is δψ = δφ/k ≈ 0.027°: **~0.02 mm at the carriage pivots' radius
+  (40.5)**. Any compliance or play in the guide that is not small against the
+  rubber's eats the ramp. Two things help:
+  - the yaw moment has **one sign** whenever the clutch drives, so the carriage
+    always leans on the same face of the guide, and the play there is taken up
+    rather than crossed (the X shims' ≤ 0.1 mm stops mattering in that
+    direction);
+  - the guide can be a **flexure**, with no pivot play at all.
+
+  The guide has to be stiff *compared with the rubber*, which is one more
+  reason to measure the rubber first.
+- **Actuation stays force-type.** Self-energizing needs the tilt free to follow
+  the ramp beyond where the servo put it. The series spring (§12d.1) already
+  makes the actuation a force source, not a position, so it fits. Its own
+  stiffness adds a small restoring term that lowers G slightly: a safe error.
+- **What it asks of the mechanism.** The four-bar today is planar: one degree
+  of freedom, tilt about X, with a virtual pivot. Mechanism A needs **two**,
+  tilt and yaw about a virtual spherical pivot at the apex, constrained to the
+  chevron. That is the real design work.
+
+### 14.3 Mechanism B — a V ball-ramp in the output drive
+
+The classic torque-sensing clutch: a ball-ramp with **V-shaped** grooves
+between the output cone and the cardan. Torque of either sign rides the balls
+up the V and pushes the cone along its own axis, toward the apex, pressing both
+contacts. It is a known, compact part and needs no new degree of freedom on the
+carriage. Its cost: moving the cone along its axis moves its apex. The squeeze
+(~0.2 mm normal) takes ~0.2/sin β ≈ 0.37 mm of axial travel, so an apex error
+of ~0.37 mm and ~1.6% micro-slip over the 23.4 mm band, against 0.60% for the
+four-bar's drift today (§5). That breaks invariant 2 a little. It has to be
+weighed against A's difficulty.
+
+### 14.4 Why G ≥ 1 cannot simply be "held by the servo"
+
+For G > 1 the balance is N·s̄·(1 − G) = M_s with (1 − G) < 0: holding a given
+squeeze needs the servo to **pull back** by (G − 1)·N·s̄. That grows with the
+torque being passed, so it is unbounded for a strong motor, and the
+equilibrium is unstable without active control. Drum brakes run high G (duo
+servo) but always below 1, and so must this.
+
+### 14.5 Next steps
+
+1. Measure μ (dry, dusty, damp) and the rubber's stiffness on a one-axis bench.
+   The same bench is needed for §10's open question anyway.
+2. Decide A or B. For A, sketch a two-DOF guide about a virtual spherical pivot
+   (flexures, or a four-bar with a skewed chevron cam), and check its
+   compliance against the rubber's.
+3. Model the chosen one in the macro: the yaw sweep, the branches and a check
+   on G at μ_max.
+4. Only then change the cube. The rest of it (column, walls, dogs, stacking,
+   screw actuation) is unaffected.
