@@ -366,7 +366,8 @@ guide_dx      = 8.5    # mm — the rod sits between the screw and the ear
 # a pocket in the coupler's base, its arms cut down to horn_arm_len tip to
 # tip: it drives the coupler by its shape and is FREE in Z in there, so the
 # servo never takes the screw's thrust. The coupler is gripped on the screw's
-# filed flat by a grub, and is the thrust stack's lower collar.
+# thread by a grub (nothing filed: bought parts stay as bought, user
+# 2026-09-22), and is the thrust stack's lower collar.
 horn_hub_d    = 7.0    # mm — the horn's hub (measured, roughly)
 horn_hub_h    = 4.0    # mm — its height
 horn_arm_t    = 2.0    # mm — the arms' thickness, flush with the hub's top
@@ -383,7 +384,6 @@ cpl_float     = 1.0    # mm — the pocket's roof above the horn: its Z play
 cpl_head_h    = 2.0    # mm — the horn screw's head (stock screw)
 cpl_top_z     = -6.4   # mm — the coupler's top face: the stack above it
                         #      ends 1 mm under the cage's lowest point (6.7)
-screw_flat    = 7.0    # mm — across the D, on the screw's end (filed, -Y)
 # The screw's THRUST stop (user, 2026-09-21): nothing may stand above the
 # ceiling (a cube can be stacked there) and the wall is 7.6 mm off the screw,
 # too close for any 8 mm-bore thrust bearing (Ø16). So a plate on the guide
@@ -559,10 +559,11 @@ out_brg_wall  = 3.0    # mm — material wall around the output shaft's bearing
                         #      length) is derived below, by the carriage
                         #      bearing block — it needs brg_w and brg_seat_lip,
                         #      not known yet here.
-shaft_flat_d  = 4.0    # mm — the Ø5 shafts are filed to a flat, leaving this
-                        #      across it; printed parts carry the matching D and
-                        #      the cardan's grub screws bear on it. Filing it is
-                        #      the one manual step the macro cannot check.
+shaft_flat_d  = 4.5    # mm — the Ø5 shafts are BOUGHT as D-shafts (user,
+                        #      2026-09-22: factory parts over modified ones),
+                        #      4.5 across the flat as they usually come — check
+                        #      the one bought; printed parts carry the matching
+                        #      D and the grub screws bear on it
 shaft_flat_clr = 0.25  # mm — how much the printed D is relieved off the flat
 
 # ── Frame ────────────────────────────────────────────────────────────────────
@@ -1070,7 +1071,7 @@ slip_fourbar  = abs(drift_preload[1]) / L_line   # same measure as v5's micro-sl
 # No X stack any more: the screw's nut pushes the ear straight, so the only
 # band left is the carriage arm's own, which the ear is part of.
 # The ear is bored into the block's own face, ear_pin_in deep.
-ear_pin_in = 8.0
+ear_pin_in = 8.6    # mm — so the pin is a stock 3 x 14 dowel (ISO 8734)
 ear_pin_out = 5.0   # mm — and this far into the carrier's slot
 x_ear = ((-carr_half, -carr_half + ear_pin_in) if ear_sx < 0
          else (carr_half - ear_pin_in, carr_half))
@@ -1321,8 +1322,8 @@ def _zspan(a, b, r_in, r_out):
 
 def make_motor_shaft():
     """The motor shaft: Ø8, from the input's female dog to the top's male
-    dog, a D filed at each end for their grubs. A plain steel rod, not a
-    hardened linear rod: that one cannot be filed."""
+    dog: a BOUGHT Ø8 D-shaft, whose flat takes every grub on it (dogs,
+    flanges, collar)."""
     z0 = _zb(_col_bottom()["base"][0] + 0.3)
     z1 = _col_top()["claws"][1] - 0.5
     return cyl(motor_shaft_d / 2.0, z1 - z0, v(0, 0, z0))
@@ -2104,23 +2105,18 @@ def make_coupler():
     body = body.cut(cyl(2.6, cpl_floor + 2.0,
                         v(screw_x, screw_y, top - 1.0), Z_AXIS))
     r = _screw_bore_r()
-    bore = cyl(r, c1 - cf + 1.0, v(screw_x, screw_y, cf), Z_AXIS)
-    y_flat = screw_y - (screw_flat - screw_d / 2.0) - 0.2
-    bore = bore.cut(Part.makeBox(2 * r + 2, y_flat - (screw_y - r - 1.0),
-                                 c1 - cf + 2.0,
-                                 v(screw_x - r - 1, screw_y - r - 1.0, cf - 0.5)))
-    body = body.cut(bore)
-    # the grub's tapped hole, square onto the flat
+    body = body.cut(cyl(r, c1 - cf + 1.0, v(screw_x, screw_y, cf), Z_AXIS))
+    # the grub's tapped hole, onto the screw's thread
     return body.cut(cyl(foot_tap_d / 2.0, cpl_d / 2.0 + 1.0,
                         v(screw_x, screw_y - cpl_d / 2.0 - 0.5, (cf + c1) / 2.0),
                         Y_AXIS))
 
 
 def make_coupler_grub():
-    """M3 grub: through the coupler's side onto the screw's flat."""
+    """M3 grub: through the coupler's side onto the screw's thread."""
     _, cf, c1 = _cpl_z()
     y0 = screw_y - cpl_d / 2.0 + 0.5
-    y1 = screw_y - (screw_flat - screw_d / 2.0)
+    y1 = screw_y - screw_d / 2.0
     return cyl(1.5, y1 - y0, v(screw_x, y0, (cf + c1) / 2.0), Y_AXIS)
 
 
@@ -2150,18 +2146,12 @@ def make_lock_collar():
 
 
 def make_screw_shaft():
-    """The lead screw itself: from the coupler's D bore, through the thrust
-    plate, past the nut's whole travel and up into its top bearing. Its
-    bottom end has a flat filed on it, on the -Y side."""
+    """The lead screw itself: from inside the coupler, through the thrust
+    plate, past the nut's whole travel and up into its top bearing."""
     _, cf, c1 = _cpl_z()
     z0 = cf + 0.5
     z1 = cube_half - 0.5
-    sh = cyl(screw_d / 2.0, z1 - z0, v(screw_x, screw_y, z0), Z_AXIS)
-    y_flat = screw_y - (screw_flat - screw_d / 2.0)
-    return sh.cut(Part.makeBox(screw_d + 2, y_flat - (screw_y - screw_d / 2.0 - 1.0),
-                               c1 - z0 + 1.5,
-                               v(screw_x - screw_d / 2.0 - 1,
-                                 screw_y - screw_d / 2.0 - 1.0, z0 - 1.0)))
+    return cyl(screw_d / 2.0, z1 - z0, v(screw_x, screw_y, z0), Z_AXIS)
 
 
 def make_screw_top():
@@ -2768,8 +2758,11 @@ def moving_parts(st):
     if key in _MOVING_CACHE:
         return _MOVING_CACHE[key]
     out = [(n, place_carriage(sh, st), c, t) for n, sh, c, t in CARRIAGE_REST]
-    pin_reach = link_x + link_t / 2.0 + 1.0
-    pin_reach_b = carr_half - 0.5
+    # Stock ISO 8734 dowels, 4 x 24 at A and 4 x 40 at B (user, 2026-09-22:
+    # bought parts as they come, nothing cut to length).
+    pin_reach = 24.0 / 2.0
+    pin_reach_b = 40.0 / 2.0
+    assert pin_reach > link_x + link_t / 2.0 and pin_reach_b < carr_half
     for zs, A, B in ((1, A1, st["B1"]), (-1, A2, st["B2"])):
         tag = "T" if zs > 0 else "B"
         out.append((f"Link{tag}", make_link(A, B), _LINK_COL, 0))
@@ -3707,21 +3700,27 @@ if RUN_CHECKS:
     print("           the screw's top bearing and the guide rod's foot.")
     print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
     print("            its own corner under the ceiling.")
-    print(f"  The cardan's fork is keyed on the output shaft by a D on a filed flat"
-          f" ({shaft_flat_d:.1f} mm across);")
-    print("  Filing the flat is the one manual step here.")
+    print(f"  The cardan's fork is keyed on the output shaft's factory D"
+          f" ({shaft_flat_d:.1f} mm across).")
+    _len = lambda sh, ax: getattr(sh.BoundBox, ax + "Length")
+    print(f"  LENGTHS to buy cut (or the next stock length up, if it fits):"
+          f" motor D8 {_len(make_motor_shaft(), 'Z'):.0f},"
+          f" output D5 {_len(make_output_shaft(), 'Y'):.0f},"
+          f" T8 {_len(make_screw_shaft(), 'Z'):.0f}, guide Ø4 {_len(make_guide_rod(), 'Z'):.0f} mm")
+    print("  MODIFIED bought parts (all else as bought): the servo horn's arms,"
+          f" cut to {horn_arm_len:.0f} mm tip to tip.")
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
-    print("             Ø5 rod (output shaft),")
-    print(f"             SHARED: Ø8 plain steel rod (NOT a hardened linear rod: it"
-          f" gets two filed flats) ~{_col_top()['claws'][1] + _face():.0f} mm,")
+    print("             Ø5 D-shaft (output shaft),")
+    print("             SHARED: Ø8 D-shaft (motor shaft),")
     print("             2x 688ZZ, 1x Ø8 shaft collar,")
     print("             2x rigid flange couplings Ø8 (+ 8x M3x10), for the motor cones,")
     print("             PER CUBE: printed dogs (4 male D5, 1 male D8, 1 female D8)")
     print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2.")
-    print("             Ø4 pin stock (4 pivot pins), Ø2 pin stock (8 cross pins),")
+    print("             dowels ISO 8734: 2x 4x24 (A), 2x 4x40 (B), 1x 3x14 (ear),")
+    print("             Ø2 dowels for the cardan's 8 cross pins (lengths: match stock),")
     print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
           f" {screw_top_z - (-cube_half + servo_body[0]):.0f} mm of it) + its nut,")
-    print(f"             Ø{guide_d:.0f} rod for the guide, Ø3 pin stock (1 ear pin),")
+    print(f"             Ø{guide_d:.0f} rod for the guide,")
     print(f"             8 shim washers 4x8 (0.1-0.5) for the four-bar's thrust faces,")
     print(f"             1 compression spring ~{_k_lin:.0f} N/mm,"
           f" 1 T8 lock collar, 2 PTFE washers 8x12x1, 1 M3 grub,")
