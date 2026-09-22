@@ -92,11 +92,15 @@ Read that before proposing changes. Summary:
   ~0.11° error. Intermediate length changes 0.25 mm → slotted pin holes. Doc §6.
 - **Four-bar**: link rays at 45°, frame pivots r 55 on the wall, carriage pivots
   r 40.5, links 14.5 mm. Apex drift 0.187 mm at preload, 0.60% slip. Doc §5.
-- **Actuation**: servo under the ceiling in the axis' own corner → torsion
-  spring (no preload) → horn r 9.04 → lever 8/3.8 → link → ear on the carriage's
-  +X arm. The servo turns ±80°: 20° to contact, the other 60° wind the spring,
-  and spring torque sets the squeeze. The chain stacks back inboard under the
-  servo's face. Doc §7.
+- **Actuation (lead screw, doc §12d and §15)**: MG90D standing on the floor in
+  the axis' own corner → its double horn (cut to 11 mm) keyed in a printed
+  coupler, free in Z → T8 lead screw (lead 8), gripped on its thread → brass
+  rectangular-flange nut on the spring cage, which slides on a Ø4 guide rod →
+  a floating carrier between two spring stacks (series spring) → Ø3×14 ear pin
+  pressed into the carriage block's −X face. The screw's thrust stops at the
+  guide rod's foot (coupler | PTFE | plate | PTFE | lock collar); the servo
+  takes torque only. ±80°: ~59° closes the gap, the rest compresses the spring.
+  34 N at the ear at 60% of stall.
 - **Further out is not more leverage.** Servo torque × servo angle = carriage
   moment × tilt; the tilt is fixed, so the push point is chosen for packaging.
 
@@ -128,10 +132,10 @@ at the band's outer end; preload stop 2.375°.
 | **s₀** | 10 mm | apex → start of the contact line |
 | **four-bar** | 45°, r 55 / 40.5, link 14.5 | link rays, frame / carriage pivot radii |
 | **cardan** | crosses y 26 / 40 | solid cross (output axis) / ring cross (cone axis) |
-| **servo sweep** | ±80° (20 + 60) | to contact + spring wind |
-| **lever** | 8.0 / 3.8 | 2.1:1; horn radius 9.04 derived from it |
-| **ear** | y 42.9 | the moment arm of the vertical push |
-| **cube** | 106.4 mm | outside, set by the servo case under the ceiling |
+| **servo sweep** | ±80° (~59 + 21) | to contact + spring compression |
+| **lead screw** | T8, lead 8, η 0.5 | + PTFE thrust washer friction |
+| **ear** | y 38 | the moment arm of the vertical push |
+| **cube** | 106.1 mm, 4 mm faces | a CUBE (user); decks stiffened by 12 mm ribs |
 
 Derived at defaults (macro):
 
@@ -144,7 +148,8 @@ Derived at defaults (macro):
 | residual apex drift from the four-bar | 0.187 mm at preload = 0.60% slip |
 | cardan residual angle error | ~0.11° |
 | normal force per N on the ear (y_ear / s̄, s̄ = 29.4) | **×1.46** — force, NOT torque |
-| output torque per N on the ear | ≈ 0.030 Nm/N; ~1.0 Nm at the spring's 34 N **(upper bound)** |
+| output torque per N on the ear | ≈ 0.027 Nm/N; ~0.92 Nm at 34 N **(upper bound, μ 1.3)** |
+| cube input (printed female dog) | ~1.1 Nm at the motor shaft: the whole cube's torque cap |
 
 ---
 
@@ -179,7 +184,7 @@ T_out       = μ · F · lever · sin β        lever = y of the ear: the ear li
 
 Set by the preload between rubber layers, μ ≈ 1.2–1.5 (rubber on rubber). It is
 also a **per-axis torque limiter**: it slips above the preload-set threshold, and
-the preload is set by servo angle against the torsion spring, so each axis caps
+the preload is set by servo angle against the series spring, so each axis caps
 its own slip torque. Slipping also makes the joint back-drivable, which the
 passive-dynamics goal wants.
 
@@ -238,16 +243,24 @@ passive-dynamics goal wants.
   bench, every torque figure here is an estimate. It decides the spring, the
   servo and whether the cones must grow.
 - **Spring rate, and how the extra travel splits between spring and rubber.**
-  The torsion spring (2.4 N·mm/°) is sized to the servo, not the rubber;
-  `spring_ratio` = 15 is invented.
+  The two spring stacks (~72 N/mm, Ø11/Ø5) are sized to the servo, not the
+  rubber; `spring_ratio` = 15 is invented. No catalogue part chosen yet.
+- **Self-energizing clutch (doc §14) — the project's original idea.** Today the
+  torque that passes is set by the servo's squeeze, so a stronger motor does
+  NOT give more torque. A chevron-guided yaw of the carriage about the apex
+  would make the torque tighten the clutch (G = μ·cos β/k, keep G < 0.8 at
+  μ_max). Not designed yet.
+- **The fourth state: a brake / lock.** Free, forward and back exist; holding
+  a pose under load does not (the clutch would slip). Needed by the walker.
+- **Cube-to-cube torque.** The printed female dog caps each cube at ~1.1 Nm at
+  its input; a column of cubes on the motor axis needs ~5–6 Nm.
 - **How the rubber layer is made.** A cone unrolls into a flat sector, so a cut
   sheet can be wrapped on — untested (adhesive, seam, uniformity).
 - **Sizing**: the layout is settled and the macro checks every pair of parts at
   every stop, sweeps the links, the cardan and the actuation chain as
   distances, and checks each axis against all three neighbours — but nothing has
   been loaded, FEA'd or printed. Weakest-looking: the printed ring cross, the
-  output shaft's reach to the fork, the lever post (printed as part of the
-  ceiling) hanging from it.
+  output shaft's reach to the fork, the printed input dog.
   Building the cardan (not print-in-place; pins pressed into the crosses, free in
   the parts round them; Ø1.9 / Ø2.1 drills) and printing the carriage (wall-side
   face on the bed, the ring's extension is the bearing's stop): doc §6.
@@ -301,7 +314,7 @@ passive-dynamics goal wants.
 | File | Purpose |
 |------|---------|
 | `docs/clutch-geometry-v6.md` | **v6 design — the source of truth.** Geometry, actuation, rejected alternatives, open questions, next steps |
-| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **the v6 assembly**. Run it headless (`freecadcmd`) and read its report: 28 numeric checks, the four-bar's measured drift, the cardan's bends, the actuation chain, the cube's driver, and the printed/purchased lists |
+| `cad/motcore_v6_apex_pivot.py` | FreeCAD macro — **the v6 assembly**. Run it headless (`freecadcmd`) and read its report: 31 numeric checks, the four-bar's measured drift, the cardan's bends, the actuation chain, the cube's driver, and the printed/purchased lists |
 | `cad/motcore_v6_flat_pattern.svg` | 1:1 cutting template for the rubber bands, regenerated by the macro on every run |
 | `cad/motcore_v5_vertical_clutch.py` | FreeCAD macro — v5, superseded. Still the best reference for cone solids, FDM hole compensation, gear helpers and the self-check scaffolding |
 | `cad/clutch_geometry_v6.html` | Interactive 2D visualiser for v6 — **STALE** (telescopic link, gear front view); update before publishing |
@@ -313,6 +326,7 @@ passive-dynamics goal wants.
 | `cad/motcore_plates.py`       | FreeCAD macro — bevel cone design (superseded) |
 | `cad/motcore_animate.py`      | FreeCAD macro — bevel cone animation (superseded) |
 | `cad/calibration.py`          | FreeCAD macro — FDM tolerance calibration coupon |
+| `docs/bom-v6.md`              | Bill of materials for one cube, bought and printed, and what to measure on arrival |
 | `docs/build-log.md`           | Prototype build log — purchases, prints, calibrations, tests |
 | `docs/clutch-geometry.md`     | v5 clutch geometry notes (superseded by the v6 doc) |
 | `docs/design-evolution.md`    | History of all generations |

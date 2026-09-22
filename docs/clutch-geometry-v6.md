@@ -884,3 +884,80 @@ servo) but always below 1, and so must this.
    on G at μ_max.
 4. Only then change the cube. The rest of it (column, walls, dogs, stacking,
    screw actuation) is unaffected.
+
+## 15. What gets built — state at 2026-09-22
+
+The cube as it stands in the macro (31 checks green), to be built as is while
+§14 is investigated. It supersedes the actuation in §7 and the cube sizes in
+§12. The parts to buy are in `docs/bom-v6.md`.
+
+### 15.1 Actuation, one axis
+
+1. **Servo.** An MG90D stands on the floor in the axis' own corner, shaft up.
+   Its cradle is printed with the wall and has a cable pocket on the shaft
+   end, open toward the motor.
+2. **Horn and coupler.** The servo's double horn, its arms cut to 11 mm tip to
+   tip (the coupler sweeps ±80° and the wall is 7.6 mm off the axis), sits in
+   a pocket in the printed coupler. It drives by its shape and is **free in
+   Z**, so the servo never takes thrust. Its own M2.5 screw holds it on the
+   spline, through the coupler's floor.
+3. **Lead screw.** A T8, lead 8 (4 starts), gripped on its thread by the
+   coupler's M3 grub. It is guided at the top by the ceiling's screw-top post
+   and at the bottom by the thrust plate.
+4. **Thrust stop.** The guide rod's foot runs on round the screw as a 4 mm
+   plate: coupler | PTFE 8×12×1 | plate | PTFE | T8 lock collar. It stops both
+   directions, and the washer's friction (~0.03 Nm) is counted in the force.
+5. **Nut and cage.** The CESFONJER kit's rectangular-flange brass nut (22 ×
+   10.5 × 4, 2× M3×10) is screwed on top of the spring cage. The cage slides on
+   the Ø4 guide rod, which stops it turning.
+6. **Series spring.** Inside the cage a carrier floats on the rod between two
+   spring stacks (Ø11/Ø5, ~72 N/mm, part not chosen). The carrier is one block
+   from the rod to the carriage.
+7. **Ear.** A Ø3×14 dowel pressed 8.6 mm into the carriage block's −X face runs
+   5 mm into the carrier's blind slot, free in Y (it swallows the ear's arc)
+   and tight in Z (the load path).
+
+The servo turns ±80°. About 59° close the free gap (1.3 mm of nut travel) and
+the rest compresses the spring 0.48 mm. With 60% of the MG90D's 0.18 Nm
+(derated for cheap servos and supply sag), the force at the ear is **34 N**:
+1.30 Nm about the apex, an output torque ceiling of **~0.92 Nm** at μ = 1.3.
+The lead screw almost holds itself (back-driving ~0.01 Nm, less than the
+washer's friction), so the servo spends torque on moving, not holding.
+
+### 15.2 The central column
+
+- **Shaft.** A bought Ø8 D-shaft (7.5 across the flat), 105 mm, on two 688ZZ.
+  Each bearing sits on a 1 mm lip just inside its deck's dog hole; the bottom
+  one stands in a boss.
+- **Cones.** Each motor cone is keyed on the flat by its own printed D bore,
+  tip to base. No flanges.
+- **Spacers.** A printed spacer from each cone's base to its bearing's inner
+  race takes that cone's thrust. The contact only ever pushes a cone away
+  from the apex, so this stop carries the load by bearing on it, not by a
+  grub's friction. The spacers' lengths set the cones' height, and so the
+  apex: print them to length or shim them.
+
+### 15.3 Cube to cube
+
+- **Faces.** Five identical male outputs (top and the four walls) and one
+  female input (bottom). Every face also carries a 34×3 square spigot or its
+  socket, which centres the cubes and carries the reaction torque in 90°
+  steps, and four N52 10×2 magnets at (±40, ±40). A hard knock pulls the cubes
+  apart, which is wanted.
+- **Dogs.** Printed parts keyed on the shafts' D by an M3 grub:
+  - the male has three 44° claws with narrowed tips and a core;
+  - the female has three claws and a free middle;
+  - a TPU spider has six arms and an outer ring.
+  
+  The input dog carries ~1.1 Nm, and that caps the whole cube. Its grub is
+  tightened on the bench, and the shaft goes in from below with the dog on it.
+
+### 15.4 The case
+
+A **106.1 mm cube** with 4 mm faces, grown back from the 122 mm version. The
+decks get their stiffness from four 12 mm ribs, one in each axis' plane, from
+the bearing boss to the four-bar posts' pads. The ribs clear the links by
+~3.5 mm over the stroke and bend ~0.007 mm with all four axes on one cone.
+Each wall is held by 4 M3×10 countersunk screws from outside, two into the
+ceiling and two into the floor (16 in all), so the stacking faces stay flat.
+The whole cube weighs **~1.0–1.15 kg** by the model, without the central motor.

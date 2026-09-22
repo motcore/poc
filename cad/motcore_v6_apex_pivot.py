@@ -3821,14 +3821,15 @@ if RUN_CHECKS:
     print(f"  CUBE side {2 * cube_out:.1f} mm"
           f"  (half {cube_half:.1f} inside + {wall_thick:.1f} wall),"
           f" HEIGHT {2 * (cube_half + deck_t):.1f} mm (decks {deck_t:.0f})")
-    print("  PRINTED: MotorCone x2 (same part, flipped), the shaft's 2 spacers, OutputCone (a SHELL),")
-    print("           Carriage (one piece),")
-    print("           UJMid, UJRing, UJCross, UJFork,")
-    print("           Link x2 (each carries both its arms), the nut's pusher")
-    print("           WITH THE WALL: the two frame posts, the servo's bracket,")
-    print("           the screw's top bearing and the guide rod's foot.")
-    print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo in")
-    print("            its own corner under the ceiling.")
+    print("  PRINTED, per cube: MotorCone x2 (same part, flipped), the shaft's 2 spacers,")
+    print("           Wall x4 (with the servo cradle and the guide rod's foot/thrust plate),")
+    print("           DeckTop (with the 4 screw top posts and ribs), DeckBottom (ribs),")
+    print("           6 dogs (4 male D5, 1 male D8, 1 female D8) + 1 spider (TPU);")
+    print("           per axis: OutputCone (a SHELL), Carriage, UJMid, UJRing, UJCross,")
+    print("           UJFork, Link x2, FramePost x2 (screwed to the decks), the spring")
+    print("           cage, the spring carrier, the servo-screw coupler.")
+    print("  ASSEMBLY: all four axes identical, rotated about the motor; each servo")
+    print("            standing on the floor in its own corner.")
     print(f"  The cardan's fork is keyed on the output shaft's factory D"
           f" ({shaft_d / 2.0 + shaft_flat_d / 2.0:.1f} mm across).")
     _len = lambda sh, ax: getattr(sh.BoundBox, ax + "Length")
@@ -3839,21 +3840,21 @@ if RUN_CHECKS:
     print("  MODIFIED bought parts (all else as bought): the servo horn's arms,"
           f" cut to {horn_arm_len:.0f} mm tip to tip.")
     print("  PURCHASED, per axis: 1x 6805 (cone), 2x MR105ZZ (output shaft),")
-    print("             Ø5 D-shaft (output shaft),")
+    print("             Ø5 D-shaft (output shaft), servo MG90D (its double horn, its")
+    print("             horn screw, its 2 tab screws), T8 lead screw lead"
+          f" {screw_lead:.0f} + its rectangular-flange nut,")
+    print(f"             2x M3x10 (nut flange), Ø{guide_d:.0f} rod (guide),"
+          f" 2 spring stacks ~{_k_lin:.0f} N/mm (Ø{spr_od:.0f}/Ø{spr_id:.0f}),")
+    print("             1 T8 lock collar, 2 PTFE washers 8x12x1, 1 M3 grub (coupler),")
+    print("             dowels ISO 8734: 2x 4x24 (A), 2x 4x40 (B), 1x 3x14 (ear),")
+    print("             8x Ø2 dowels (cardan cross pins; lengths: match stock),")
+    print("             8 shim washers DIN 988 4x8 (0.1-0.5, four-bar thrust faces),")
+    print(f"             4x M3x{fp_deck_len:.0f} (frame posts, from outside the decks).")
     print(f"             SHARED: Ø8 D-shaft ({motor_flat_d:.1f} across the flat,"
           f" motor shaft), 2x 688ZZ,")
-    print("             PER CUBE: printed dogs (4 male D5, 1 male D8, 1 female D8)")
-    print("             + a TPU spider, 6x M3 grubs; 24 disc magnets N52 10x2;")
-    print("             16x M3x10 countersunk DIN 7991 (walls to the decks).")
-    print("             dowels ISO 8734: 2x 4x24 (A), 2x 4x40 (B), 1x 3x14 (ear),")
-    print("             Ø2 dowels for the cardan's 8 cross pins (lengths: match stock),")
-    print(f"             T8 lead screw, lead {screw_lead:.0f} (about"
-          f" {screw_top_z - (-cube_half + servo_body[0]):.0f} mm of it) + its nut,")
-    print(f"             Ø{guide_d:.0f} rod for the guide,")
-    print(f"             8 shim washers 4x8 (0.1-0.5) for the four-bar's thrust faces,")
-    print(f"             1 compression spring ~{_k_lin:.0f} N/mm,"
-          f" 1 T8 lock collar, 2 PTFE washers 8x12x1, 1 M3 grub,")
-    print("             2x M2x6 for the servo tabs, rubber sheet, servo.")
+    print("             6x M3 grubs (dogs), 24 disc magnets N52 10x2,")
+    print("             16x M3x10 countersunk DIN 7991 (walls to the decks),")
+    print("             rubber sheet (6 bands: 2 motor cones, 4 output cones).")
     print(f"  FDM holes (this printer runs ~0.5 under): shaft Ø{fdm_shaft_hole_d:.1f}"
           f"  pin Ø{fdm_pin_hole_d:.1f}  bearing seat Ø{brg_od + 2*brg_fit_press:.1f}")
     print("=" * 72)
